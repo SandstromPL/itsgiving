@@ -1,6 +1,6 @@
 import type { FetchLike } from "../qloo";
 import { BASE_KEYWORDS, sanitizeSchema } from "./schema";
-import { LlmError, classifyHttpStatus, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
+import { LlmError, classifyHttpStatus, retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
 
 // Groq's OpenAI-compatible chat completions. Shapes checked against
 // https://console.groq.com/docs/structured-outputs and /docs/reasoning on
@@ -20,8 +20,8 @@ interface GroqResponse {
 
 export function groqProvider(options: { apiKey: string; model: string; fetch?: FetchLike; baseUrl?: string }): LlmProvider {
   const { apiKey, model } = options;
-  const fail = (kind: LlmError["kind"], message: string, status?: number) =>
-    new LlmError({ kind, message: `Groq ${model}: ${message}`, provider: "groq", model, status });
+  const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
+    new LlmError({ kind, message: `Groq ${model}: ${message}`, provider: "groq", model, status, retryAfterMs });
 
   return {
     kind: "groq",
@@ -59,7 +59,12 @@ export function groqProvider(options: { apiKey: string; model: string; fetch?: F
         const kind = classifyHttpStatus(response.status);
         // A best-effort schema miss also comes back as 400; treat it as bad output, not a bad request.
         const schemaMiss = kind === "bad_request" && /schema|json_validate/i.test(`${reason} ${json.error?.code ?? ""}`);
-        throw fail(schemaMiss ? "invalid_output" : kind, `HTTP ${response.status}${reason ? `: ${reason}` : ""}`, response.status);
+        throw fail(
+          schemaMiss ? "invalid_output" : kind,
+          `HTTP ${response.status}${reason ? `: ${reason}` : ""}`,
+          response.status,
+          retryAfterHeader(response.headers.get("retry-after")),
+        );
       }
 
       const choice = json.choices?.[0];

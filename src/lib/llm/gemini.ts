@@ -1,6 +1,6 @@
 import type { FetchLike } from "../qloo";
 import { GEMINI_KEYWORDS, sanitizeSchema } from "./schema";
-import { LlmError, classifyHttpStatus, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
+import { LlmError, classifyHttpStatus, retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
 
 // Gemini through Google AI Studio, REST generateContent. Shapes checked against
 // https://ai.google.dev/api/generate-content (GenerationConfig, ThinkingConfig)
@@ -23,13 +23,20 @@ interface GeminiResponse {
   candidates?: { content?: { parts?: GeminiPart[] }; finishReason?: string }[];
   promptFeedback?: { blockReason?: string };
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
-  error?: { message?: string; status?: string };
+  error?: { message?: string; status?: string; details?: { "@type"?: string; retryDelay?: string }[] };
+}
+
+/** Gemini puts the wait in error.details[].retryDelay ("33s") rather than a header. */
+function retryDelayMs(json: GeminiResponse, header: string | null): number | undefined {
+  const delay = json.error?.details?.find((d) => d["@type"]?.endsWith("RetryInfo"))?.retryDelay;
+  const seconds = delay ? Number.parseFloat(delay) : Number.NaN;
+  return Number.isFinite(seconds) ? seconds * 1000 : retryAfterHeader(header);
 }
 
 export function geminiProvider(options: { apiKey: string; model: string; fetch?: FetchLike; baseUrl?: string }): LlmProvider {
   const { apiKey, model } = options;
-  const fail = (kind: LlmError["kind"], message: string, status?: number) =>
-    new LlmError({ kind, message: `Gemini ${model}: ${message}`, provider: "gemini", model, status });
+  const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
+    new LlmError({ kind, message: `Gemini ${model}: ${message}`, provider: "gemini", model, status, retryAfterMs });
 
   return {
     kind: "gemini",
@@ -61,7 +68,12 @@ export function geminiProvider(options: { apiKey: string; model: string; fetch?:
       }
       if (!response.ok) {
         const reason = json.error?.message ?? raw.slice(0, 200);
-        throw fail(classifyHttpStatus(response.status), `HTTP ${response.status}${reason ? `: ${reason}` : ""}`, response.status);
+        throw fail(
+          classifyHttpStatus(response.status),
+          `HTTP ${response.status}${reason ? `: ${reason}` : ""}`,
+          response.status,
+          retryDelayMs(json, response.headers.get("retry-after")),
+        );
       }
 
       if (json.promptFeedback?.blockReason) throw fail("blocked", `prompt blocked (${json.promptFeedback.blockReason})`);

@@ -1,14 +1,24 @@
 import { z } from "zod";
-import { DailyBudget, createProviders, llmConfigFromEnv, mockProvider, type LlmMode } from "./config";
+import { COOLDOWN_MS, Cooldowns, DailyBudget, createProviders, llmConfigFromEnv, mockProvider, type LlmMode } from "./config";
 import { toJsonSchema } from "./schema";
-import { LlmError, type Effort, type LlmCall, type LlmErrorKind, type LlmProvider, type LlmProviderKind } from "./types";
+import {
+  LlmError,
+  type Effort,
+  type LlmCall,
+  type LlmErrorKind,
+  type LlmProvider,
+  type LlmProviderKind,
+  type SkipReason,
+} from "./types";
 
 export interface LlmDeps {
   mode: LlmMode;
   /** Real providers in fallback order; the mock is always tried last. */
   providers: LlmProvider[];
   budget: DailyBudget;
+  /** Longest a single call may take; the deadline can make it shorter. */
   timeoutMs: number;
+  cooldowns: Cooldowns;
 }
 
 export interface GenerateJsonOptions<T> {
@@ -22,6 +32,8 @@ export interface GenerateJsonOptions<T> {
   effort?: Effort;
   maxOutputTokens?: number;
   signal?: AbortSignal;
+  /** Epoch ms by which a result is needed; real providers are skipped once too little time is left. */
+  deadline?: number;
 }
 
 export type AttemptOutcome = "ok" | "repaired" | "invalid" | "error" | "skipped";
@@ -30,7 +42,7 @@ export interface LlmAttempt {
   provider: LlmProviderKind;
   model: string;
   outcome: AttemptOutcome;
-  kind?: LlmErrorKind | "daily_cap";
+  kind?: LlmErrorKind | SkipReason;
   message?: string;
   ms: number;
 }
@@ -51,9 +63,12 @@ export interface LlmResult<T> {
   degraded: boolean;
 }
 
+/** Below this, starting a real call is pointless: it can't finish in time. */
+export const MIN_CALL_MS = 3_000;
+
 let shared: LlmDeps | undefined;
 
-/** Process-wide providers and daily budget, built from the environment once. */
+/** Process-wide providers, daily budget and cooldowns, built from the environment once. */
 export function getLlm(): LlmDeps {
   if (!shared) {
     const config = llmConfigFromEnv();
@@ -62,6 +77,7 @@ export function getLlm(): LlmDeps {
       providers: createProviders(config),
       budget: new DailyBudget(config.dailyCap),
       timeoutMs: config.timeoutMs,
+      cooldowns: new Cooldowns(),
     };
   }
   return shared;
@@ -109,10 +125,12 @@ function abortError(provider: LlmProvider): LlmError {
 /**
  * Ask for JSON matching `schema`: try each provider in order, give each one
  * repair retry when its output fails validation, and fall through on 429, 5xx,
- * timeouts and invalid output. The labelled mock is always the last resort.
+ * timeouts and invalid output. Providers that just failed rest for a while,
+ * and no call outlives the deadline. The labelled mock is always the last resort.
  */
 export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: LlmDeps = getLlm()): Promise<LlmResult<T>> {
   const signal = options.signal ?? new AbortController().signal;
+  const deadline = options.deadline ?? Number.POSITIVE_INFINITY;
   const schema = toJsonSchema(options.schema);
   const attempts: LlmAttempt[] = [];
   let calls = 0;
@@ -120,10 +138,28 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
 
   for (const provider of chain) {
     const isMock = provider.kind === "mock";
+    const started = Date.now();
+    const record = (outcome: AttemptOutcome, extra: Partial<LlmAttempt> = {}) =>
+      attempts.push({ provider: provider.kind, model: provider.model, outcome, ms: Date.now() - started, ...extra });
 
-    const run = async (prompt: string): Promise<string> => {
+    /** Checks cooldown, deadline and the daily cap; returns the time this call may take, or null to skip. */
+    const admit = (): number | null => {
+      if (isMock) return deps.timeoutMs;
+      const skip = (kind: SkipReason, message: string) => {
+        record("skipped", { kind, message });
+        return null;
+      };
+      if (deps.cooldowns.active(provider)) return skip("cooldown", "Failed recently; resting.");
+      const left = deadline - Date.now();
+      if (left < MIN_CALL_MS) return skip("deadline", `Only ${Math.max(left, 0)} ms left for this step.`);
+      if (!deps.budget.take()) return skip("daily_cap", "Daily LLM call cap reached.");
+      calls += 1;
+      return Math.min(deps.timeoutMs, left);
+    };
+
+    const run = async (prompt: string, timeoutMs: number): Promise<string> => {
       if (signal.aborted) throw abortError(provider);
-      const timeout = AbortSignal.timeout(deps.timeoutMs);
+      const timeout = AbortSignal.timeout(timeoutMs);
       const call: LlmCall = {
         system: options.system,
         prompt,
@@ -142,30 +178,17 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
         const timedOut = timeout.aborted || (err instanceof Error && err.name === "TimeoutError");
         throw new LlmError({
           kind: timedOut ? "timeout" : "network",
-          message: `${provider.kind} ${provider.model}: ${timedOut ? `no reply within ${deps.timeoutMs} ms` : err instanceof Error ? err.message : String(err)}`,
+          message: `${provider.kind} ${provider.model}: ${timedOut ? `no reply within ${timeoutMs} ms` : err instanceof Error ? err.message : String(err)}`,
           provider: provider.kind,
           model: provider.model,
         });
       }
     };
 
-    const spend = (): boolean => {
-      if (isMock) return true;
-      if (!deps.budget.take()) {
-        attempts.push({ provider: provider.kind, model: provider.model, outcome: "skipped", kind: "daily_cap", message: "Daily LLM call cap reached.", ms: 0 });
-        return false;
-      }
-      calls += 1;
-      return true;
-    };
-
-    const started = Date.now();
-    const record = (outcome: AttemptOutcome, extra: Partial<LlmAttempt> = {}) =>
-      attempts.push({ provider: provider.kind, model: provider.model, outcome, ms: Date.now() - started, ...extra });
-
     try {
-      if (!spend()) continue;
-      const first = await run(options.prompt);
+      const firstBudget = admit();
+      if (firstBudget === null) continue;
+      const first = await run(options.prompt, firstBudget);
       const firstCheck = check(options.schema, first);
       if (firstCheck.ok) {
         record("ok");
@@ -173,8 +196,9 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
       }
       if (isMock) throw new Error(`Mock output for "${options.name}" does not match its schema: ${firstCheck.problem}`);
 
-      if (!spend()) continue;
-      const second = await run(repairPrompt(options.prompt, first, firstCheck.problem));
+      const secondBudget = admit();
+      if (secondBudget === null) continue;
+      const second = await run(repairPrompt(options.prompt, first, firstCheck.problem), secondBudget);
       const secondCheck = check(options.schema, second);
       if (secondCheck.ok) {
         record("repaired");
@@ -184,6 +208,8 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
     } catch (err) {
       if (!(err instanceof LlmError)) throw err;
       if (err.kind === "aborted") throw err;
+      const rest = COOLDOWN_MS[err.kind];
+      if (rest !== undefined) deps.cooldowns.trip(provider, Math.max(rest, err.retryAfterMs ?? 0));
       record("error", { kind: err.kind, message: err.message.slice(0, 300) });
     }
   }

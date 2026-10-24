@@ -1,6 +1,7 @@
 "use client";
 
 import type { LlmTrace, StepEvent, StepStatus } from "@/lib/agent/types";
+import { describeKind } from "@/lib/llm/types";
 import type { Provenance } from "@/lib/qloo/client";
 import { Tape } from "./parts";
 
@@ -72,7 +73,7 @@ function LlmLine({ trace }: { trace: LlmTrace }) {
       {tried.length > 0 && (
         <p className="text-faint">
           Fell back past{" "}
-          {tried.map((a) => `${a.model} (${(a.kind ?? a.outcome).replace("_", " ")})`).join(", ")}
+          {tried.map((a) => `${a.model} (${a.kind ? describeKind(a.kind) : a.outcome})`).join(", ")}
         </p>
       )}
     </div>

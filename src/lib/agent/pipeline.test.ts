@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
+import { Cooldowns, DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
 import { createQlooClient } from "../qloo";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
@@ -10,7 +10,7 @@ import type { AgentEvent, StepEvent } from "./types";
 import { writeSchema, type WriteContext } from "./write";
 
 const qloo = () => createQlooClient({ mode: "mock", baseUrl: "https://mock.qloo.invalid" });
-const mockLlm = (): LlmDeps => ({ mode: "mock", providers: [], budget: new DailyBudget(100), timeoutMs: 1000 });
+const mockLlm = (): LlmDeps => ({ mode: "mock", providers: [], budget: new DailyBudget(100), timeoutMs: 1000, cooldowns: new Cooldowns() });
 
 const brief = (input: BriefInput) => normalizeBrief(briefSchema.parse(input));
 
@@ -44,7 +44,13 @@ function scriptedProvider(script: Partial<Record<string, (mock: Record<string, u
   return { provider, seen };
 }
 
-const liveWith = (...providers: LlmProvider[]): LlmDeps => ({ mode: "live", providers, budget: new DailyBudget(100), timeoutMs: 1000 });
+const liveWith = (...providers: LlmProvider[]): LlmDeps => ({
+  mode: "live",
+  providers,
+  budget: new DailyBudget(100),
+  timeoutMs: 1000,
+  cooldowns: new Cooldowns(),
+});
 
 describe("runPipeline (mock Qloo, mock LLM)", () => {
   it("builds a labelled treatment end to end with at most three LLM calls", async () => {
@@ -151,6 +157,24 @@ describe("runPipeline with a live provider", () => {
     expect(tries).toBe(2);
     expect(t.llm.find((l) => l.step === "write")?.attempts[0].outcome).toBe("repaired");
     expect(t.references.length).toBeGreaterThan(0);
+  });
+
+  it("stops waiting on an overloaded primary for the write step once the plan step tripped it", async () => {
+    let primaryCalls = 0;
+    const flaky: LlmProvider = {
+      kind: "gemini",
+      model: "busy-flash",
+      complete: async () => {
+        primaryCalls += 1;
+        throw new LlmError({ kind: "upstream", message: "503 high demand", provider: "gemini", model: "busy-flash", status: 503 });
+      },
+    };
+    const { provider: backup } = scriptedProvider({});
+    const { outcome } = await run({ artist: "Frank Ocean", city: "New York" }, liveWith(flaky, backup));
+    const t = treatmentOf(outcome);
+    expect(primaryCalls).toBe(1);
+    expect(t.llm.find((l) => l.step === "write")?.attempts[0]).toMatchObject({ model: "busy-flash", outcome: "skipped", kind: "cooldown" });
+    expect(t.writtenBy).toEqual({ provider: "gemini", model: "fake-flash", mock: false });
   });
 
   it("falls back to the labelled template when every model fails, and notes it", async () => {

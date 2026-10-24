@@ -1,4 +1,4 @@
-import { generateJson, type LlmDeps, type LlmResult } from "../llm";
+import { describeKind, generateJson, type LlmDeps, type LlmResult } from "../llm";
 import type { CompactEntity, CompactTag, Provenance, QlooClient } from "../qloo";
 import { runTool } from "../tools/registry";
 import type { ToolResult } from "../tools/types";
@@ -60,6 +60,8 @@ interface Execution {
 }
 
 const MAX_TONE_CANDIDATES = 16;
+/** Time held back for the write step while planning, so a slow planner can't starve it. */
+const WRITE_RESERVE_MS = 18_000;
 
 function clip(text: string, max: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -101,9 +103,10 @@ export async function runPipeline(
   brief: Brief,
   deps: PipelineDeps,
   emit: (event: AgentEvent) => void,
-  options: { id: string; signal: AbortSignal },
+  options: { id: string; signal: AbortSignal; deadline?: number },
 ): Promise<PipelineOutcome> {
   const { signal } = options;
+  const runDeadline = options.deadline ?? Number.POSITIVE_INFINITY;
   const trail: Partial<Record<StepId, Provenance[]>> = {};
   const notes: string[] = [];
   const traces: LlmTrace[] = [];
@@ -138,7 +141,7 @@ export async function runPipeline(
     if (result.degraded) {
       const last = [...result.attempts].reverse().find((a) => a.provider !== "mock");
       notes.push(
-        `Live models were unavailable for the ${step} step${last?.kind ? ` (${last.kind.replace("_", " ")})` : ""}, so the labelled template wrote it.`,
+        `Live models were unavailable for the ${step} step${last?.kind ? ` (${describeKind(last.kind)})` : ""}, so the labelled template wrote it.`,
       );
     }
     end(result.degraded ? "warning" : "done", summarize(result.data), trace);
@@ -276,6 +279,7 @@ export async function runPipeline(
             effort: "low",
             maxOutputTokens: 2048,
             signal,
+            deadline: runDeadline - WRITE_RESERVE_MS,
           },
           deps.llm,
         ),
@@ -495,6 +499,7 @@ export async function runPipeline(
           effort: "medium",
           maxOutputTokens: 8192,
           signal,
+          deadline: runDeadline - 1_000,
         },
         deps.llm,
       ),

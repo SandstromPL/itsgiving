@@ -61,7 +61,11 @@ export async function streamTreatment(
   const timeout = AbortSignal.timeout(service.runTimeoutMs);
   const signal = AbortSignal.any([clientSignal, timeout]);
   try {
-    const outcome = await runPipeline(brief, { qloo: service.qloo, llm: service.llm }, emit, { id: key, signal });
+    const outcome = await runPipeline(brief, { qloo: service.qloo, llm: service.llm }, emit, {
+      id: key,
+      signal,
+      deadline: started + service.runTimeoutMs,
+    });
     if (outcome.kind === "treatment") {
       const { treatment } = outcome;
       // Don't pin a degraded (template-written) treatment in live mode; retry later for a real one.

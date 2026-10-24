@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  Cooldowns,
   DailyBudget,
   LlmError,
   createProviders,
@@ -39,7 +40,7 @@ const rateLimited = (kind: "gemini" | "groq", model: string) =>
   new LlmError({ kind: "rate_limit", message: "429", provider: kind, model, status: 429 });
 
 function deps(providers: LlmProvider[], overrides: Partial<LlmDeps> = {}): LlmDeps {
-  return { mode: "live", providers, budget: new DailyBudget(100), timeoutMs: 1000, ...overrides };
+  return { mode: "live", providers, budget: new DailyBudget(100), timeoutMs: 1000, cooldowns: new Cooldowns(), ...overrides };
 }
 
 const ask = (d: LlmDeps, signal?: AbortSignal) =>
@@ -118,6 +119,60 @@ describe("generateJson", () => {
     const result = await ask(deps([slow], { timeoutMs: 20 }));
     expect(result.attempts[0]).toMatchObject({ model: "slow", outcome: "error", kind: "timeout" });
     expect(result.producedBy.mock).toBe(true);
+  });
+
+  it("rests a provider after it is overloaded, so the next call skips straight past it", async () => {
+    const overloaded = new LlmError({ kind: "upstream", message: "503", provider: "gemini", model: "gemini-3.8-flash", status: 503 });
+    const primary = scripted("gemini", "gemini-3.8-flash", [overloaded]);
+    const backup = scripted("groq", "openai/gpt-oss-120b", ['{"title":"A","tone":"T1"}', '{"title":"B","tone":"T2"}']);
+    const d = deps([primary.provider, backup.provider]);
+    await ask(d);
+    const second = await ask(d);
+    expect(second.data.title).toBe("B");
+    expect(second.attempts[0]).toMatchObject({ model: "gemini-3.8-flash", outcome: "skipped", kind: "cooldown" });
+    expect(primary.prompts).toHaveLength(1);
+  });
+
+  it("honours a provider's retry delay when it is longer than the default rest", () => {
+    let now = 0;
+    const cooldowns = new Cooldowns(() => now);
+    const provider = scripted("groq", "m", []).provider;
+    cooldowns.trip(provider, 90_000);
+    now = 89_000;
+    expect(cooldowns.active(provider)).toBe(true);
+    now = 90_001;
+    expect(cooldowns.active(provider)).toBe(false);
+  });
+
+  it("skips real providers when the step's deadline is too close, and bounds each call by it", async () => {
+    const gemini = scripted("gemini", "gemini-3.8-flash", ['{"title":"A","tone":"T1"}']);
+    const late = await generateJson(
+      { name: "test", system: "", prompt: "", schema, mock: () => MOCK, deadline: Date.now() + 500 },
+      deps([gemini.provider]),
+    );
+    expect(late.producedBy.mock).toBe(true);
+    expect(late.attempts[0]).toMatchObject({ outcome: "skipped", kind: "deadline" });
+    expect(gemini.prompts).toHaveLength(0);
+
+    let seenTimeout = 0;
+    const slow: LlmProvider = {
+      kind: "gemini",
+      model: "slow",
+      complete: (call) =>
+        new Promise((_, reject) => {
+          const t0 = Date.now();
+          call.signal.addEventListener("abort", () => {
+            seenTimeout = Date.now() - t0;
+            reject(call.signal.reason);
+          });
+        }),
+    };
+    const bounded = await generateJson(
+      { name: "test", system: "", prompt: "", schema, mock: () => MOCK, deadline: Date.now() + 3_300 },
+      deps([slow], { timeoutMs: 60_000 }),
+    );
+    expect(bounded.attempts[0]).toMatchObject({ outcome: "error", kind: "timeout" });
+    expect(seenTimeout).toBeLessThan(4_000);
   });
 
   it("propagates a client abort instead of falling through", async () => {
@@ -233,6 +288,16 @@ describe("geminiProvider", () => {
     const { fetchImpl } = recordingFetch(status, { error: { message: "nope" } });
     const provider = geminiProvider({ apiKey: "k", model: "m", fetch: fetchImpl });
     await expect(provider.complete(call())).rejects.toMatchObject({ kind, status });
+  });
+
+  it("reads Gemini's RetryInfo delay from a 429", async () => {
+    const { fetchImpl } = recordingFetch(429, {
+      error: { message: "quota", details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "33s" }] },
+    });
+    await expect(geminiProvider({ apiKey: "k", model: "m", fetch: fetchImpl }).complete(call())).rejects.toMatchObject({
+      kind: "rate_limit",
+      retryAfterMs: 33_000,
+    });
   });
 
   it("treats MAX_TOKENS and safety stops as failures", async () => {

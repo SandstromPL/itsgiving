@@ -54,15 +54,60 @@ export class LlmError extends Error {
   readonly provider: LlmProviderKind;
   readonly model: string;
   readonly status?: number;
+  /** How long the provider asked us to wait (Retry-After header or Gemini RetryInfo). */
+  readonly retryAfterMs?: number;
 
-  constructor(init: { kind: LlmErrorKind; message: string; provider: LlmProviderKind; model: string; status?: number }) {
+  constructor(init: {
+    kind: LlmErrorKind;
+    message: string;
+    provider: LlmProviderKind;
+    model: string;
+    status?: number;
+    retryAfterMs?: number;
+  }) {
     super(init.message);
     this.name = "LlmError";
     this.kind = init.kind;
     this.provider = init.provider;
     this.model = init.model;
     this.status = init.status;
+    this.retryAfterMs = init.retryAfterMs;
   }
+}
+
+/** Why an attempt was skipped without calling the model. */
+export type SkipReason = "daily_cap" | "cooldown" | "deadline";
+
+const KIND_TEXT: Record<LlmErrorKind | SkipReason, string> = {
+  config: "not configured",
+  auth: "key rejected",
+  rate_limit: "rate limited",
+  upstream: "overloaded",
+  timeout: "too slow",
+  network: "unreachable",
+  bad_request: "rejected the request",
+  blocked: "blocked the output",
+  truncated: "ran out of tokens",
+  empty: "returned nothing",
+  invalid_output: "invalid output",
+  aborted: "cancelled",
+  daily_cap: "daily cap reached",
+  cooldown: "resting after recent failures",
+  deadline: "out of time",
+};
+
+/** Plain words for an attempt's failure kind, for the UI and the treatment's notes. */
+export function describeKind(kind: LlmErrorKind | SkipReason): string {
+  return KIND_TEXT[kind] ?? kind;
+}
+
+/** Parse a Retry-After header (seconds or HTTP date). */
+export function retryAfterHeader(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(seconds, 0) * 1000;
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? undefined : Math.max(date - Date.now(), 0);
 }
 
 export function classifyHttpStatus(status: number): LlmErrorKind {

@@ -48,7 +48,8 @@ export function llmConfigFromEnv(env: Record<string, string | undefined> = proce
     geminiModels: [...new Set(geminiModels.filter((m) => m !== "none"))],
     groqModel: env.GROQ_MODEL?.trim() || DEFAULT_MODELS.groq,
     dailyCap: positiveInt(env.LLM_DAILY_CAP, 300),
-    timeoutMs: positiveInt(env.LLM_TIMEOUT_MS, 30_000),
+    // Free-tier Gemini 3.8 Flash took 100+ s per call under load (2026-10-24); waiting longer only burns the run budget.
+    timeoutMs: positiveInt(env.LLM_TIMEOUT_MS, 20_000),
   };
 }
 
@@ -110,3 +111,35 @@ export class DailyBudget {
     return Math.max(this.limit - this.used, 0);
   }
 }
+
+/**
+ * Circuit breaker: a provider that just timed out, was overloaded or rate
+ * limited is skipped for a while, so the next step (and the next treatment)
+ * goes straight to one that works instead of waiting out the same timeout.
+ */
+export class Cooldowns {
+  private readonly until = new Map<string, number>();
+
+  constructor(private readonly now: () => number = Date.now) {}
+
+  static key(provider: LlmProvider): string {
+    return `${provider.kind}:${provider.model}`;
+  }
+
+  active(provider: LlmProvider): boolean {
+    const until = this.until.get(Cooldowns.key(provider));
+    return until !== undefined && until > this.now();
+  }
+
+  trip(provider: LlmProvider, ms: number): void {
+    this.until.set(Cooldowns.key(provider), this.now() + ms);
+  }
+}
+
+/** How long to rest a provider after each kind of failure; others (bad output, auth) don't trip it. */
+export const COOLDOWN_MS: Partial<Record<LlmError["kind"], number>> = {
+  rate_limit: 60_000,
+  upstream: 120_000,
+  timeout: 120_000,
+  network: 30_000,
+};

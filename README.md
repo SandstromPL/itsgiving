@@ -55,6 +55,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - The chain falls through on 429, 5xx, timeouts and invalid output: **Gemini `gemini-3.8-flash`** (Google AI Studio
   free tier, thinking level low for planning and medium for writing), then **`gemini-3.5-flash-lite`**, then **Groq
   `openai/gpt-oss-120b`** (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit).
+- A provider that times out, is overloaded or is rate limited rests for one to two minutes (longer if it sends a retry
+  delay), so the next step goes straight to one that works. Every call is also bounded by the time left in the run,
+  with time held back for the writing step.
 - With no keys, `LLM_MODE=mock`, a spent daily cap, or every provider down, a deterministic template plans and writes.
   Its output is always labelled **Mock LLM**, and the result records which model produced each step.
 
@@ -113,7 +116,7 @@ All server-side only.
 | `LLM_MODE` | `live` or `mock`; defaults to `live` when either LLM key is set |
 | `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` / `GROQ_MODEL` | Model overrides (defaults `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`) |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
-| `LLM_TIMEOUT_MS` | Per-call timeout before falling through (default 30000) |
+| `LLM_TIMEOUT_MS` | Per-call timeout before falling through (default 20000) |
 | `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
 
 ### API routes
