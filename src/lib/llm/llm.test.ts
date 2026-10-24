@@ -210,13 +210,21 @@ describe("llmConfigFromEnv", () => {
     expect(llmConfigFromEnv({ GEMINI_API_KEY: "k", LLM_MODE: "mock" }).mode).toBe("mock");
   });
 
-  it("orders providers Gemini primary, Gemini fallback, then Groq, honouring overrides", () => {
-    const config = llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g", GEMINI_FALLBACK_MODEL: "gemini-x-lite" });
+  it("orders providers Flash-Lite, then Groq, then 3.8 Flash as the last resort", () => {
+    const config = llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g" });
     expect(createProviders(config).map((p) => `${p.kind}:${p.model}`)).toEqual([
-      "gemini:gemini-3.8-flash",
-      "gemini:gemini-x-lite",
+      "gemini:gemini-3.5-flash-lite",
       "groq:openai/gpt-oss-120b",
+      "gemini:gemini-3.8-flash",
     ]);
+  });
+
+  it("honours model overrides, drops 'none', and skips providers without a key", () => {
+    const overridden = llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g", GEMINI_MODEL: "gemini-x", GEMINI_FALLBACK_MODEL: "none" });
+    expect(createProviders(overridden).map((p) => `${p.kind}:${p.model}`)).toEqual(["gemini:gemini-x", "groq:openai/gpt-oss-120b"]);
+    expect(createProviders(llmConfigFromEnv({ GROQ_API_KEY: "g" })).map((p) => p.kind)).toEqual(["groq"]);
+    const same = llmConfigFromEnv({ GEMINI_API_KEY: "k", GEMINI_FALLBACK_MODEL: "gemini-3.5-flash-lite" });
+    expect(createProviders(same).map((p) => p.model)).toEqual(["gemini-3.5-flash-lite"]);
   });
 });
 

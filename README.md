@@ -52,9 +52,11 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 
 - Every output is validated with zod. Invalid output gets one repair retry on the same model, with the validation
   problems in the prompt.
-- The chain falls through on 429, 5xx, timeouts and invalid output: **Gemini `gemini-3.8-flash`** (Google AI Studio
-  free tier, thinking level low for planning and medium for writing), then **`gemini-3.5-flash-lite`**, then **Groq
-  `openai/gpt-oss-120b`** (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit).
+- The chain falls through on 429, 5xx, timeouts and invalid output: **Gemini `gemini-3.5-flash-lite`** (Google AI
+  Studio free tier, thinking level low for planning and medium for writing), then **Groq `openai/gpt-oss-120b`**
+  (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit), then **`gemini-3.8-flash`**
+  as a last resort. The order comes from live free-tier measurements: Flash-Lite answered in 5-7 s and Groq in 1-3 s,
+  while 3.8 Flash returned 503s or took over 100 s per call.
 - A provider that times out, is overloaded or is rate limited rests for one to two minutes (longer if it sends a retry
   delay), so the next step goes straight to one that works. Every call is also bounded by the time left in the run,
   with time held back for the writing step.
@@ -114,7 +116,7 @@ All server-side only.
 | `GEMINI_API_KEY` | Google AI Studio key (free tier) |
 | `GROQ_API_KEY` | Groq key (free tier), the backup provider |
 | `LLM_MODE` | `live` or `mock`; defaults to `live` when either LLM key is set |
-| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` / `GROQ_MODEL` | Model overrides (defaults `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`) |
+| `GEMINI_MODEL` / `GROQ_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `gemini-3.8-flash`); `none` drops a Gemini one |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `LLM_TIMEOUT_MS` | Per-call timeout before falling through (default 20000) |
 | `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
