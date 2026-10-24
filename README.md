@@ -4,8 +4,9 @@ Mise is an agentic pre-production assistant for music-video and short-film direc
 reference films), a shoot city and a budget, and it builds a treatment grounded in what that audience actually loves:
 reference films, wardrobe brands and real shoot locations, each with the evidence behind it.
 
-> **Status:** work in progress for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). The Qloo client and the
-> agent's tools are built and tested; the LLM agent loop and the treatment UI are next.
+> **Status:** work in progress for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). The treatment builder
+> runs end to end: Qloo tools, a lean LLM agent on free tiers, and the board UI. Persistence, share links and director
+> taste import come next.
 
 ## Why Qloo
 
@@ -19,6 +20,46 @@ Mise uses Qloo's taste graph as the source of truth:
 - **Taste profiles and demographics:** the audience's vocabulary (themes, styles, ambiences) and who they are.
 - **Audience comparison:** where the director's own film taste meets the artist's audience.
 - **Real places:** venues in the shoot city whose ambience fits and whose regulars share the taste.
+
+## How a treatment is built
+
+Code runs every Qloo call; the LLM is called at most three times per treatment (normally two), so the whole thing fits
+free-tier limits.
+
+1. **Intake** is a form, so no LLM is spent parsing it.
+2. **Resolve** the artist, touchstone films and the director's own films (`resolve_entities`). Names that match more
+   than one title go to a picker in the UI instead of being guessed; only Qloo's own candidates can be picked.
+3. **Read the audience** (`read_audience`) and, when the director lists films, **compare** their taste with the
+   audience (`taste_overlap`).
+4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, an era, how deep the cuts go, and a
+   few plain style words for wardrobe and ambience. Tags are shown to it as short refs (`T1`, `T2`, ...) and the output
+   schema only accepts those refs, so it cannot invent a tag ID.
+5. **Execute in code.** The style words go through `find_tags`; then `reference_films`, `styling_brands` and
+   `scout_locations` run in parallel. Empty results are relaxed deterministically (drop the era, lift the deep-cut
+   ceiling, let tags rank instead of filter, allow places without photos, lift the price ceiling), and the treatment
+   says what was relaxed.
+6. **Re-plan (optional LLM call 2)** only when a whole set of style words matched no Qloo tag.
+7. **Write (last LLM call).** The model writes the treatment as JSON, citing films, brands and places only by ref
+   (`R1`, `B1`, `L1`); refs not returned by a tool fail validation. Code maps refs back to Qloo items and attaches each
+   item's evidence (rank within its call, affinity, popularity, the input entities that drove it) and the model that
+   wrote it.
+
+Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
+
+### LLM layer (`src/lib/llm`)
+
+`generateJson({ system, prompt, schema, mock })` is provider-neutral:
+
+- Every output is validated with zod. Invalid output gets one repair retry on the same model, with the validation
+  problems in the prompt.
+- The chain falls through on 429, 5xx, timeouts and invalid output: **Gemini `gemini-3.8-flash`** (Google AI Studio
+  free tier, thinking level low for planning and medium for writing), then **`gemini-3.5-flash-lite`**, then **Groq
+  `openai/gpt-oss-120b`** (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit).
+- With no keys, `LLM_MODE=mock`, a spent daily cap, or every provider down, a deterministic template plans and writes.
+  Its output is always labelled **Mock LLM**, and the result records which model produced each step.
+
+Both providers are called over REST (`generateContent` with `responseJsonSchema`; OpenAI-compatible chat completions
+with `response_format: json_schema`), so there are no SDK dependencies.
 
 ## Agent tools
 
@@ -43,31 +84,44 @@ Requires Node 22.12 or newer (`.nvmrc` pins 24).
 ```bash
 nvm use
 npm install
-cp .env.example .env.local   # add QLOO_API_KEY; without it the app runs on mock data
+cp .env.example .env.local   # optional: add QLOO_API_KEY, GEMINI_API_KEY, GROQ_API_KEY
 npm run dev                  # http://localhost:3000
 ```
 
+With no keys at all the app still runs end to end on the synthetic Qloo mock and the mock LLM, both clearly labelled.
+
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Dev server with the tool playground |
-| `npm test` | Unit tests (always run against the mock, never the live API) |
+| `npm run dev` | Dev server: the treatment builder at `/`, the tool playground at `/playground` |
+| `npm test` | Unit tests (always against the mocks and fake LLM providers, never live APIs) |
 | `npm run typecheck` / `npm run lint` | Static checks |
 | `npm run smoke` | Day-1 checks of the live Qloo data Mise depends on (about 30 requests) |
 | `npm run smoke:mock` | Same script against the mock, to test the script itself |
 
 ### Environment variables
 
+All server-side only.
+
 | Variable | Description |
 | --- | --- |
-| `QLOO_API_KEY` | Qloo hackathon key (server-side only) |
+| `QLOO_API_KEY` | Qloo hackathon key |
 | `QLOO_BASE_URL` | Defaults to `https://hackathon.api.qloo.com`, the only host hackathon keys work on |
 | `QLOO_MODE` | `live` or `mock`; defaults to `live` when a key is set |
 | `QLOO_CACHE_DIR` | Optional on-disk response cache (gitignored) |
-| `MISE_TOOL_PLAYGROUND` | `1` enables `/api/tools/*` in production builds |
+| `GEMINI_API_KEY` | Google AI Studio key (free tier) |
+| `GROQ_API_KEY` | Groq key (free tier), the backup provider |
+| `LLM_MODE` | `live` or `mock`; defaults to `live` when either LLM key is set |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` / `GROQ_MODEL` | Model overrides (defaults `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`) |
+| `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
+| `LLM_TIMEOUT_MS` | Per-call timeout before falling through (default 30000) |
+| `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
 
 ### API routes
 
-- `GET /api/health`: makes a real Qloo call and reports mode, host and provenance.
+- `POST /api/treatment`: takes a brief, streams progress as server-sent events (`start`, `step`, `needs_input`,
+  `treatment`, `error`, `done`). Guarded by a per-IP rate limit (6 fresh treatments a minute), a daily LLM-call cap, a
+  55-second run budget and a 24-hour cache keyed by the normalized brief.
+- `GET /api/health`: makes a real Qloo call and reports mode, host and provenance, plus the LLM chain (never called).
 - `GET /api/tools`: tool definitions (JSON Schema) with an example input each.
 - `POST /api/tools/{name}`: runs a tool (development only unless `MISE_TOOL_PLAYGROUND=1`).
 
@@ -79,12 +133,25 @@ npm run dev                  # http://localhost:3000
 - `src/lib/qloo/mock`: a fake Qloo server over a small **synthetic** catalog, so the app and tests run without a key.
   Mock responses are labelled; names are real but every score and tag assignment is invented.
 - `src/lib/tools`: the agent tools described above.
+- `src/lib/llm`: the provider-neutral JSON generator and fallback chain.
+- `src/lib/agent`: the brief schema, plan and write prompts (with their deterministic mocks), the pipeline, and the
+  rate limit, cache and SSE service behind `/api/treatment`.
+- `src/app/studio`: the treatment builder UI: intake, live agent timeline with every Qloo request, ambiguity picker,
+  and the board with "why" popovers that keep Qloo's evidence apart from Mise's interpretation.
 
 ## Data handling
 
-- No personal data is sent to Qloo; Mise works from aggregate audience taste.
-- Qloo results are presented as aggregate affinities, separate from the agent's own interpretation.
-- The Qloo key stays on the server, and Qloo responses are never committed to this repository.
+- No personal data is sent to Qloo or to the LLM; Mise works from names of public works and aggregate audience taste.
+- Qloo results are presented as aggregate affinities, visibly separate from the agent's own interpretation. The model
+  is told never to infer health, politics, finances, identity or eligibility from taste.
+- Keys stay on the server, and Qloo responses are never committed to this repository.
+
+## Limitations
+
+- Rate limits, the daily LLM cap and the treatment cache live in process memory, so each serverless instance keeps its
+  own. That is enough to protect free-tier quota for a demo, not to meter users.
+- The free Gemini tier may use prompts to improve Google's products; Mise only sends public names and Qloo tags.
+- Location results are candidates to scout: availability and filming permission must be confirmed with each venue.
 
 ## License
 

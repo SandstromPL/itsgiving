@@ -1,14 +1,36 @@
 @import "tailwindcss";
 
+/*
+ * Mise palette. Tungsten (amber) is reserved for Qloo evidence, set in the
+ * mono face like the edge print on film stock; Mise's own interpretation is
+ * set in the sans. Tape pink marks anything mocked, like camera tape on a
+ * stand-in prop.
+ */
 :root {
   --background: #0c0a09;
   --foreground: #f5f5f4;
+  --graphite: #1c1917;
+  --line: #292524;
+  --dim: #a8a29e;
+  --faint: #8c8680;
+  --tungsten: #fbbf24;
+  --tape: #f9a8d4;
+  --safelight: #f87171;
   color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-ink: var(--background);
+  --color-paper: var(--foreground);
+  --color-graphite: var(--graphite);
+  --color-line: var(--line);
+  --color-dim: var(--dim);
+  --color-faint: var(--faint);
+  --color-tungsten: var(--tungsten);
+  --color-tape: var(--tape);
+  --color-safelight: var(--safelight);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -17,4 +39,56 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--tungsten);
+  outline-offset: 2px;
+}
+
+/* "Why" popovers: native popover API, light-dismiss and Esc for free. */
+[popover].why {
+  margin: auto;
+  max-width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: var(--graphite);
+  color: var(--foreground);
+  padding: 1.25rem;
+}
+[popover].why::backdrop {
+  background: rgb(12 10 9 / 0.7);
+}
+
+/* The one orchestrated moment: the cover's letterbox opens when a treatment lands. */
+@keyframes letterbox-open {
+  from {
+    clip-path: inset(50% 0 50% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.letterbox-open {
+  animation: letterbox-open 900ms cubic-bezier(0.2, 0.7, 0.1, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Saved as PDF, the board keeps its dark lookbook look. */
+@media print {
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }
