@@ -6,8 +6,8 @@ import { LlmError, type LlmProvider } from "./types";
 
 export type LlmMode = "live" | "mock";
 
-// Chain order: DeepSeek (when its paid key is set) -> Gemini primary -> Groq ->
-// Gemini fallback. Benchmarked on live Qloo (2026-10-25, same data for both):
+// Chain order: DeepSeek (when its paid key is set) -> Gemini Flash-Lite -> Groq
+// -> Gemini 3.8 Flash. Benchmarked on live Qloo (2026-10-25, same data for both):
 // DeepSeek Flash wrote clearly better treatments (concrete "what to borrow"
 // notes tied to the audience, styled outfits, budget-aware lighting, lensed
 // shots) for about $0.002 each, taking 17-30 s per treatment against 12-13 s
@@ -69,7 +69,7 @@ export function llmConfigFromEnv(env: Record<string, string | undefined> = proce
     deepseekModel: env.DEEPSEEK_MODEL?.trim() || DEFAULT_MODELS.deepseek,
     geminiFallbackModel: geminiFallbackModel === geminiModel ? undefined : geminiFallbackModel,
     dailyCap: positiveInt(env.LLM_DAILY_CAP, 300),
-    // A healthy free-tier call takes under 10 s; waiting longer only burns the run budget.
+    // Only for calls that set no limit of their own: the treatment's plan and write steps do (TIMING in agent/pipeline.ts).
     timeoutMs: positiveInt(env.LLM_TIMEOUT_MS, 20_000),
   };
 }
@@ -105,7 +105,7 @@ export const mockProvider: LlmProvider = {
   },
 };
 
-/** Counts real LLM calls per UTC day so free-tier quota survives a burst of demo traffic. */
+/** Counts real LLM calls per UTC day so free-tier quota and DeepSeek credit survive a burst of demo traffic. */
 export class DailyBudget {
   private day = "";
   private used = 0;

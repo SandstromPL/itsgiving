@@ -4,7 +4,7 @@ import { QlooError, getQlooClient } from "@/lib/qloo";
 
 /**
  * Makes a real Qloo call: a stored key is not proof the key and host work.
- * The LLM chain is only described, never called, so health checks don't spend free-tier quota.
+ * The LLM chain is only described, never called, so health checks spend no model quota or credit.
  */
 export async function GET() {
   await connection();

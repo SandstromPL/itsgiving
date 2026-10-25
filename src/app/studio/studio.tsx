@@ -63,7 +63,7 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
   const focusTitle = useRef(false);
   const running = phase === "running";
 
-  // Leaving the page mid-run shouldn't keep spending free-tier LLM quota.
+  // Leaving the page mid-run shouldn't keep spending model quota and credit.
   useEffect(() => () => active.current?.abort(), []);
 
   // Move focus to the new treatment's title once it renders (it also scrolls it into view).

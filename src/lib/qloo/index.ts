@@ -38,7 +38,7 @@ export function createQlooClient(config: QlooConfig = qlooConfigFromEnv()): Qloo
     mode: config.mode,
     apiKey: config.apiKey,
     // A healthy call takes 0.3-1.5 s; Qloo's own gateway gives up at 60 s (504). Two short attempts keep one
-    // bad call from eating a 55 s treatment run.
+    // bad call from eating the treatment's time limit.
     timeoutMs: 12_000,
     maxAttempts: 2,
     baseUrl: config.mode === "mock" ? "https://mock.qloo.invalid" : config.baseUrl,
