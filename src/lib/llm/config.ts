@@ -6,11 +6,14 @@ import { LlmError, type LlmProvider } from "./types";
 
 export type LlmMode = "live" | "mock";
 
-// Chain order: Gemini primary -> Groq -> DeepSeek -> Gemini fallback. Measured
-// live (2026-10-24/25): 3.5 Flash-Lite answered plan/write in 5-7 s and Groq
-// gpt-oss-120b in 1-3 s (both free). DeepSeek Flash is paid, so it only runs
-// when both free tiers fail; it writes the richest treatments but takes 15-20 s
-// to write. 3.8 Flash returned 503s or took 100+ s, so it goes last.
+// Chain order: DeepSeek (when its paid key is set) -> Gemini primary -> Groq ->
+// Gemini fallback. Benchmarked on live Qloo (2026-10-25, same data for both):
+// DeepSeek Flash wrote clearly better treatments (concrete "what to borrow"
+// notes tied to the audience, styled outfits, budget-aware lighting, lensed
+// shots) for about $0.002 each, taking 17-30 s per treatment against 12-13 s
+// for free 3.5 Flash-Lite (which once spiked to 44 s). Paritosh chose DeepSeek
+// first with the free tiers as fallback. Groq gpt-oss-120b answers in 1-3 s;
+// 3.8 Flash returned 503s or took 100+ s, so it goes last.
 export const DEFAULT_MODELS = {
   gemini: "gemini-3.5-flash-lite",
   groq: "openai/gpt-oss-120b",
@@ -23,7 +26,7 @@ export interface LlmConfig {
   geminiApiKey?: string;
   groqApiKey?: string;
   deepseekApiKey?: string;
-  /** First in the chain; "none" drops it. */
+  /** First free model in the chain (after DeepSeek when its key is set); "none" drops it. */
   geminiModel?: string;
   groqModel: string;
   deepseekModel: string;
@@ -78,11 +81,11 @@ export function createProviders(config: LlmConfig, fetchImpl?: FetchLike): LlmPr
   const gemini = (model: string | undefined) => {
     if (config.geminiApiKey && model) providers.push(geminiProvider({ apiKey: config.geminiApiKey, model, fetch: fetchImpl }));
   };
-  gemini(config.geminiModel);
-  if (config.groqApiKey) providers.push(groqProvider({ apiKey: config.groqApiKey, model: config.groqModel, fetch: fetchImpl }));
   if (config.deepseekApiKey) {
     providers.push(deepseekProvider({ apiKey: config.deepseekApiKey, model: config.deepseekModel, fetch: fetchImpl }));
   }
+  gemini(config.geminiModel);
+  if (config.groqApiKey) providers.push(groqProvider({ apiKey: config.groqApiKey, model: config.groqModel, fetch: fetchImpl }));
   gemini(config.geminiFallbackModel);
   return providers;
 }

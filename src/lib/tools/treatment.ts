@@ -14,6 +14,20 @@ function tagBias(ids: string[] | undefined): QlooParams {
   return ids && ids.length > 0 ? { "signal.interests.tags": ids, "operator.signal.interests.tags": "union" } : {};
 }
 
+/**
+ * Chain branches come back as separate places ("Starbucks - Juhu Tara Road", "Starbucks - Vile Parle West").
+ * Keep the best-ranked branch of each name, in Qloo's order, so a shortlist isn't three of the same café.
+ */
+export function oneBranchEach<T extends { name: string }>(places: T[]): T[] {
+  const seen = new Set<string>();
+  return places.filter((place) => {
+    const brand = place.name.split(/\s+[-|–(]\s*/)[0].trim().toLowerCase();
+    if (seen.has(brand)) return false;
+    seen.add(brand);
+    return true;
+  });
+}
+
 /** Brands carry this parent genre when they make clothing; without it "wardrobe" also returned snack and drink brands. */
 export const FASHION_GENRE = "urn:tag:genre:brand:fashion";
 
@@ -142,9 +156,10 @@ export const scoutLocations = defineTool({
       "filter.price_level.max": input.price_level_max,
       "filter.hours": input.open_on,
       "feature.explainability": true,
-      take: input.take,
+      // A few spare results, since repeated chain branches are dropped below.
+      take: Math.min(input.take + 4, 24),
     });
-    const locations = entityList(response.data).map((e) => compactEntity(e, { maxTags: 6 }));
+    const locations = oneBranchEach(entityList(response.data).map((e) => compactEntity(e, { maxTags: 6 }))).slice(0, input.take);
     const relax = [
       input.venue_kinds && input.venue_kinds.length < VENUE_KIND_VALUES.length ? "more venue_kinds" : undefined,
       input.require_photo ? "require_photo=false" : undefined,

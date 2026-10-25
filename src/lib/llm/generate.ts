@@ -36,6 +36,8 @@ export interface GenerateJsonOptions<T> {
   deadline?: number;
   /** Shortest call worth starting before the deadline (a write needs longer than a plan). */
   minCallMs?: number;
+  /** Longest a single call of this step may take; defaults to deps.timeoutMs. */
+  timeoutMs?: number;
 }
 
 export type AttemptOutcome = "ok" | "repaired" | "invalid" | "error" | "skipped";
@@ -146,8 +148,9 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
 
     /** The time this call may take, or why it shouldn't start (cooldown, too little time, daily cap). */
     let clamped = false;
+    const callTimeout = options.timeoutMs ?? deps.timeoutMs;
     const admit = (): { ok: true; budgetMs: number } | { ok: false; kind: SkipReason; message: string } => {
-      if (isMock) return { ok: true, budgetMs: deps.timeoutMs };
+      if (isMock) return { ok: true, budgetMs: callTimeout };
       if (deps.cooldowns.active(provider)) return { ok: false, kind: "cooldown", message: "Failed recently; resting." };
       const left = deadline - Date.now();
       if (left < (options.minCallMs ?? MIN_CALL_MS)) {
@@ -156,8 +159,8 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
       if (!deps.budget.take()) return { ok: false, kind: "daily_cap", message: "Daily LLM call cap reached." };
       calls += 1;
       // A call cut short by the run's deadline isn't the provider's fault; remember that for the cooldown below.
-      clamped = left < deps.timeoutMs;
-      return { ok: true, budgetMs: Math.min(deps.timeoutMs, left) };
+      clamped = left < callTimeout;
+      return { ok: true, budgetMs: Math.min(callTimeout, left) };
     };
 
     const run = async (prompt: string, timeoutMs: number): Promise<string> => {
@@ -211,7 +214,8 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
       const second = await run(repairPrompt(options.prompt, first, firstCheck.problem), repairTurn.budgetMs);
       const secondCheck = check(options.schema, second);
       if (secondCheck.ok) {
-        record("repaired");
+        // Keep what the first reply got wrong: it shows which provider needs prompt help.
+        record("repaired", { message: `First reply: ${firstCheck.problem.slice(0, 240)}` });
         return finish(secondCheck.data, provider);
       }
       record("invalid", { kind: "invalid_output", message: secondCheck.problem.slice(0, 300) });

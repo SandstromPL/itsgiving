@@ -37,7 +37,7 @@ export type PipelineOutcome =
   | { kind: "failed"; message: string };
 
 type Resolution =
-  | { input: string; status: "resolved"; match: CompactEntity }
+  | { input: string; status: "resolved"; match: CompactEntity; among?: number }
   | { input: string; status: "ambiguous"; candidates: CompactEntity[] }
   | { input: string; status: "not_found" };
 
@@ -77,8 +77,11 @@ interface Execution {
 }
 
 const MAX_TONE_CANDIDATES = 16;
-/** Time held back for the write step while planning, so a slow planner can't starve it. */
-const WRITE_RESERVE_MS = 18_000;
+/** Time held back for the write step while planning: DeepSeek writes take 12-23 s, plus room for one fallback. */
+const WRITE_RESERVE_MS = 30_000;
+/** Per-call limits: a plan is a short reply; a DeepSeek write can take over 20 s before it is slow. */
+const PLAN_TIMEOUT_MS = 15_000;
+const WRITE_TIMEOUT_MS = 35_000;
 /** A re-plan means another LLM call, a second round of Qloo calls and the write: skip it when less time is left. */
 const REPLAN_MIN_MS = 30_000;
 
@@ -213,7 +216,13 @@ export async function runPipeline(
   const missing: string[] = [];
   const settle = (spec: NameSpec, resolution: Resolution | undefined): CompactEntity | undefined => {
     const key = pickKey(spec.type, spec.input);
-    if (resolution?.status === "resolved") return resolution.match;
+    if (resolution?.status === "resolved") {
+      if (resolution.among) {
+        const m = resolution.match;
+        notes.push(`"${spec.input}" matched ${resolution.among} titles in Qloo; Mise used the far better-known ${m.name}${m.year ? ` (${m.year})` : ""}.`);
+      }
+      return resolution.match;
+    }
     if (resolution?.status === "ambiguous") {
       // A pick only counts if it is one of the candidates Qloo returned.
       const chosen = resolution.candidates.find((c) => c.id === brief.picks[key]);
@@ -327,6 +336,7 @@ export async function runPipeline(
             signal,
             deadline: runDeadline - WRITE_RESERVE_MS,
             minCallMs: 4_000,
+            timeoutMs: PLAN_TIMEOUT_MS,
           },
           deps.llm,
         ),
@@ -563,6 +573,7 @@ export async function runPipeline(
           signal,
           deadline: runDeadline - 1_000,
           minCallMs: 8_000,
+          timeoutMs: WRITE_TIMEOUT_MS,
         },
         deps.llm,
       ),

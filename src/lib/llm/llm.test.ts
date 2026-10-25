@@ -179,6 +179,25 @@ describe("generateJson", () => {
     expect(cooldowns.active(slow)).toBe(false);
   });
 
+  it("lets a step set its own call timeout", async () => {
+    let seen = 0;
+    const slow: LlmProvider = {
+      kind: "deepseek",
+      model: "slow-writer",
+      complete: (call) =>
+        new Promise((_, reject) => {
+          const t0 = Date.now();
+          call.signal.addEventListener("abort", () => {
+            seen = Date.now() - t0;
+            reject(call.signal.reason);
+          });
+        }),
+    };
+    const result = await generateJson({ name: "test", system: "", prompt: "", schema, mock: () => MOCK, timeoutMs: 50 }, deps([slow], { timeoutMs: 60_000 }));
+    expect(result.attempts[0]).toMatchObject({ outcome: "error", kind: "timeout" });
+    expect(seen).toBeLessThan(1_000);
+  });
+
   it("propagates a client abort instead of falling through", async () => {
     const controller = new AbortController();
     const hanging: LlmProvider = {
@@ -214,14 +233,16 @@ describe("llmConfigFromEnv", () => {
     expect(llmConfigFromEnv({ GEMINI_API_KEY: "k", LLM_MODE: "mock" }).mode).toBe("mock");
   });
 
-  it("orders providers Flash-Lite, Groq, then paid DeepSeek, with 3.8 Flash as the last resort", () => {
+  it("puts paid DeepSeek first, then the free Flash-Lite and Groq, with 3.8 Flash as the last resort", () => {
     const config = llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g", DEEPSEEK_API_KEY: "d" });
     expect(createProviders(config).map((p) => `${p.kind}:${p.model}`)).toEqual([
+      "deepseek:deepseek-flash",
       "gemini:gemini-3.5-flash-lite",
       "groq:openai/gpt-oss-120b",
-      "deepseek:deepseek-flash",
       "gemini:gemini-3.8-flash",
     ]);
+    // Without the paid key the chain is free-only, Flash-Lite first.
+    expect(createProviders(llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g" }))[0].model).toBe("gemini-3.5-flash-lite");
     expect(llmConfigFromEnv({ DEEPSEEK_API_KEY: "d" }).mode).toBe("live");
   });
 

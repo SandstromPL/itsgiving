@@ -39,7 +39,7 @@ const EXAMPLES: Example<FormState>[] = [
   },
   {
     label: "A short film after Past Lives and Aftersun",
-    form: { ...EMPTY_FORM, format: "short_film", touchstones: "Past Lives\nAftersun", city: "Mumbai", budget: "shoestring", directorFilms: "Masaan" },
+    form: { ...EMPTY_FORM, format: "short_film", touchstones: "Past Lives (2023)\nAftersun (2022)", city: "Mumbai", budget: "shoestring", directorFilms: "Masaan (2015)" },
   },
   {
     label: "Frank Ocean, with a title to pick",

@@ -3,7 +3,8 @@ import { compactEntity, entityList, entityUrn, type CompactEntity } from "../qlo
 import { SEARCHABLE_KINDS, defineTool, normalizeName, plural } from "./shared";
 
 type Resolution =
-  | { input: string; status: "resolved"; match: CompactEntity }
+  /** `among` is set when several titles matched exactly and this one was far better known. */
+  | { input: string; status: "resolved"; match: CompactEntity; among?: number }
   | { input: string; status: "ambiguous"; candidates: CompactEntity[] }
   | { input: string; status: "not_found" };
 
@@ -36,10 +37,19 @@ function pick(item: z.output<typeof itemSchema>, candidates: CompactEntity[]): R
     if (sameCity.length > 0) exact = sameCity;
   }
   // Like Qloo's own harness: only auto-accept a single exact match; anything
-  // else goes back to the user rather than being guessed.
+  // else goes back to the user rather than being guessed...
   if (exact.length === 1) return { input: item.name, status: "resolved", match: exact[0] };
+  // ...unless one exact match dwarfs the rest: "Aftersun (2022)" means Charlotte Wells' film (popularity
+  // 0.999), not the other 2022 Aftersun (0.086). Close calls still go back to the user.
+  const [top, next] = [...exact].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+  if (top && next && (top.popularity ?? 0) - (next.popularity ?? 0) >= DOMINANT_GAP) {
+    return { input: item.name, status: "resolved", match: top, among: exact.length };
+  }
   return { input: item.name, status: "ambiguous", candidates: (exact.length > 0 ? exact : candidates).slice(0, 5) };
 }
+
+/** How much more popular (0-1 percentile) one same-name title must be to be taken without asking. */
+export const DOMINANT_GAP = 0.5;
 
 export const resolveEntities = defineTool({
   name: "resolve_entities",

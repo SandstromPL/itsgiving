@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createQlooClient } from "../qloo";
+import { QlooClient, createQlooClient } from "../qloo";
+import { createMockFetch } from "../qloo/mock/server";
 import { mockEntityId } from "../qloo/mock/catalog";
 import { TOOLS, runTool, toolDefinitions } from "./registry";
+import { oneBranchEach } from "./treatment";
 import type { CompactEntity } from "../qloo";
 
 const qloo = createQlooClient({ mode: "mock", baseUrl: "https://mock.qloo.invalid" });
@@ -42,6 +44,26 @@ describe("resolve_entities", () => {
     expect(artist.status).toBe("resolved");
     expect(film.status).toBe("ambiguous");
     expect(film.candidates?.map((c) => c.year).sort()).toEqual([2004, 2017]);
+  });
+
+  it("takes a far better-known exact match without asking, and keeps close calls for the user", async () => {
+    // Mock: "Forgotten" (popularity 0.62) vs "The Forgotten" (0.58) is a close call...
+    const close = await runTool("resolve_entities", { items: [{ name: "Forgotten", type: "movie" }] }, ctx);
+    expect(close.status).toBe("needs_input");
+    // ...while a search that returns one dominant title among same-name matches resolves, and says how many it beat.
+    const mock = createMockFetch();
+    const dominant = new QlooClient({
+      mode: "mock",
+      baseUrl: "https://mock.qloo.invalid",
+      fetch: async (url, init) => {
+        if (!url.includes("/search")) return mock(url, init);
+        const film = (id: string, popularity: number) => ({ entity_id: id, name: "Aftersun", subtype: "urn:entity:movie", popularity, properties: { release_year: 2022 } });
+        return new Response(JSON.stringify({ results: [film("A", 0.999), film("B", 0.086)] }), { status: 200 });
+      },
+    });
+    const result = await runTool("resolve_entities", { items: [{ name: "Aftersun", type: "movie", year: 2022 }] }, { qloo: dominant });
+    const [item] = (result.data as { items: { status: string; match?: CompactEntity; among?: number }[] }).items;
+    expect(item).toMatchObject({ status: "resolved", match: { id: "A" }, among: 2 });
   });
 
   it("uses the year to pick between same-name titles", async () => {
@@ -85,6 +107,17 @@ describe("styling_brands", () => {
     );
     expect(steered.provenance[0].query).toMatchObject({ "feature.explainability": "false", "signal.interests.tags": "urn:tag:genre:brand:fashion:streetwear" });
     expect((steered.data as Data<"brands">).brands[0].name).toMatch(/Stüssy|Carhartt WIP/);
+  });
+});
+
+describe("oneBranchEach", () => {
+  it("keeps the best-ranked branch of each chain, in Qloo's order", () => {
+    const places = ["Starbucks - Juhu Tara Road", "Cafe Mondegar", "Starbucks - Vile Parle West", "The Coffee Bean & Tea Leaf (Malad)", "The Coffee Bean & Tea Leaf - Bandra"];
+    expect(oneBranchEach(places.map((name) => ({ name }))).map((p) => p.name)).toEqual([
+      "Starbucks - Juhu Tara Road",
+      "Cafe Mondegar",
+      "The Coffee Bean & Tea Leaf (Malad)",
+    ]);
   });
 });
 

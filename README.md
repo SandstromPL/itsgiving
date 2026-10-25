@@ -29,7 +29,8 @@ free-tier limits.
 1. **Intake** is a form, so no LLM is spent parsing it.
 2. **Resolve** the artist, touchstone films and the director's own films (`resolve_entities`). Names that match more
    than one title go to a picker in the UI instead of being guessed; only Qloo's own candidates can be picked. A year
-   in brackets, like "Rockstar (2011)", settles it without asking.
+   in brackets, like "Rockstar (2011)", settles it without asking, and so does one match being far better known than
+   the rest (the treatment notes which one was used).
 3. **Read the audience** (`read_audience`) and, when the director lists films, **compare** their taste with the
    audience (`taste_overlap`).
 4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, an era, how deep the cuts go, and a
@@ -60,7 +61,8 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - Tag signals on film queries made Qloo run 22-60 s and end in a 504, so films use the artist signal alone (about
   1.4 s). Brand queries without the fashion filter returned snack and drink brands.
 - `tourist_attraction` is on hotels and golf clubs, so it is not a venue kind. Places carry Qloo's own
-  `ambience_description`, shown as evidence on each location.
+  `ambience_description`, shown as evidence on each location. Chain branches ("Starbucks - Juhu") are collapsed to
+  the best-ranked one.
 
 ### LLM layer (`src/lib/llm`)
 
@@ -68,12 +70,15 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 
 - Every output is validated with zod. Invalid output gets one repair retry on the same model, with the validation
   problems in the prompt.
-- The chain falls through on 429, 5xx, timeouts and invalid output: **Gemini `gemini-3.5-flash-lite`** (Google AI
-  Studio free tier, thinking level low for planning and medium for writing), then **Groq `openai/gpt-oss-120b`**
-  (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit), then, only if a key is
-  set, **DeepSeek `deepseek-flash`** (paid; JSON mode with the schema in the prompt, thinking off), then
-  **`gemini-3.8-flash`** as a last resort. The order comes from live measurements: Flash-Lite answered in 5-7 s, Groq
-  in 1-3 s, DeepSeek in 2-3 s to plan and 15-20 s to write, while 3.8 Flash returned 503s or took over 100 s per call.
+- The chain falls through on 429, 5xx, timeouts and invalid output: **DeepSeek `deepseek-flash`** when its (paid)
+  key is set (JSON mode with the schema in the prompt, thinking off), then the free tiers: **Gemini
+  `gemini-3.5-flash-lite`** (Google AI Studio, thinking level low for planning and medium for writing), **Groq
+  `openai/gpt-oss-120b`** (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit),
+  and **`gemini-3.8-flash`** as a last resort.
+- The order comes from a head-to-head on live Qloo data (same briefs, same Qloo results). DeepSeek wrote clearly
+  better treatments: "what to borrow" notes like "observational framing, long deadpan holds" where Flash-Lite wrote
+  "framing", outfits down to fabric and fit, budget-aware lighting, shots with lenses. It costs about $0.002 a
+  treatment and takes 17-30 s against 12-13 s. 3.8 Flash returned 503s or took over 100 s per call.
 - Array limits ("4-6 colours") are stated to the model but applied in code, so one extra item never costs a repair.
 - A provider that times out, is overloaded or is rate limited rests for one to two minutes (longer if it sends a retry
   delay), so the next step goes straight to one that works. Every call is also bounded by the time left in the run,
@@ -134,8 +139,8 @@ All server-side only.
 | `GEMINI_API_KEY` | Google AI Studio key (free tier) |
 | `GROQ_API_KEY` | Groq key (free tier), the backup provider |
 | `LLM_MODE` | `live` or `mock`; defaults to `live` when either LLM key is set |
-| `DEEPSEEK_API_KEY` | Optional, paid: DeepSeek runs only when both free providers fail (about $0.001 a treatment) |
-| `GEMINI_MODEL` / `GROQ_MODEL` / `DEEPSEEK_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `deepseek-flash`, `gemini-3.8-flash`); `none` drops a Gemini one |
+| `DEEPSEEK_API_KEY` | Optional, paid: when set, DeepSeek plans and writes first (about $0.002 a treatment) and the free tiers become fallbacks |
+| `DEEPSEEK_MODEL` / `GEMINI_MODEL` / `GROQ_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `deepseek-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `gemini-3.8-flash`); `none` drops a Gemini one |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `LLM_TIMEOUT_MS` | Per-call timeout before falling through (default 20000) |
 | `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
