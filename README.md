@@ -5,8 +5,8 @@ reference films), a shoot city and a budget, and it builds a treatment grounded 
 reference films, wardrobe brands and real shoot locations, each with the evidence behind it.
 
 > **Status:** work in progress for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). The treatment builder
-> runs end to end: Qloo tools, a lean LLM agent on free tiers, and the board UI. Persistence, share links and director
-> taste import come next.
+> runs end to end on live Qloo: the Qloo tools, a lean LLM agent (DeepSeek first, free models as fallbacks), the board
+> UI and four pre-built featured treatments. Director taste import comes next.
 
 ## Why Qloo
 
@@ -25,8 +25,8 @@ Mise uses Qloo's taste graph as the source of truth:
 
 ## How a treatment is built
 
-Code runs every Qloo call; the LLM is called at most three times per treatment (normally two), so the whole thing fits
-free-tier limits.
+Code runs every Qloo call; the LLM is called at most three times per treatment (normally two), which keeps a treatment
+fast and cheap, and within the free fallback models' limits.
 
 1. **Intake** is a form, so no LLM is spent parsing it.
 2. **Resolve** the artist, touchstone films and the director's own films (`resolve_entities`). Names that match more
@@ -181,8 +181,8 @@ All server-side only.
 | `QLOO_MODE` | `live` or `mock`; defaults to `live` when a key is set |
 | `QLOO_CACHE_DIR` | Optional on-disk response cache (gitignored) |
 | `GEMINI_API_KEY` | Google AI Studio key (free tier) |
-| `GROQ_API_KEY` | Groq key (free tier), the backup provider |
-| `LLM_MODE` | `live` or `mock`; defaults to `live` when either LLM key is set |
+| `GROQ_API_KEY` | Groq key (free tier), a fallback |
+| `LLM_MODE` | `live` or `mock`; defaults to `live` when any LLM key is set |
 | `DEEPSEEK_API_KEY` | Optional, paid: when set, DeepSeek plans and writes first (under a cent a treatment) and the free tiers become fallbacks |
 | `DEEPSEEK_MODEL` / `GEMINI_MODEL` / `GROQ_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `deepseek-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `gemini-3.8-flash`); `none` drops a Gemini one |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
@@ -222,7 +222,7 @@ All server-side only.
 ## Limitations
 
 - Rate limits, the daily LLM cap and the treatment cache live in process memory, so each serverless instance keeps its
-  own. That is enough to protect free-tier quota for a demo, not to meter users. The per-IP limit trusts
+  own. That is enough to protect free-tier quota and DeepSeek credit during a demo, not to meter users. The per-IP limit trusts
   `x-forwarded-for`, which is right on Vercel but spoofable behind other proxies, and identical cold briefs arriving
   at once each run their own pipeline.
 - A treatment that hit a failed Qloo call or a template-written step is shown (and says so) but never cached.
