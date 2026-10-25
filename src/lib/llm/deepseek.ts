@@ -24,7 +24,14 @@ export function schemaInPrompt(prompt: string, schema: Record<string, unknown>):
   return `${prompt}\n\nReply with one json object that validates against this JSON Schema:\n${JSON.stringify(sanitizeSchema(schema, BASE_KEYWORDS))}`;
 }
 
-export function deepseekProvider(options: { apiKey: string; model: string; fetch?: FetchLike; baseUrl?: string }): LlmProvider {
+export function deepseekProvider(options: {
+  apiKey: string;
+  model: string;
+  fetch?: FetchLike;
+  baseUrl?: string;
+  /** Off by default: thinking makes every call slower. */
+  thinking?: boolean;
+}): LlmProvider {
   const { apiKey, model } = options;
   const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
     new LlmError({ kind, message: `DeepSeek ${model}: ${message}`, provider: "deepseek", model, status, retryAfterMs });
@@ -40,7 +47,7 @@ export function deepseekProvider(options: { apiKey: string; model: string; fetch
           { role: "user", content: schemaInPrompt(call.prompt, call.schema) },
         ],
         response_format: { type: "json_object" },
-        thinking: { type: "disabled" },
+        thinking: { type: options.thinking ? "enabled" : "disabled" },
         max_tokens: call.maxOutputTokens,
       };
       const response = await (options.fetch ?? fetch)(`${options.baseUrl ?? DEEPSEEK_BASE_URL}/chat/completions`, {

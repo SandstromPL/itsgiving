@@ -33,7 +33,14 @@ function retryDelayMs(json: GeminiResponse, header: string | null): number | und
   return Number.isFinite(seconds) ? seconds * 1000 : retryAfterHeader(header);
 }
 
-export function geminiProvider(options: { apiKey: string; model: string; fetch?: FetchLike; baseUrl?: string }): LlmProvider {
+export function geminiProvider(options: {
+  apiKey: string;
+  model: string;
+  fetch?: FetchLike;
+  baseUrl?: string;
+  /** Overrides the per-step effort, e.g. "high" to give the model more thinking time. */
+  thinkingLevel?: "low" | "medium" | "high";
+}): LlmProvider {
   const { apiKey, model } = options;
   const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
     new LlmError({ kind, message: `Gemini ${model}: ${message}`, provider: "gemini", model, status, retryAfterMs });
@@ -49,7 +56,7 @@ export function geminiProvider(options: { apiKey: string; model: string; fetch?:
           responseMimeType: "application/json",
           responseJsonSchema: sanitizeSchema(call.schema, GEMINI_KEYWORDS),
           maxOutputTokens: call.maxOutputTokens,
-          thinkingConfig: { thinkingLevel: call.effort },
+          thinkingConfig: { thinkingLevel: options.thinkingLevel ?? call.effort },
         },
       };
       const url = `${options.baseUrl ?? GEMINI_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;

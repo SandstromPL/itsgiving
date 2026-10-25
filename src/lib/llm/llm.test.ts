@@ -342,6 +342,12 @@ describe("geminiProvider", () => {
       await expect(provider.complete(call())).rejects.toMatchObject({ kind });
     }
   });
+
+  it("lets thinkingLevel override the step's effort", async () => {
+    const { fetchImpl, requests } = recordingFetch(200, { candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }] });
+    await geminiProvider({ apiKey: "k", model: "m", fetch: fetchImpl, thinkingLevel: "high" }).complete(call());
+    expect(JSON.parse(String(requests[0].init.body)).generationConfig.thinkingConfig).toEqual({ thinkingLevel: "high" });
+  });
 });
 
 describe("groqProvider", () => {
@@ -372,6 +378,12 @@ describe("groqProvider", () => {
     await expect(groqProvider({ apiKey: "k", model: "m", fetch: tpm.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "rate_limit" });
     const miss = recordingFetch(400, { error: { message: "Generated JSON does not match the expected schema." } });
     await expect(groqProvider({ apiKey: "k", model: "m", fetch: miss.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "invalid_output" });
+  });
+
+  it("sends a higher reasoning effort when asked", async () => {
+    const { fetchImpl, requests } = recordingFetch(200, { choices: [{ message: { content: "{}" }, finish_reason: "stop" }] });
+    await groqProvider({ apiKey: "k", model: "m", fetch: fetchImpl, reasoningEffort: "high" }).complete(call());
+    expect(JSON.parse(String(requests[0].init.body)).reasoning_effort).toBe("high");
   });
 });
 
@@ -406,6 +418,12 @@ describe("deepseekProvider", () => {
     });
     const empty = recordingFetch(200, { choices: [{ message: { content: "" }, finish_reason: "stop" }] });
     await expect(deepseekProvider({ apiKey: "k", model: "m", fetch: empty.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "empty" });
+  });
+
+  it("turns thinking on when asked", async () => {
+    const { fetchImpl, requests } = recordingFetch(200, { choices: [{ message: { content: "{}" }, finish_reason: "stop" }] });
+    await deepseekProvider({ apiKey: "k", model: "m", fetch: fetchImpl, thinking: true }).complete(call());
+    expect(JSON.parse(String(requests[0].init.body)).thinking).toEqual({ type: "enabled" });
   });
 });
 

@@ -18,7 +18,14 @@ interface GroqResponse {
   error?: { message?: string; code?: string };
 }
 
-export function groqProvider(options: { apiKey: string; model: string; fetch?: FetchLike; baseUrl?: string }): LlmProvider {
+export function groqProvider(options: {
+  apiKey: string;
+  model: string;
+  fetch?: FetchLike;
+  baseUrl?: string;
+  /** Defaults to "low": reasoning tokens count against the free tier's 8K tokens per minute. */
+  reasoningEffort?: "low" | "medium" | "high";
+}): LlmProvider {
   const { apiKey, model } = options;
   const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
     new LlmError({ kind, message: `Groq ${model}: ${message}`, provider: "groq", model, status, retryAfterMs });
@@ -37,7 +44,7 @@ export function groqProvider(options: { apiKey: string; model: string; fetch?: F
           type: "json_schema",
           json_schema: { name: call.schemaName, strict: true, schema: sanitizeSchema(call.schema, BASE_KEYWORDS) },
         },
-        reasoning_effort: "low",
+        reasoning_effort: options.reasoningEffort ?? "low",
         include_reasoning: false,
         max_completion_tokens: call.maxOutputTokens,
       };
