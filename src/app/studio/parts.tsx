@@ -38,7 +38,7 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
       {qloo === "mock" ? (
         <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>
       ) : (
-        <span className="inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 font-medium text-emerald-300 ring-1 ring-emerald-400/30">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-graphite px-2.5 py-1 text-paper ring-1 ring-line">
           <span aria-hidden className="size-1.5 rounded-full bg-emerald-400" />
           Live Qloo data
         </span>
@@ -47,7 +47,8 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
         writer.mock ? (
           <Tape title="A deterministic template wrote this treatment, not a language model.">Mock LLM</Tape>
         ) : (
-          <span className="rounded-sm px-2 py-0.5 text-dim ring-1 ring-line">
+          // Phones keep the header to one line; the run log and the credits name the model too.
+          <span className="hidden rounded-full bg-graphite px-2.5 py-1 text-dim ring-1 ring-line sm:inline">
             Written by <span className="text-paper">{writer.model}</span>
             {writer.reasoning && `, ${thinkingName(writer.reasoning)}`}
           </span>
@@ -75,7 +76,7 @@ export function Still({ src, alt, className = "" }: { src?: string; alt: string;
   if (!src || broken) {
     return (
       <div aria-hidden className={`flex items-end bg-graphite p-3 ${className}`}>
-        <span className="line-clamp-2 text-2xl font-semibold leading-tight text-paper/15">{alt}</span>
+        <span className="type-head line-clamp-2 text-2xl leading-tight text-paper/15">{alt}</span>
       </div>
     );
   }
@@ -104,13 +105,13 @@ function ordinal(n: number): string {
 /** Evidence colour: tungsten for Qloo, tape pink for the synthetic mock, so mock numbers never pass as Qloo's. */
 const evidenceTone = (mock: boolean) => (mock ? "text-tape" : "text-tungsten");
 
-/** One line of Qloo evidence, set like the edge print on film stock. */
+/** One line of Qloo evidence, set like a camera report: where the item ranked in its call, and why. */
 export function EdgeCode({ qloo, mock }: { qloo: QlooEvidence; mock: boolean }) {
   const affinity = pct(qloo.affinity);
   return (
-    <p className={`flex flex-wrap gap-x-3 font-mono text-[11px] leading-5 ${evidenceTone(mock)}`}>
+    <p className={`type-evidence flex flex-wrap gap-x-3 text-[11.5px] leading-5 ${evidenceTone(mock)}`}>
       <span>
-        {mock ? "Mock rank" : "Qloo rank"} {qloo.rank}/{qloo.of}
+        {mock ? "Mock" : "Qloo"} #{qloo.rank} of {qloo.of}
       </span>
       {affinity && <span>affinity {affinity}</span>}
       {qloo.because[0] && <span>via {qloo.because[0].name}</span>}
@@ -119,9 +120,9 @@ export function EdgeCode({ qloo, mock }: { qloo: QlooEvidence; mock: boolean }) 
 }
 
 /** A few of the item's Qloo tags (style notes for films, aesthetics for brands, kind and mood for places). */
-export function QlooTags({ tags, mock, max = 3 }: { tags: string[]; mock: boolean; max?: number }) {
+export function QlooTags({ tags, max = 3 }: { tags: string[]; max?: number }) {
   if (tags.length === 0) return null;
-  return <p className={`font-mono text-[11px] leading-5 opacity-80 ${evidenceTone(mock)}`}>{tags.slice(0, max).join(" / ")}</p>;
+  return <p className="type-evidence text-[11.5px] leading-5 text-dim">{tags.slice(0, max).join(" / ")}</p>;
 }
 
 /** "Why" popover: Qloo's evidence on top, Mise's interpretation below, never mixed. */
@@ -150,16 +151,16 @@ export function Why({
       <button
         type="button"
         popoverTarget={id}
-        className="self-start rounded-sm text-xs text-dim underline decoration-line underline-offset-4 hover:text-paper hover:decoration-dim"
+        className="self-start rounded-sm text-xs text-dim underline decoration-edge underline-offset-4 hover:text-paper hover:decoration-dim"
       >
         {label}
         <span className="sr-only">: {name}</span>
       </button>
       <div id={id} popover="auto" className="why" role="dialog" aria-label={`Why ${name}`}>
-        <p className="text-lg font-semibold leading-snug">{name}</p>
+        <p className="type-head text-2xl leading-tight">{name}</p>
         <section className="mt-4">
-          <h3 className={`font-mono text-xs ${evidenceTone(mock)}`}>{mock ? "Mock data (synthetic, not Qloo)" : "From Qloo"}</h3>
-          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs text-paper/90">
+          <h3 className={`text-xs font-medium ${evidenceTone(mock)}`}>{mock ? "Mock data (synthetic, not Qloo)" : "From Qloo"}</h3>
+          <dl className="type-evidence mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs leading-5 text-paper/90">
             <dt className="text-dim">Rank</dt>
             <dd>
               {qloo.rank} of {qloo.of} from {qloo.tool}

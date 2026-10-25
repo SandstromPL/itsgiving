@@ -44,6 +44,9 @@ export function subjectPhrase(artists: string[], touchstones: string[]): string 
     .join(", ");
 }
 
+/** The pipeline's steps in the order they run (overlap and re-plan are often skipped). */
+export const STEP_ORDER: StepId[] = ["resolve", "audience", "overlap", "plan", "tags", "references", "wardrobe", "locations", "replan", "write"];
+
 /** Timeline labels, shared so a treatment replayed from cache shows the same steps the server names. */
 export const STEP_LABELS: Record<StepId, string> = {
   resolve: "Resolve names in Qloo",

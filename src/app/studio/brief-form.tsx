@@ -63,7 +63,8 @@ export function validateForm(form: FormState): FormProblem | null {
 }
 
 const field =
-  "w-full rounded-md border border-edge bg-graphite px-3 py-2 text-sm text-paper placeholder:text-faint hover:border-dim focus:border-tungsten aria-invalid:border-safelight";
+  "w-full rounded-md border border-edge bg-raised px-3 py-2.5 text-[15px] text-paper placeholder:text-faint hover:border-dim focus:border-tungsten aria-invalid:border-safelight";
+const label = "text-[13px] font-medium text-dim";
 
 export function BriefForm({
   form,
@@ -103,19 +104,19 @@ export function BriefForm({
   return (
     <form onSubmit={submit} aria-labelledby={`${ids}-title`} className="flex flex-col gap-5" noValidate>
       <div>
-        <h2 id={`${ids}-title`} className="text-sm font-medium text-paper">
+        <h2 id={`${ids}-title`} className="type-head text-2xl text-paper">
           The brief
         </h2>
         <p className="mt-1 text-xs leading-5 text-dim">Names of public works only. Nothing personal goes to Qloo or the language model.</p>
       </div>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-xs text-dim">Format</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-md bg-graphite p-1 ring-1 ring-edge">
+        <legend className={`mb-2 ${label}`}>Format</legend>
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-frame p-1 ring-1 ring-line">
           {(Object.keys(FORMATS) as Format[]).map((format) => (
             <label
               key={format}
-              className="cursor-pointer rounded px-3 py-1.5 text-center text-sm text-dim has-checked:bg-paper has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
+              className="cursor-pointer rounded-md px-3 py-2 text-center text-sm text-dim hover:text-paper has-checked:bg-paper has-checked:font-medium has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
             >
               <input
                 type="radio"
@@ -132,7 +133,7 @@ export function BriefForm({
       </fieldset>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${ids}-artist`} className="text-xs text-dim">
+        <label htmlFor={`${ids}-artist`} className={label}>
           {isVideo ? "Artist" : "Artist or band (optional)"}
         </label>
         <input
@@ -148,7 +149,7 @@ export function BriefForm({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${ids}-touchstones`} className="text-xs text-dim">
+        <label htmlFor={`${ids}-touchstones`} className={label}>
           Touchstone films {isVideo ? "(optional)" : ""}
         </label>
         <textarea
@@ -160,7 +161,7 @@ export function BriefForm({
           placeholder={"Past Lives\nAftersun"}
           {...describe("touchstones", `${ids}-touchstones-hint`)}
         />
-        <p id={`${ids}-touchstones-hint`} className="text-xs text-faint">
+        <p id={`${ids}-touchstones-hint`} className="text-xs leading-5 text-faint">
           One title per line, up to {LIMITS.touchstones}. The client&apos;s references, if any.
         </p>
         {message("touchstones")}
@@ -168,7 +169,7 @@ export function BriefForm({
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${ids}-city`} className="text-xs text-dim">
+          <label htmlFor={`${ids}-city`} className={label}>
             Shoot city
           </label>
           <input
@@ -182,7 +183,7 @@ export function BriefForm({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${ids}-budget`} className="text-xs text-dim">
+          <label htmlFor={`${ids}-budget`} className={label}>
             Budget
           </label>
           <select
@@ -202,7 +203,7 @@ export function BriefForm({
       {message("city")}
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${ids}-taste`} className="text-xs text-dim">
+        <label htmlFor={`${ids}-taste`} className={label}>
           Your taste (optional)
         </label>
         <textarea
@@ -214,7 +215,7 @@ export function BriefForm({
           placeholder={"In the Mood for Love\nDonnie Darko"}
           {...describe("directorFilms", `${ids}-taste-hint`)}
         />
-        <p id={`${ids}-taste-hint`} className="text-xs text-faint">
+        <p id={`${ids}-taste-hint`} className="text-xs leading-5 text-faint">
           Films you love, one per line, up to {LIMITS.directorFilms}. Add the year, like Rockstar (2011), to skip a
           question when titles repeat. Mise finds where your taste meets the audience&apos;s.
         </p>
@@ -222,12 +223,12 @@ export function BriefForm({
       </div>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-xs text-dim">Thinking</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-md bg-graphite p-1 ring-1 ring-edge">
+        <legend className={`mb-2 ${label}`}>Thinking</legend>
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-frame p-1 ring-1 ring-line">
           {(Object.keys(THINKING) as Thinking[]).map((thinking) => (
             <label
               key={thinking}
-              className="cursor-pointer rounded px-3 py-1.5 text-center text-sm text-dim has-checked:bg-paper has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
+              className="cursor-pointer rounded-md px-3 py-2 text-center text-sm text-dim hover:text-paper has-checked:bg-paper has-checked:font-medium has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
             >
               <input
                 type="radio"
@@ -242,7 +243,7 @@ export function BriefForm({
             </label>
           ))}
         </div>
-        <p id={`${ids}-thinking-hint`} className="text-xs text-faint">
+        <p id={`${ids}-thinking-hint`} className="text-xs leading-5 text-faint">
           {THINKING[form.thinking].hint}
         </p>
       </fieldset>
@@ -252,12 +253,12 @@ export function BriefForm({
         <button
           type="submit"
           aria-disabled={running}
-          className="flex-1 rounded-md bg-paper px-4 py-2.5 text-sm font-semibold text-ink hover:bg-white aria-disabled:cursor-progress aria-disabled:opacity-60"
+          className="h-11 flex-1 rounded-md bg-paper px-4 text-[15px] font-semibold text-ink hover:bg-white aria-disabled:cursor-progress aria-disabled:opacity-60"
         >
           {running ? "Building treatment…" : "Build treatment"}
         </button>
         {running && (
-          <button type="button" onClick={onStop} className="rounded-md px-4 py-2.5 text-sm text-paper ring-1 ring-edge hover:ring-dim">
+          <button type="button" onClick={onStop} className="h-11 rounded-md px-4 text-[15px] text-paper ring-1 ring-edge hover:ring-dim">
             Stop
           </button>
         )}

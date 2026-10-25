@@ -1,22 +1,25 @@
 @import "tailwindcss";
 
 /*
- * Mise palette. Tungsten (amber) is reserved for Qloo evidence, set in the
- * mono face like the edge print on film stock; Mise's own interpretation is
- * set in the sans. Tape pink marks anything mocked, like camera tape on a
- * stand-in prop.
+ * Mise: the screening room and the frame. The page is the room, a warm dark grey; only a treatment's
+ * cover is true black, like the projected image. Tungsten (amber) is reserved for Qloo evidence, set a
+ * little expanded with tabular figures like a camera report; Mise's own writing uses the normal width.
+ * Tape pink marks anything mocked, like camera tape on a stand-in prop; safelight red marks errors.
+ * Every text pair below passes WCAG AA (the a11y plugin's contrast script, 2026-10-25).
  */
 :root {
-  --background: #0c0a09;
-  --foreground: #f5f5f4;
-  --graphite: #1c1917;
-  --line: #292524;
-  --dim: #a8a29e;
-  --faint: #8c8680;
-  --edge: #78716c;
-  --tungsten: #fbbf24;
-  --tape: #f9a8d4;
-  --safelight: #f87171;
+  --background: #141311; /* the room */
+  --foreground: #ece7df; /* 15:1 on the room */
+  --graphite: #1a1917; /* panels */
+  --raised: #211f1c; /* controls */
+  --line: #2b2925; /* rules, decorative only */
+  --edge: #6e685f; /* control borders, 3.2:1 on panels */
+  --dim: #a39d93; /* secondary text, 6.5:1 on panels */
+  --faint: #8e887e; /* hints, 5.0:1 on panels */
+  --frame: #0a0908; /* the projected frame */
+  --tungsten: #e8b04b;
+  --tape: #f2a4c8;
+  --safelight: #ef6c5d;
   color-scheme: dark;
 }
 
@@ -26,21 +29,43 @@
   --color-ink: var(--background);
   --color-paper: var(--foreground);
   --color-graphite: var(--graphite);
+  --color-raised: var(--raised);
   --color-line: var(--line);
   --color-dim: var(--dim);
   --color-faint: var(--faint);
   --color-edge: var(--edge);
+  --color-frame: var(--frame);
   --color-tungsten: var(--tungsten);
   --color-tape: var(--tape);
   --color-safelight: var(--safelight);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-archivo), system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+}
+
+/* Archivo's width axis carries the hierarchy: condensed for titles, normal for reading, expanded for evidence. */
+@utility type-poster {
+  font-stretch: 68%;
+  font-weight: 760;
+  letter-spacing: -0.012em;
+  line-height: 0.92;
+}
+
+@utility type-head {
+  font-stretch: 78%;
+  font-weight: 640;
+  letter-spacing: -0.005em;
+}
+
+@utility type-evidence {
+  font-stretch: 112%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-archivo), system-ui, sans-serif;
 }
 
 :focus-visible {
@@ -48,20 +73,26 @@ body {
   outline-offset: 2px;
 }
 
+/* The brief panel scrolls on its own on wide screens; keep its scrollbar quiet. */
+.quiet-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
 /* "Why" popovers: native popover API, light-dismiss and Esc for free. */
 [popover].why {
   margin: auto;
-  max-width: min(28rem, calc(100vw - 2rem));
+  max-width: min(30rem, calc(100vw - 2rem));
   max-height: calc(100vh - 4rem);
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   background: var(--graphite);
   color: var(--foreground);
-  padding: 1.25rem;
+  padding: 1.5rem;
 }
 [popover].why::backdrop {
-  background: rgb(12 10 9 / 0.7);
+  background: rgb(10 9 8 / 0.72);
 }
 
 /* The one orchestrated moment: the cover's letterbox opens when a treatment lands. */

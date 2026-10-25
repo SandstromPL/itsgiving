@@ -77,6 +77,7 @@ export function Playground({ tools }: { tools: ToolInfo[] }) {
         </div>
         <p className="text-sm leading-6 text-stone-400">{tool?.description}</p>
         <textarea
+          aria-label="Tool input (JSON)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           spellCheck={false}

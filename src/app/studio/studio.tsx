@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { BriefInput } from "@/lib/agent/brief";
-import { STEP_LABELS, type Nudge } from "@/lib/agent/options";
-import type { AgentEvent, Ambiguity, StepEvent, StepId, Treatment } from "@/lib/agent/types";
+import { STEP_LABELS, STEP_ORDER, type Nudge } from "@/lib/agent/options";
+import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
 import { Board, EmptyBoard, type Example } from "./board";
@@ -12,7 +12,7 @@ import { BriefForm, EMPTY_FORM, splitTitles, validateForm, type FormProblem, typ
 import { ModeBadges } from "./parts";
 import { Picker } from "./picker";
 import { StreamError, streamTreatment } from "./stream";
-import { Timeline } from "./timeline";
+import { RunStage, Timeline } from "./timeline";
 
 type Phase = "idle" | "running" | "needs_input" | "done" | "error";
 
@@ -33,24 +33,26 @@ const STALL_MS = 75_000;
 // that live Qloo knows more than one of carry their year, so only the last example stops to ask.
 const EXAMPLES: Example<FormState>[] = [
   {
-    label: "Prateek Kuhad, shot in Mumbai",
+    title: "Prateek Kuhad",
+    detail: "Music video in Mumbai on an indie budget, with your taste in films.",
     form: { ...EMPTY_FORM, artist: "Prateek Kuhad", city: "Mumbai", directorFilms: "In the Mood for Love\nDonnie Darko\nRockstar (2011)" },
   },
   {
-    label: "Charli xcx, shot in New York",
+    title: "Charli xcx",
+    detail: "Music video in New York on a premium budget.",
     form: { ...EMPTY_FORM, artist: "Charli xcx", city: "New York", budget: "premium", directorFilms: "Chungking Express\nDrive (2011)" },
   },
   {
-    label: "A short film after Past Lives and Aftersun",
+    title: "After Past Lives and Aftersun",
+    detail: "A short film in Mumbai on a shoestring.",
     form: { ...EMPTY_FORM, format: "short_film", touchstones: "Past Lives (2023)\nAftersun (2022)", city: "Mumbai", budget: "shoestring", directorFilms: "Masaan (2015)" },
   },
   {
-    label: "Frank Ocean, with a title to pick",
+    title: "Frank Ocean",
+    detail: "Music video in New York, with a title to pick.",
     form: { ...EMPTY_FORM, artist: "Frank Ocean", touchstones: "Forgotten", city: "New York" },
   },
 ];
-
-const STEP_ORDER: StepId[] = ["resolve", "audience", "overlap", "plan", "tags", "references", "wardrobe", "locations", "replan", "write"];
 
 function toBrief({ form, picks, nudges }: RunInput): BriefInput {
   return {
@@ -92,6 +94,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const [runProblem, setRunProblem] = useState<string | null>(null);
   const [modes, setModes] = useState<{ qloo: QlooMode; llm: LlmMode } | null>(null);
   const [status, setStatus] = useState("");
+  const [startedAt, setStartedAt] = useState(0);
   const active = useRef<AbortController | null>(null);
   const stopActive = useRef<() => void>(() => {});
   const focusTitle = useRef(false);
@@ -124,6 +127,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     setRunProblem(null);
     setQuestion(null);
     setSteps([]);
+    setStartedAt(Date.now());
     setPhase("running");
     setStatus("Building the treatment…");
 
@@ -235,14 +239,20 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   // Chips show the run in flight while it runs, otherwise the nudges behind the board on screen.
   const nudgesShown = running && pending ? pending.nudges : (shown?.nudges ?? []);
   const boardState = running ? "updating" : phase === "error" ? "previous" : "current";
+  // A first build takes the stage with its run log; the rail keeps the log the rest of the time.
+  const logOnStage = running && !treatment;
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="sticky top-0 z-20 border-b border-line bg-ink/95 backdrop-blur print:static">
-        <div className="mx-auto flex w-full max-w-[96rem] flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-8">
-          <div className="flex items-baseline gap-4">
-            <h1 className="text-lg font-semibold tracking-[0.3em] text-paper">MISE</h1>
-            <p className="hidden text-sm text-dim sm:block">Treatments grounded in what the audience loves</p>
+      <header className="sticky top-0 z-30 border-b border-line bg-background/90 backdrop-blur print:static">
+        <div className="mx-auto flex h-14 w-full max-w-[100rem] items-center justify-between gap-4 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-4">
+            <h1 className="flex items-center gap-2.5">
+              {/* A 2.39:1 frame with letterbox bars: the mark is the screen the treatment is made for. */}
+              <span aria-hidden className="h-[14px] w-[33px] shrink-0 rounded-[2px] border-x border-y-[3px] border-paper" />
+              <span className="type-head text-2xl leading-none text-paper">Mise</span>
+            </h1>
+            <p className="hidden truncate text-sm text-dim md:block">Treatments grounded in what the audience loves</p>
           </div>
           {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={treatment ?? undefined} /> : initialBadges}
         </div>
@@ -251,8 +261,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
         {status}
       </p>
 
-      <main className="mx-auto grid w-full max-w-[96rem] flex-1 grid-cols-[minmax(0,1fr)] gap-10 px-4 py-8 sm:px-8 lg:grid-cols-[21rem_minmax(0,1fr)] lg:gap-12 print:block">
-        <aside className="flex min-w-0 flex-col gap-10 print:hidden lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-2">
+      <main className="mx-auto grid w-full max-w-[100rem] flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[23rem_minmax(0,1fr)] print:block">
+        <aside className="quiet-scroll flex min-w-0 flex-col gap-10 border-line px-4 py-6 sm:px-6 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto lg:border-r lg:bg-graphite/40 lg:py-8 print:hidden">
           <BriefForm
             form={form}
             onChange={setForm}
@@ -261,7 +271,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
             running={running}
             problem={formProblem}
           />
-          <Timeline steps={steps} />
+          {!logOnStage && <Timeline steps={steps} />}
           {process.env.NODE_ENV !== "production" && (
             <Link href="/playground" className="text-xs text-faint underline decoration-line underline-offset-4 hover:text-dim">
               Tool playground (development)
@@ -269,20 +279,28 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
           )}
         </aside>
 
-        <section aria-label="Treatment" className="flex min-w-0 flex-col gap-8">
+        <section aria-label="Treatment" className="flex min-w-0 flex-col gap-8 px-4 py-8 sm:px-8 lg:px-12 lg:py-10 xl:px-16 print:p-0">
           {phase === "error" && runProblem && (
             <div role="alert" className="rounded-lg border border-safelight/40 bg-safelight/10 px-4 py-3 text-sm text-paper">
               <p className="font-medium text-safelight">The treatment didn&apos;t finish.</p>
               <p className="mt-1 text-paper/85">{runProblem}</p>
             </div>
           )}
+          {running && treatment && (
+            <p className="flex items-center gap-3 text-sm text-dim print:hidden">
+              <span aria-hidden className="size-1.5 rounded-full bg-tungsten motion-safe:animate-pulse" />
+              Reworking the treatment{current ? `: ${current.toLowerCase()}` : ""}…
+            </p>
+          )}
           {question && phase === "needs_input" && (
             <Picker key={question.items.map((i) => i.key).join("|")} message={question.message} items={question.items} onPick={pick} running={running} />
           )}
-          {treatment ? (
+          {logOnStage ? (
+            <RunStage steps={steps} startedAt={startedAt} thinking={pending?.form.thinking ?? "deep"} />
+          ) : treatment ? (
             <Board treatment={treatment} state={boardState} nudges={nudgesShown} onToggleNudge={toggleNudge} running={running} />
           ) : (
-            phase !== "needs_input" && <EmptyBoard examples={EXAMPLES} onTry={tryExample} running={running} current={current} />
+            phase !== "needs_input" && <EmptyBoard examples={EXAMPLES} onTry={tryExample} />
           )}
         </section>
       </main>
