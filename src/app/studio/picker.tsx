@@ -27,6 +27,7 @@ export function Picker({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (running) return;
     const data = new FormData(event.currentTarget);
     onPick(Object.fromEntries(items.map((item) => [item.key, String(data.get(item.key) ?? "")])));
   };
@@ -45,12 +46,12 @@ export function Picker({
             &ldquo;{item.input}&rdquo;, from {ROLE[item.role]}
           </legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            {item.candidates.map((candidate, i) => (
+            {item.candidates.map((candidate) => (
               <label
                 key={candidate.id}
-                className="flex cursor-pointer items-center gap-3 rounded-md p-2 ring-1 ring-line hover:ring-stone-600 has-checked:ring-2 has-checked:ring-paper has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
+                className="flex cursor-pointer items-center gap-3 rounded-md p-2 ring-1 ring-edge hover:ring-dim has-checked:ring-2 has-checked:ring-paper has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
               >
-                <input type="radio" name={item.key} value={candidate.id} required defaultChecked={i === 0} className="sr-only" />
+                <input type="radio" name={item.key} value={candidate.id} required className="sr-only" />
                 <Still src={candidate.image} alt="" className="aspect-video w-20 shrink-0 rounded-sm" />
                 <span className="min-w-0">
                   <span className="block truncate text-sm text-paper">{candidate.name}</span>
@@ -65,8 +66,8 @@ export function Picker({
       ))}
       <button
         type="submit"
-        disabled={running}
-        className="self-start rounded-md bg-paper px-4 py-2 text-sm font-semibold text-ink hover:bg-white disabled:opacity-60"
+        aria-disabled={running}
+        className="self-start rounded-md bg-paper px-4 py-2 text-sm font-semibold text-ink hover:bg-white aria-disabled:opacity-60"
       >
         Continue with these
       </button>

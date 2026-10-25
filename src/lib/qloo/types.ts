@@ -39,6 +39,8 @@ export interface QlooEntity {
   query?: QlooEntityQuery;
   disambiguation?: string;
   external?: Record<string, unknown>;
+  /** Places: coordinates sit here on live responses, not in properties. */
+  location?: { lat?: number; lon?: number; geohash?: string };
 }
 
 export interface QlooAudience {

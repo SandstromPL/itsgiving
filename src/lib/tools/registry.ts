@@ -65,7 +65,7 @@ export async function runTool(name: string, rawInput: unknown, ctx: ToolContext)
   }
 
   try {
-    const output = await tool.run(parsed.data, { qloo: ctx.qloo.recording((p) => provenance.push(p)) });
+    const output = await tool.run(parsed.data, { qloo: ctx.qloo.recording((p) => provenance.push(p), ctx.signal) });
     return {
       ...base,
       status: output.status,

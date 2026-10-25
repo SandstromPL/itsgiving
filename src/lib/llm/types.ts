@@ -1,4 +1,4 @@
-export type LlmProviderKind = "gemini" | "groq" | "mock";
+export type LlmProviderKind = "gemini" | "groq" | "deepseek" | "mock";
 
 /** Maps to Gemini's thinkingLevel. Groq always reasons at low effort to fit its 8K tokens/min free tier. */
 export type Effort = "low" | "medium";

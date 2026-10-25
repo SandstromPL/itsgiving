@@ -5,12 +5,15 @@ import { BUDGETS, FORMATS, NUDGES, type Budget, type Format } from "./options";
 
 export { BUDGETS, NUDGES, type Budget, type Nudge } from "./options";
 
-const name = z.string().trim().min(1).max(80);
+// No control characters: names go into LLM prompts, and a line break could forge a prompt section.
+const noControl = (value: string) => !/\p{Cc}/u.test(value);
+const CONTROL_MESSAGE = "Remove line breaks and control characters.";
+const name = z.string().trim().min(1).max(80).refine(noControl, CONTROL_MESSAGE);
 
 export const briefSchema = z
   .strictObject({
     format: z.enum(Object.keys(FORMATS) as [Format, ...Format[]]).default("music_video"),
-    artist: z.string().trim().max(80).optional(),
+    artist: z.string().trim().max(80).refine(noControl, CONTROL_MESSAGE).optional(),
     touchstones: z.array(name).max(5).default([]),
     city: name,
     budget: z.enum(Object.keys(BUDGETS) as [Budget, ...Budget[]]).default("indie"),
@@ -44,13 +47,17 @@ function dedupe(names: string[]): string[] {
   });
 }
 
+/** Single spaces only, so prompts and cache keys see one canonical spelling. */
+const tidy = (value: string) => value.replace(/\s+/g, " ").trim();
+
 /** Drop empty and duplicate entries so equivalent briefs share a cache key. */
 export function normalizeBrief(brief: Brief): Brief {
   return {
     ...brief,
-    artist: brief.artist?.trim() || undefined,
-    touchstones: dedupe(brief.touchstones),
-    director_films: dedupe(brief.director_films),
+    artist: brief.artist ? tidy(brief.artist) || undefined : undefined,
+    touchstones: dedupe(brief.touchstones.map(tidy)),
+    city: tidy(brief.city),
+    director_films: dedupe(brief.director_films.map(tidy)),
     nudges: NUDGES.filter((n) => brief.nudges.includes(n)),
   };
 }

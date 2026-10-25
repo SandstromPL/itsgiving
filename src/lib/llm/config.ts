@@ -1,17 +1,20 @@
 import type { FetchLike } from "../qloo";
+import { deepseekProvider } from "./deepseek";
 import { geminiProvider } from "./gemini";
 import { groqProvider } from "./groq";
 import { LlmError, type LlmProvider } from "./types";
 
 export type LlmMode = "live" | "mock";
 
-// Chain order: Gemini primary -> Groq -> Gemini fallback. Measured live on the
-// free tiers (2026-10-24): 3.5 Flash-Lite answered plan/write in 5-7 s and Groq
-// gpt-oss-120b in 1-3 s, while 3.8 Flash returned 503s or took 100+ s, so it
-// only runs when both faster models are down.
+// Chain order: Gemini primary -> Groq -> DeepSeek -> Gemini fallback. Measured
+// live (2026-10-24/25): 3.5 Flash-Lite answered plan/write in 5-7 s and Groq
+// gpt-oss-120b in 1-3 s (both free). DeepSeek Flash is paid, so it only runs
+// when both free tiers fail; it writes the richest treatments but takes 15-20 s
+// to write. 3.8 Flash returned 503s or took 100+ s, so it goes last.
 export const DEFAULT_MODELS = {
   gemini: "gemini-3.5-flash-lite",
   groq: "openai/gpt-oss-120b",
+  deepseek: "deepseek-flash",
   geminiFallback: "gemini-3.8-flash",
 } as const;
 
@@ -19,10 +22,12 @@ export interface LlmConfig {
   mode: LlmMode;
   geminiApiKey?: string;
   groqApiKey?: string;
+  deepseekApiKey?: string;
   /** First in the chain; "none" drops it. */
   geminiModel?: string;
   groqModel: string;
-  /** Last real model in the chain, after Groq; "none" drops it. */
+  deepseekModel: string;
+  /** Last real model in the chain, after Groq and DeepSeek; "none" drops it. */
   geminiFallbackModel?: string;
   /** Real LLM calls allowed per UTC day across the process; the mock never counts. */
   dailyCap: number;
@@ -41,9 +46,10 @@ function positiveInt(value: string | undefined, fallback: number): number {
 export function llmConfigFromEnv(env: Record<string, string | undefined> = process.env): LlmConfig {
   const geminiApiKey = env.GEMINI_API_KEY?.trim() || undefined;
   const groqApiKey = env.GROQ_API_KEY?.trim() || undefined;
+  const deepseekApiKey = env.DEEPSEEK_API_KEY?.trim() || undefined;
   const requested = env.LLM_MODE?.trim().toLowerCase();
   const mode: LlmMode =
-    requested === "mock" || requested === "live" ? requested : geminiApiKey || groqApiKey ? "live" : "mock";
+    requested === "mock" || requested === "live" ? requested : geminiApiKey || groqApiKey || deepseekApiKey ? "live" : "mock";
   const model = (value: string | undefined, fallback: string) => {
     const chosen = value?.trim() || fallback;
     return chosen === "none" ? undefined : chosen;
@@ -54,8 +60,10 @@ export function llmConfigFromEnv(env: Record<string, string | undefined> = proce
     mode,
     geminiApiKey,
     groqApiKey,
+    deepseekApiKey,
     geminiModel,
     groqModel: env.GROQ_MODEL?.trim() || DEFAULT_MODELS.groq,
+    deepseekModel: env.DEEPSEEK_MODEL?.trim() || DEFAULT_MODELS.deepseek,
     geminiFallbackModel: geminiFallbackModel === geminiModel ? undefined : geminiFallbackModel,
     dailyCap: positiveInt(env.LLM_DAILY_CAP, 300),
     // A healthy free-tier call takes under 10 s; waiting longer only burns the run budget.
@@ -72,6 +80,9 @@ export function createProviders(config: LlmConfig, fetchImpl?: FetchLike): LlmPr
   };
   gemini(config.geminiModel);
   if (config.groqApiKey) providers.push(groqProvider({ apiKey: config.groqApiKey, model: config.groqModel, fetch: fetchImpl }));
+  if (config.deepseekApiKey) {
+    providers.push(deepseekProvider({ apiKey: config.deepseekApiKey, model: config.deepseekModel, fetch: fetchImpl }));
+  }
   gemini(config.geminiFallbackModel);
   return providers;
 }
@@ -141,8 +152,10 @@ export class Cooldowns {
     return until !== undefined && until > this.now();
   }
 
+  /** Rest a provider for `ms`, never shortening a longer rest already in place (e.g. a long Retry-After). */
   trip(provider: LlmProvider, ms: number): void {
-    this.until.set(Cooldowns.key(provider), this.now() + ms);
+    const key = Cooldowns.key(provider);
+    this.until.set(key, Math.max(this.until.get(key) ?? 0, this.now() + ms));
   }
 }
 

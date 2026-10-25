@@ -1,9 +1,9 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
-import type { QlooEvidence } from "@/lib/agent/types";
-import type { ProducedBy } from "@/lib/llm/generate";
+import { useId, useState, type ReactNode } from "react";
+import type { QlooEvidence, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
+import type { ProducedBy } from "@/lib/llm/generate";
 import type { QlooMode } from "@/lib/qloo/client";
 
 /** Pink "camera tape" label for anything mocked. */
@@ -19,7 +19,13 @@ export function modelName(by: ProducedBy): string {
   return by.mock ? "Mock LLM" : by.model;
 }
 
-export function ModeBadges({ qloo, llm, writtenBy }: { qloo: QlooMode; llm: LlmMode; writtenBy?: ProducedBy }) {
+/**
+ * Data-source badges. Before any run they come from the server at request
+ * time (see live-modes.tsx); after a run, from the run itself.
+ */
+export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmMode; treatment?: Treatment }) {
+  const writer = treatment?.writtenBy;
+  const mockedSteps = treatment?.llm.filter((t) => t.producedBy.mock && t.step !== "write").map((t) => t.step) ?? [];
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       {qloo === "mock" ? (
@@ -30,24 +36,35 @@ export function ModeBadges({ qloo, llm, writtenBy }: { qloo: QlooMode; llm: LlmM
           Live Qloo data
         </span>
       )}
-      {writtenBy ? (
-        writtenBy.mock ? (
+      {writer ? (
+        writer.mock ? (
           <Tape title="A deterministic template wrote this treatment, not a language model.">Mock LLM</Tape>
         ) : (
           <span className="rounded-sm px-2 py-0.5 text-dim ring-1 ring-line">
-            Written by <span className="text-paper">{writtenBy.model}</span>
+            Written by <span className="text-paper">{writer.model}</span>
           </span>
         )
       ) : llm === "mock" ? (
         <Tape title="No LLM key is set, so a deterministic template plans and writes.">Mock LLM</Tape>
       ) : null}
+      {writer && !writer.mock && mockedSteps.length > 0 && (
+        <Tape title="Live models were unavailable for this step, so a deterministic template did it.">
+          Mock LLM {mockedSteps.join(" and ")}
+        </Tape>
+      )}
     </div>
   );
 }
 
+/** Shown in place of the badges until the server has said which data sources are live. */
+export function ModesPending() {
+  return <span className="text-xs text-faint">Checking data sources…</span>;
+}
+
 /** An image from Qloo (or a mock placeholder); plain <img> because hosts vary per entity. */
 export function Still({ src, alt, className = "" }: { src?: string; alt: string; className?: string }) {
-  if (!src) {
+  const [broken, setBroken] = useState(false);
+  if (!src || broken) {
     return (
       <div aria-hidden className={`flex items-end bg-graphite p-3 ${className}`}>
         <span className="line-clamp-2 text-2xl font-semibold leading-tight text-paper/15">{alt}</span>
@@ -56,7 +73,14 @@ export function Still({ src, alt, className = "" }: { src?: string; alt: string;
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element -- remote Qloo images from many hosts; no optimizer config needed
-    <img src={src} alt={alt} loading="lazy" referrerPolicy="no-referrer" className={`bg-graphite object-cover ${className}`} />
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setBroken(true)}
+      className={`bg-graphite object-cover ${className}`}
+    />
   );
 }
 
@@ -69,18 +93,27 @@ function ordinal(n: number): string {
   return `${n}${tail}`;
 }
 
+/** Evidence colour: tungsten for Qloo, tape pink for the synthetic mock, so mock numbers never pass as Qloo's. */
+const evidenceTone = (mock: boolean) => (mock ? "text-tape" : "text-tungsten");
+
 /** One line of Qloo evidence, set like the edge print on film stock. */
-export function EdgeCode({ qloo }: { qloo: QlooEvidence }) {
+export function EdgeCode({ qloo, mock }: { qloo: QlooEvidence; mock: boolean }) {
   const affinity = pct(qloo.affinity);
   return (
-    <p className="flex flex-wrap gap-x-3 font-mono text-[11px] leading-5 text-tungsten">
+    <p className={`flex flex-wrap gap-x-3 font-mono text-[11px] leading-5 ${evidenceTone(mock)}`}>
       <span>
-        Qloo rank {qloo.rank}/{qloo.of}
+        {mock ? "Mock rank" : "Qloo rank"} {qloo.rank}/{qloo.of}
       </span>
       {affinity && <span>affinity {affinity}</span>}
       {qloo.because[0] && <span>via {qloo.because[0].name}</span>}
     </p>
   );
+}
+
+/** A few of the item's Qloo tags (style notes for films, aesthetics for brands, kind and mood for places). */
+export function QlooTags({ tags, mock, max = 3 }: { tags: string[]; mock: boolean; max?: number }) {
+  if (tags.length === 0) return null;
+  return <p className={`font-mono text-[11px] leading-5 opacity-80 ${evidenceTone(mock)}`}>{tags.slice(0, max).join(" / ")}</p>;
 }
 
 /** "Why" popover: Qloo's evidence on top, Mise's interpretation below, never mixed. */
@@ -90,12 +123,18 @@ export function Why({
   qloo,
   read,
   writtenBy,
+  mock,
+  note,
 }: {
   label: string;
   name: string;
   qloo: QlooEvidence;
   read: { term: string; text: string }[];
   writtenBy: ProducedBy;
+  /** True when the evidence came from the synthetic mock, not Qloo. */
+  mock: boolean;
+  /** Qloo's own description of the item, e.g. a place's atmosphere. */
+  note?: string;
 }) {
   const id = useId();
   return (
@@ -111,7 +150,7 @@ export function Why({
       <div id={id} popover="auto" className="why" role="dialog" aria-label={`Why ${name}`}>
         <p className="text-lg font-semibold leading-snug">{name}</p>
         <section className="mt-4">
-          <h3 className="font-mono text-xs text-tungsten">From Qloo</h3>
+          <h3 className={`font-mono text-xs ${evidenceTone(mock)}`}>{mock ? "Mock data (synthetic, not Qloo)" : "From Qloo"}</h3>
           <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs text-paper/90">
             <dt className="text-dim">Rank</dt>
             <dd>
@@ -141,6 +180,12 @@ export function Why({
                 <dd>{qloo.tags.slice(0, 6).join(", ")}</dd>
               </>
             )}
+            {note && (
+              <>
+                <dt className="text-dim">Atmosphere</dt>
+                <dd>{note}</dd>
+              </>
+            )}
           </dl>
           <p className="mt-2 text-xs leading-5 text-dim">
             Aggregate audience affinity: what fans of the input over-index on, not a fact about any one person.
@@ -158,10 +203,12 @@ export function Why({
           </dl>
           <p className="mt-2 text-xs text-dim">Interpretation by {modelName(writtenBy)}.</p>
         </section>
+        {/* autoFocus moves focus into the popover when it opens; closing returns it to the invoker. */}
         <button
           type="button"
           popoverTarget={id}
           popoverTargetAction="hide"
+          autoFocus
           className="mt-5 rounded-sm px-3 py-1.5 text-sm ring-1 ring-line hover:ring-dim"
         >
           Close

@@ -34,6 +34,8 @@ export interface GenerateJsonOptions<T> {
   signal?: AbortSignal;
   /** Epoch ms by which a result is needed; real providers are skipped once too little time is left. */
   deadline?: number;
+  /** Shortest call worth starting before the deadline (a write needs longer than a plan). */
+  minCallMs?: number;
 }
 
 export type AttemptOutcome = "ok" | "repaired" | "invalid" | "error" | "skipped";
@@ -142,19 +144,20 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
     const record = (outcome: AttemptOutcome, extra: Partial<LlmAttempt> = {}) =>
       attempts.push({ provider: provider.kind, model: provider.model, outcome, ms: Date.now() - started, ...extra });
 
-    /** Checks cooldown, deadline and the daily cap; returns the time this call may take, or null to skip. */
-    const admit = (): number | null => {
-      if (isMock) return deps.timeoutMs;
-      const skip = (kind: SkipReason, message: string) => {
-        record("skipped", { kind, message });
-        return null;
-      };
-      if (deps.cooldowns.active(provider)) return skip("cooldown", "Failed recently; resting.");
+    /** The time this call may take, or why it shouldn't start (cooldown, too little time, daily cap). */
+    let clamped = false;
+    const admit = (): { ok: true; budgetMs: number } | { ok: false; kind: SkipReason; message: string } => {
+      if (isMock) return { ok: true, budgetMs: deps.timeoutMs };
+      if (deps.cooldowns.active(provider)) return { ok: false, kind: "cooldown", message: "Failed recently; resting." };
       const left = deadline - Date.now();
-      if (left < MIN_CALL_MS) return skip("deadline", `Only ${Math.max(left, 0)} ms left for this step.`);
-      if (!deps.budget.take()) return skip("daily_cap", "Daily LLM call cap reached.");
+      if (left < (options.minCallMs ?? MIN_CALL_MS)) {
+        return { ok: false, kind: "deadline", message: `Only ${Math.max(left, 0)} ms left for this step.` };
+      }
+      if (!deps.budget.take()) return { ok: false, kind: "daily_cap", message: "Daily LLM call cap reached." };
       calls += 1;
-      return Math.min(deps.timeoutMs, left);
+      // A call cut short by the run's deadline isn't the provider's fault; remember that for the cooldown below.
+      clamped = left < deps.timeoutMs;
+      return { ok: true, budgetMs: Math.min(deps.timeoutMs, left) };
     };
 
     const run = async (prompt: string, timeoutMs: number): Promise<string> => {
@@ -186,9 +189,12 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
     };
 
     try {
-      const firstBudget = admit();
-      if (firstBudget === null) continue;
-      const first = await run(options.prompt, firstBudget);
+      const firstTurn = admit();
+      if (!firstTurn.ok) {
+        record("skipped", { kind: firstTurn.kind, message: firstTurn.message });
+        continue;
+      }
+      const first = await run(options.prompt, firstTurn.budgetMs);
       const firstCheck = check(options.schema, first);
       if (firstCheck.ok) {
         record("ok");
@@ -196,9 +202,13 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
       }
       if (isMock) throw new Error(`Mock output for "${options.name}" does not match its schema: ${firstCheck.problem}`);
 
-      const secondBudget = admit();
-      if (secondBudget === null) continue;
-      const second = await run(repairPrompt(options.prompt, first, firstCheck.problem), secondBudget);
+      const repairTurn = admit();
+      if (!repairTurn.ok) {
+        // Keep the validation failure on record even though there's no turn left to repair it.
+        record("invalid", { kind: "invalid_output", message: `${firstCheck.problem.slice(0, 240)} (no repair: ${repairTurn.message})` });
+        continue;
+      }
+      const second = await run(repairPrompt(options.prompt, first, firstCheck.problem), repairTurn.budgetMs);
       const secondCheck = check(options.schema, second);
       if (secondCheck.ok) {
         record("repaired");
@@ -208,9 +218,10 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
     } catch (err) {
       if (!(err instanceof LlmError)) throw err;
       if (err.kind === "aborted") throw err;
-      const rest = COOLDOWN_MS[err.kind];
+      const outOfTime = err.kind === "timeout" && clamped;
+      const rest = outOfTime ? undefined : COOLDOWN_MS[err.kind];
       if (rest !== undefined) deps.cooldowns.trip(provider, Math.max(rest, err.retryAfterMs ?? 0));
-      record("error", { kind: err.kind, message: err.message.slice(0, 300) });
+      record("error", { kind: outOfTime ? "deadline" : err.kind, message: err.message.slice(0, 300) });
     }
   }
   // Unreachable: the mock either returns or throws a programming error.

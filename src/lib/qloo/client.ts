@@ -47,19 +47,36 @@ export interface QlooClientOptions {
   cache?: QlooCache | null;
   maxAttempts?: number;
   timeoutMs?: number;
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   sinks?: ((provenance: Provenance) => void)[];
+  /** Aborts in-flight requests and pending retries, e.g. when the treatment run times out. */
+  signal?: AbortSignal;
 }
 
 interface GetOptions {
   /** /search documents 404 as "No results"; treat it as an empty list. */
   emptyOn404?: boolean;
+  /** Skip the response cache, e.g. for a health check that must prove the key works now. */
+  noCache?: boolean;
 }
 
 const MAX_BODY_CHARS = 5 * 1024 * 1024;
 const MAX_DELAY_MS = 30_000;
 
-export const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** Waits `ms`, or rejects as soon as `signal` aborts so a cancelled run doesn't sit out a Retry-After. */
+export const defaultSleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason);
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason);
+      },
+      { once: true },
+    );
+  });
 
 function backoffMs(attempt: number): number {
   return Math.min(250 * 2 ** attempt + Math.random() * 100, MAX_DELAY_MS);
@@ -95,16 +112,16 @@ export class QlooClient {
     this.baseUrl = (options.baseUrl ?? HACKATHON_BASE_URL).replace(/\/+$/, "");
   }
 
-  /** A client that also reports every request, cache hits included, to `sink`. */
-  recording(sink: (provenance: Provenance) => void): QlooClient {
-    return new QlooClient({ ...this.options, sinks: [...(this.options.sinks ?? []), sink] });
+  /** A client that also reports every request, cache hits included, to `sink`, and stops when `signal` aborts. */
+  recording(sink: (provenance: Provenance) => void, signal?: AbortSignal): QlooClient {
+    return new QlooClient({ ...this.options, sinks: [...(this.options.sinks ?? []), sink], signal: signal ?? this.options.signal });
   }
 
   async get<T>(path: string, params: QlooParams = {}, options: GetOptions = {}): Promise<QlooResult<T>> {
     const query = serializeParams(params);
     const warnings = path === "/v2/insights" ? validateInsightsParams(query) : [];
     const key = `${this.mode}:${cacheKey(path, query)}`;
-    const cache = this.options.cache;
+    const cache = options.noCache ? null : this.options.cache;
     const started = Date.now();
 
     const hit = cache ? await cache.get(key) : undefined;
@@ -117,7 +134,10 @@ export class QlooClient {
     }
 
     const { data, status, requestId } = await this.fetchWithRetry(path, query, options);
-    if (cache) await cache.set(key, data);
+    if (cache) {
+      // Best effort: a read-only disk (QLOO_CACHE_DIR on a serverless host) must not fail a good response.
+      await cache.set(key, data).catch((err: unknown) => console.warn(`Qloo cache write failed for ${path}:`, err));
+    }
     return this.report({
       data: data as T,
       warnings,
@@ -134,8 +154,9 @@ export class QlooClient {
     });
   }
 
+  /** Uncached: the health check must prove the key and host work right now. */
   info() {
-    return this.get<ApiInfoResponse>("/");
+    return this.get<ApiInfoResponse>("/", {}, { noCache: true });
   }
 
   search(params: QlooParams) {
@@ -198,21 +219,30 @@ export class QlooClient {
     const url = `${this.baseUrl}${path}${search ? `?${search}` : ""}`;
     const maxAttempts = this.options.maxAttempts ?? 3;
     const sleep = this.options.sleep ?? defaultSleep;
+    const outer = this.options.signal;
 
     let lastError: QlooError | undefined;
     let delay = 0;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (attempt > 0) await sleep(delay);
+      // An aborted run (client gone, or the run's deadline) stops here instead of retrying: rethrow its reason.
+      outer?.throwIfAborted();
+      if (attempt > 0) await (outer ? sleep(delay, outer) : sleep(delay));
 
       let response: Response;
+      let body: string;
+      const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 20_000);
       try {
         response = await fetchImpl(url, {
           method: "GET",
           headers: this.headers(),
-          signal: AbortSignal.timeout(this.options.timeoutMs ?? 20_000),
+          signal: outer ? AbortSignal.any([outer, timeout]) : timeout,
         });
+        // Qloo sometimes sends JSON error bodies as text/plain, so always read text. The body can fail
+        // mid-stream too (reset, timeout), so it is read inside the same retry guard as the request.
+        body = await response.text();
       } catch (err) {
-        const timedOut = err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError");
+        outer?.throwIfAborted();
+        const timedOut = timeout.aborted || (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError"));
         lastError = new QlooError({
           kind: timedOut ? "timeout" : "network",
           message: `Qloo ${path} ${timedOut ? "timed out" : "request failed"}: ${err instanceof Error ? err.message : String(err)}`,
@@ -224,8 +254,6 @@ export class QlooClient {
       }
 
       const requestId = response.headers.get("x-qloo-request-id") ?? undefined;
-      // Qloo sometimes sends JSON error bodies as text/plain, so always read text.
-      const body = await response.text();
 
       if (response.ok) {
         if (body.length > MAX_BODY_CHARS) {

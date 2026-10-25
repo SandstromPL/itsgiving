@@ -60,24 +60,37 @@ export async function streamTreatment(
 
   const timeout = AbortSignal.timeout(service.runTimeoutMs);
   const signal = AbortSignal.any([clientSignal, timeout]);
+  // Every await in the pipeline honours `signal`, but racing it as well guarantees the client gets
+  // "error" and "done" at the deadline even if some call ignores the abort.
+  const stopped = new Promise<never>((_, reject) => {
+    if (signal.aborted) reject(signal.reason);
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
+  const pipeline = runPipeline(brief, { qloo: service.qloo, llm: service.llm }, emit, {
+    id: key,
+    signal,
+    deadline: started + service.runTimeoutMs,
+  });
+  pipeline.catch(() => {}); // if the race is lost, its later rejection is expected
+  stopped.catch(() => {});
   try {
-    const outcome = await runPipeline(brief, { qloo: service.qloo, llm: service.llm }, emit, {
-      id: key,
-      signal,
-      deadline: started + service.runTimeoutMs,
-    });
+    const outcome = await Promise.race([pipeline, stopped]);
     if (outcome.kind === "treatment") {
       const { treatment } = outcome;
-      // Don't pin a degraded (template-written) treatment in live mode; retry later for a real one.
+      // Only pin a full treatment: a template-written one (live models down) or one missing a Qloo
+      // section (a failed call) would otherwise be replayed for 24 hours after the cause has passed.
       const degraded = treatment.llm.some((t) => t.degraded);
-      if (!degraded) service.cache.set(key, treatment);
+      if (!degraded && treatment.complete) service.cache.set(key, treatment);
       emit({ type: "treatment", treatment, cached: false });
       log({
         outcome: "ok",
         degraded,
+        complete: treatment.complete,
         writtenBy: `${treatment.writtenBy.provider}:${treatment.writtenBy.model}`,
         llmCalls: treatment.llm.reduce((sum, t) => sum + t.calls, 0),
         qlooCalls: treatment.qloo.calls,
+        // Why each step went the way it did: which models failed and how, without the raw upstream text.
+        attempts: treatment.llm.map((t) => `${t.step}:${t.attempts.map((a) => `${a.model}=${a.kind ?? a.outcome}`).join(",")}`),
       });
     } else if (outcome.kind === "needs_input") {
       emit({ type: "needs_input", message: outcome.message, items: outcome.items });

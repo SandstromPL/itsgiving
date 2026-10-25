@@ -5,6 +5,7 @@ import {
   DailyBudget,
   LlmError,
   createProviders,
+  deepseekProvider,
   extractJson,
   generateJson,
   geminiProvider,
@@ -167,12 +168,15 @@ describe("generateJson", () => {
           });
         }),
     };
+    const cooldowns = new Cooldowns();
     const bounded = await generateJson(
       { name: "test", system: "", prompt: "", schema, mock: () => MOCK, deadline: Date.now() + 3_300 },
-      deps([slow], { timeoutMs: 60_000 }),
+      deps([slow], { timeoutMs: 60_000, cooldowns }),
     );
-    expect(bounded.attempts[0]).toMatchObject({ outcome: "error", kind: "timeout" });
+    // Cut short by the run's deadline, not by the provider: recorded as out of time, and not rested.
+    expect(bounded.attempts[0]).toMatchObject({ outcome: "error", kind: "deadline" });
     expect(seenTimeout).toBeLessThan(4_000);
+    expect(cooldowns.active(slow)).toBe(false);
   });
 
   it("propagates a client abort instead of falling through", async () => {
@@ -210,13 +214,15 @@ describe("llmConfigFromEnv", () => {
     expect(llmConfigFromEnv({ GEMINI_API_KEY: "k", LLM_MODE: "mock" }).mode).toBe("mock");
   });
 
-  it("orders providers Flash-Lite, then Groq, then 3.8 Flash as the last resort", () => {
-    const config = llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g" });
+  it("orders providers Flash-Lite, Groq, then paid DeepSeek, with 3.8 Flash as the last resort", () => {
+    const config = llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g", DEEPSEEK_API_KEY: "d" });
     expect(createProviders(config).map((p) => `${p.kind}:${p.model}`)).toEqual([
       "gemini:gemini-3.5-flash-lite",
       "groq:openai/gpt-oss-120b",
+      "deepseek:deepseek-flash",
       "gemini:gemini-3.8-flash",
     ]);
+    expect(llmConfigFromEnv({ DEEPSEEK_API_KEY: "d" }).mode).toBe("live");
   });
 
   it("honours model overrides, drops 'none', and skips providers without a key", () => {
@@ -345,6 +351,40 @@ describe("groqProvider", () => {
     await expect(groqProvider({ apiKey: "k", model: "m", fetch: tpm.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "rate_limit" });
     const miss = recordingFetch(400, { error: { message: "Generated JSON does not match the expected schema." } });
     await expect(groqProvider({ apiKey: "k", model: "m", fetch: miss.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "invalid_output" });
+  });
+});
+
+describe("deepseekProvider", () => {
+  it("sends json_object mode with thinking off and the schema in the prompt", async () => {
+    const { fetchImpl, requests } = recordingFetch(200, {
+      choices: [{ message: { content: '{"tone":["T1"]}' }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 30, completion_tokens: 6 },
+    });
+    const provider = deepseekProvider({ apiKey: "sk-test", model: "deepseek-flash", fetch: fetchImpl });
+    expect((await provider.complete(call())).text).toBe('{"tone":["T1"]}');
+    const { url, init } = requests[0];
+    expect(url).toBe("https://api.deepseek.com/chat/completions");
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer sk-test");
+    const body = JSON.parse(String(init.body));
+    expect(body).toMatchObject({
+      model: "deepseek-flash",
+      response_format: { type: "json_object" },
+      thinking: { type: "disabled" },
+      max_tokens: 2048,
+    });
+    // DeepSeek requires the word "json" and an example of the shape in the prompt.
+    expect(body.messages[1].content).toContain("json object");
+    expect(body.messages[1].content).toContain('"tone"');
+  });
+
+  it("rests on 402 (out of credit) and fails on empty JSON-mode content", async () => {
+    const broke = recordingFetch(402, { error: { message: "Insufficient Balance" } });
+    await expect(deepseekProvider({ apiKey: "k", model: "m", fetch: broke.fetchImpl }).complete(call())).rejects.toMatchObject({
+      kind: "rate_limit",
+      status: 402,
+    });
+    const empty = recordingFetch(200, { choices: [{ message: { content: "" }, finish_reason: "stop" }] });
+    await expect(deepseekProvider({ apiKey: "k", model: "m", fetch: empty.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "empty" });
   });
 });
 

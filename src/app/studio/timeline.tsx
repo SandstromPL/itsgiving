@@ -38,14 +38,13 @@ function Mark({ status }: { status: StepStatus }) {
 }
 
 function QlooCalls({ calls }: { calls: Provenance[] }) {
-  const fresh = calls.filter((c) => !c.cached);
-  const ms = fresh.reduce((sum, c) => sum + c.durationMs, 0);
+  // Counts only: calls in a step run in parallel, so summing their durations would overstate the step's time.
+  const cached = calls.filter((c) => c.cached).length;
   return (
     <details className="mt-1.5 group">
       <summary className="cursor-pointer font-mono text-[11px] text-tungsten marker:text-line hover:text-amber-300">
         {calls.length} Qloo {calls.length === 1 ? "call" : "calls"}
-        {fresh.length < calls.length ? `, ${calls.length - fresh.length} cached` : ""}
-        {fresh.length > 0 ? `, ${ms} ms` : ""}
+        {cached > 0 ? `, ${cached} cached` : ""}
       </summary>
       <ul className="mt-1.5 flex flex-col gap-1">
         {calls.map((call, i) => (
@@ -80,10 +79,11 @@ function LlmLine({ trace }: { trace: LlmTrace }) {
   );
 }
 
-export function Timeline({ steps, running }: { steps: StepEvent[]; running: boolean }) {
+export function Timeline({ steps }: { steps: StepEvent[] }) {
   const current = [...steps].reverse().find((s) => s.status === "running");
+  // No aria-busy here: screen readers may hold back the live region below until it clears.
   return (
-    <section aria-labelledby="agent-heading" aria-busy={running} className="flex flex-col gap-3">
+    <section aria-labelledby="agent-heading" className="flex flex-col gap-3">
       <div>
         <h2 id="agent-heading" className="text-sm font-medium text-paper">
           Agent at work

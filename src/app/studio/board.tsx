@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { BUDGETS, FORMATS, NUDGES, NUDGE_LABELS, subjectPhrase, type Nudge } from "@/lib/agent/options";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
-import { EdgeCode, Still, Why, modelName } from "./parts";
+import { EdgeCode, QlooTags, Still, Tape, Why, modelName } from "./parts";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
 
@@ -24,9 +24,12 @@ function names(entities: CompactEntity[]): string {
   return entities.map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`).join(", ");
 }
 
-function TagList({ tags }: { tags: CompactTag[] }) {
+/** Tungsten marks Qloo evidence; tape pink marks the synthetic mock standing in for it. */
+const evidenceTone = (mock: boolean) => (mock ? "text-tape" : "text-tungsten");
+
+function TagList({ tags, mock }: { tags: CompactTag[]; mock: boolean }) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs leading-5 text-tungsten">
+    <ul className={`flex flex-wrap gap-x-4 gap-y-1 font-mono text-xs leading-5 ${evidenceTone(mock)}`}>
       {tags.map((tag) => (
         <li key={tag.id}>{tag.name}</li>
       ))}
@@ -57,11 +60,14 @@ function Cover({ t }: { t: Treatment }) {
           }}
         />
       </div>
-      <p className="p-5 text-xs text-paper/80 sm:p-8">
-        {FORMATS[t.brief.format]} {subject} / {t.brief.city} / {BUDGETS[t.brief.budget].label} budget
+      <p className="flex flex-wrap items-center gap-3 p-5 text-xs text-paper/80 sm:p-8">
+        <span>
+          {FORMATS[t.brief.format]} {subject} / {t.brief.city} / {BUDGETS[t.brief.budget].label} budget
+        </span>
+        {t.mock.qloo && <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>}
       </p>
       <div className="px-5 pb-6 sm:px-8 sm:pb-8">
-        <h2 id="treatment-title" className="max-w-4xl text-[clamp(2.25rem,6vw,5.25rem)] font-semibold leading-[0.92] tracking-[-0.03em] text-balance">
+        <h2 id="treatment-title" tabIndex={-1} className="max-w-4xl text-[clamp(2.25rem,6vw,5.25rem)] font-semibold leading-[0.92] tracking-[-0.03em] text-balance">
           {t.title}
         </h2>
         <p className="mt-4 max-w-2xl text-base leading-7 text-pretty text-paper/85 sm:text-lg">{t.logline}</p>
@@ -89,9 +95,9 @@ function Rework({ nudges, onToggle, running }: { nudges: Nudge[]; onToggle: (nud
             key={nudge}
             type="button"
             aria-pressed={nudges.includes(nudge)}
-            disabled={running}
+            aria-disabled={running}
             onClick={() => onToggle(nudge)}
-            className="rounded-full px-3 py-1.5 text-sm text-paper ring-1 ring-line hover:ring-dim disabled:cursor-progress disabled:opacity-50 aria-pressed:bg-paper aria-pressed:text-ink aria-pressed:ring-paper"
+            className="rounded-full px-3 py-1.5 text-sm text-paper ring-1 ring-edge hover:ring-dim aria-disabled:cursor-progress aria-disabled:opacity-50 aria-pressed:bg-paper aria-pressed:text-ink aria-pressed:ring-paper"
           >
             {NUDGE_LABELS[nudge]}
           </button>
@@ -99,7 +105,7 @@ function Rework({ nudges, onToggle, running }: { nudges: Nudge[]; onToggle: (nud
         <button
           type="button"
           onClick={() => window.print()}
-          className="ml-auto rounded-md px-3 py-1.5 text-sm text-dim ring-1 ring-line hover:text-paper hover:ring-dim"
+          className="ml-auto rounded-md px-3 py-1.5 text-sm text-dim ring-1 ring-edge hover:text-paper hover:ring-dim"
         >
           Save as PDF
         </button>
@@ -111,19 +117,30 @@ function Rework({ nudges, onToggle, running }: { nudges: Nudge[]; onToggle: (nud
 
 export function Board({
   treatment: t,
-  stale,
+  state,
   nudges,
   onToggleNudge,
   running,
 }: {
   treatment: Treatment;
-  stale: boolean;
+  /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
+  state: "current" | "updating" | "previous";
   nudges: Nudge[];
   onToggleNudge: (nudge: Nudge) => void;
   running: boolean;
 }) {
+  const mock = t.mock.qloo;
+  const source = mock ? "the synthetic mock, not Qloo" : "Qloo";
+  const templated = t.llm.filter((l) => l.producedBy.mock).map((l) => STEP_NAME[l.step].toLowerCase());
   return (
-    <article aria-labelledby="treatment-title" aria-busy={stale} className={`flex flex-col gap-14 transition-opacity duration-300 ${stale ? "opacity-40" : ""}`}>
+    <article
+      aria-labelledby="treatment-title"
+      aria-busy={state === "updating"}
+      className={`flex flex-col gap-14 transition-opacity duration-300 ${state === "current" ? "" : "opacity-50"}`}
+    >
+      {state === "previous" && (
+        <p className="-mb-8 text-sm text-dim">This is the previous version. The latest change didn&apos;t finish, so nothing below reflects it.</p>
+      )}
       <div className="flex flex-col gap-5">
         <Cover t={t} />
         <Rework nudges={nudges} onToggle={onToggleNudge} running={running} />
@@ -143,7 +160,7 @@ export function Board({
           <ul className="mt-4 flex flex-col gap-4">
             {t.tone.map((tone) => (
               <li key={tone.tag.id}>
-                <p className="flex flex-wrap items-baseline gap-x-2 font-mono text-xs text-tungsten">
+                <p className={`flex flex-wrap items-baseline gap-x-2 font-mono text-xs ${evidenceTone(mock)}`}>
                   {tone.tag.name}
                   <span className="text-dim">{tone.source === "overlap" ? "shared with your taste" : "audience taste"}</span>
                 </p>
@@ -154,9 +171,9 @@ export function Board({
         </section>
       </div>
 
-      <Section id="references" title="Reference films" note="Films this audience over-indexes on, ranked by Qloo. The notes are Mise's.">
+      <Section id="references" title="Reference films" note={`Films this audience over-indexes on, ranked by ${source}. The notes are Mise's.`}>
         {t.references.length === 0 ? (
-          <p className="text-sm text-dim">Qloo returned no reference films for this brief.</p>
+          <p className="text-sm text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
         ) : (
           <ul className="grid gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
             {t.references.map((r) => (
@@ -165,7 +182,8 @@ export function Board({
                 <h4 className="mt-1 text-base font-medium leading-snug">
                   {r.entity.name} {r.entity.year && <span className="font-normal text-dim">{r.entity.year}</span>}
                 </h4>
-                <EdgeCode qloo={r.qloo} />
+                <EdgeCode qloo={r.qloo} mock={mock} />
+                <QlooTags tags={r.qloo.tags} mock={mock} />
                 <p className="text-sm leading-6 text-paper/85">{r.notes.why}</p>
                 <p className="text-sm leading-6">
                   <span className="text-dim">Borrow: </span>
@@ -180,6 +198,7 @@ export function Board({
                     { term: "What to borrow", text: r.notes.borrow },
                   ]}
                   writtenBy={t.writtenBy}
+                  mock={mock}
                 />
               </li>
             ))}
@@ -187,7 +206,7 @@ export function Board({
         )}
         {t.extras.references.length > 0 && (
           <p className="mt-8 text-sm text-dim">
-            Also high for this audience: <span className="font-mono text-xs text-tungsten">{names(t.extras.references)}</span>
+            Also high for this audience: <span className={`font-mono text-xs ${evidenceTone(mock)}`}>{names(t.extras.references)}</span>
           </p>
         )}
       </Section>
@@ -205,20 +224,28 @@ export function Board({
         </ol>
       </Section>
 
-      <Section id="wardrobe" title="Wardrobe" note="Brands this audience over-indexes on, ranked by Qloo. The looks are Mise's.">
+      <Section id="wardrobe" title="Wardrobe" note={`Brands this audience over-indexes on, ranked by ${source}. The looks are Mise's.`}>
         {t.wardrobe.length === 0 ? (
-          <p className="text-sm text-dim">Qloo returned no brands for this brief.</p>
+          <p className="text-sm text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
           <ul className="flex flex-col divide-y divide-line border-y border-line">
             {t.wardrobe.map((w) => (
               <li key={w.entity.id} className="grid gap-3 py-5 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-6">
                 <div className="flex flex-col gap-1">
                   <h4 className="text-base font-medium">{w.entity.name}</h4>
-                  <EdgeCode qloo={w.qloo} />
+                  <EdgeCode qloo={w.qloo} mock={mock} />
+                  <QlooTags tags={w.qloo.tags} mock={mock} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <p className="text-sm leading-6 text-paper/85">{w.notes.look}</p>
-                  <Why label="Why this brand" name={w.entity.name} qloo={w.qloo} read={[{ term: "The look", text: w.notes.look }]} writtenBy={t.writtenBy} />
+                  <Why
+                    label="Why this brand"
+                    name={w.entity.name}
+                    qloo={w.qloo}
+                    read={[{ term: "The look", text: w.notes.look }]}
+                    writtenBy={t.writtenBy}
+                    mock={mock}
+                  />
                 </div>
               </li>
             ))}
@@ -226,7 +253,7 @@ export function Board({
         )}
         {t.extras.brands.length > 0 && (
           <p className="mt-6 text-sm text-dim">
-            Also high for this audience: <span className="font-mono text-xs text-tungsten">{names(t.extras.brands)}</span>
+            Also high for this audience: <span className={`font-mono text-xs ${evidenceTone(mock)}`}>{names(t.extras.brands)}</span>
           </p>
         )}
       </Section>
@@ -234,7 +261,7 @@ export function Board({
       <Section
         id="locations"
         title={`Locations in ${t.brief.city}`}
-        note="Real places whose regulars share this audience's taste, found by Qloo. Confirm availability and filming permission with each venue."
+        note={`Real places whose regulars share this audience's taste, found by ${source}. Confirm availability and filming permission with each venue.`}
       >
         {t.locations.length === 0 ? (
           <p className="text-sm text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
@@ -242,7 +269,9 @@ export function Board({
           <ul className="grid gap-x-6 gap-y-10 sm:grid-cols-2 xl:grid-cols-3">
             {t.locations.map((l) => {
               const place = l.entity.place;
-              const where = [place?.neighborhood, place?.price_level ? `price level ${place.price_level} of 4` : undefined].filter(Boolean).join(", ");
+              const where = [place?.kind, place?.neighborhood, place?.price_level ? `price level ${place.price_level} of 4` : undefined]
+                .filter(Boolean)
+                .join(", ");
               const map =
                 place?.lat !== undefined && place?.lon !== undefined
                   ? `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=17/${place.lat}/${place.lon}`
@@ -252,10 +281,23 @@ export function Board({
                   <Still src={l.entity.image} alt={`Photo of ${l.entity.name}`} className="aspect-[3/2] w-full rounded-sm" />
                   <h4 className="mt-1 text-base font-medium leading-snug">{l.entity.name}</h4>
                   {where && <p className="text-xs text-dim">{where}</p>}
-                  <EdgeCode qloo={l.qloo} />
+                  <EdgeCode qloo={l.qloo} mock={mock} />
+                  {place?.ambience && (
+                    <p title={mock ? "Mock note on the atmosphere" : "Qloo's note on the atmosphere"} className={`line-clamp-3 font-mono text-[11px] leading-5 opacity-80 ${evidenceTone(mock)}`}>
+                      {place.ambience}
+                    </p>
+                  )}
                   <p className="text-sm leading-6 text-paper/85">{l.notes.scene}</p>
                   <div className="flex items-center gap-4">
-                    <Why label="Why this place" name={l.entity.name} qloo={l.qloo} read={[{ term: "The scene", text: l.notes.scene }]} writtenBy={t.writtenBy} />
+                    <Why
+                      label="Why this place"
+                      name={l.entity.name}
+                      qloo={l.qloo}
+                      note={place?.ambience}
+                      read={[{ term: "The scene", text: l.notes.scene }]}
+                      writtenBy={t.writtenBy}
+                      mock={mock}
+                    />
                     {map && (
                       <a href={map} target="_blank" rel="noreferrer" className="text-xs text-dim underline decoration-line underline-offset-4 hover:text-paper">
                         Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
@@ -269,7 +311,7 @@ export function Board({
         )}
         {t.extras.locations.length > 0 && (
           <p className="mt-8 text-sm text-dim">
-            More to scout: <span className="font-mono text-xs text-tungsten">{names(t.extras.locations)}</span>
+            More to scout: <span className={`font-mono text-xs ${evidenceTone(mock)}`}>{names(t.extras.locations)}</span>
           </p>
         )}
       </Section>
@@ -316,24 +358,28 @@ export function Board({
       <section aria-labelledby="evidence" className="flex flex-col gap-5 rounded-lg border border-line p-5 sm:p-6">
         <div>
           <h3 id="evidence" className="text-xl font-semibold tracking-tight">
-            What Qloo says about this audience
+            {mock ? "What the mock says about this audience" : "What Qloo says about this audience"}
           </h3>
-          <p className="mt-1 text-sm text-dim">Aggregate affinities from Qloo&apos;s taste graph, never facts about any one person.</p>
+          <p className="mt-1 text-sm text-dim">
+            {mock
+              ? "Synthetic fixtures standing in for Qloo's taste graph: real names, invented affinities."
+              : "Aggregate affinities from Qloo's taste graph, never facts about any one person."}
+          </p>
         </div>
         {t.audience.overlap.length > 0 && (
           <div className="flex flex-col gap-2">
             <h4 className="text-sm text-paper">Shared by your films and the audience</h4>
-            <TagList tags={t.audience.overlap} />
+            <TagList tags={t.audience.overlap} mock={mock} />
           </div>
         )}
         <div className="flex flex-col gap-2">
           <h4 className="text-sm text-paper">The audience over-indexes on</h4>
-          {t.audience.taste_tags.length > 0 ? <TagList tags={t.audience.taste_tags} /> : <p className="text-sm text-dim">No taste tags came back.</p>}
+          {t.audience.taste_tags.length > 0 ? <TagList tags={t.audience.taste_tags} mock={mock} /> : <p className="text-sm text-dim">No taste tags came back.</p>}
         </div>
         {t.audience.leans.length > 0 && (
           <div className="flex flex-col gap-2">
             <h4 className="text-sm text-paper">Who over-indexes</h4>
-            <p className="font-mono text-xs leading-5 text-tungsten">{t.audience.leans.join("; ")}</p>
+            <p className={`font-mono text-xs leading-5 ${evidenceTone(mock)}`}>{t.audience.leans.join("; ")}</p>
           </div>
         )}
       </section>
@@ -357,7 +403,11 @@ export function Board({
         {t.mock.qloo && (
           <p className="text-tape">Mock data: the names are real, but every score, tag, photo and ranking here is synthetic, not Qloo&apos;s.</p>
         )}
-        {t.mock.llm && <p className="text-tape">Mock LLM: a deterministic template planned and wrote this, not a language model.</p>}
+        {templated.length > 0 && (
+          <p className="text-tape">
+            Mock LLM: a deterministic template did the {templated.join(" and ")} {templated.length === 1 ? "step" : "steps"}, not a language model.
+          </p>
+        )}
       </footer>
     </article>
   );
@@ -405,7 +455,7 @@ export function EmptyBoard<F>({
                 <button
                   type="button"
                   onClick={() => onTry(example.form)}
-                  className="rounded-full px-3 py-1.5 text-sm text-paper ring-1 ring-line hover:ring-dim"
+                  className="rounded-full px-3 py-1.5 text-sm text-paper ring-1 ring-edge hover:ring-dim"
                 >
                   {example.label}
                 </button>

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { CompactTag } from "../qloo";
+import { VENUE_KIND_VALUES, type VenueKind } from "../tools/shared";
 import { BUDGETS, priceLevelMax, type Brief, type Nudge } from "./brief";
 import { subjectPhrase } from "./options";
 
@@ -18,7 +19,8 @@ export const SYSTEM_PROMPT = [
   "- Reply with one JSON object matching the schema.",
 ].join("\n");
 
-export const DEEP_CUT_CEILING = { canon: undefined, balanced: 0.95, deep: 0.85 } as const;
+// Live popularity (2026-10-25): hits sit at 0.83-0.99, a 0.7 ceiling already gives obscure titles.
+export const DEEP_CUT_CEILING = { canon: undefined, balanced: 0.95, deep: 0.8 } as const;
 export type DeepCuts = keyof typeof DEEP_CUT_CEILING;
 
 const NUDGE_TEXT: Record<Nudge, string> = {
@@ -45,31 +47,40 @@ export interface PlanContext {
   feedback?: string;
 }
 
-export interface Plan {
+/** What the planning model returns. */
+export interface PlanDraft {
   direction: string;
   tone?: string[];
-  era_from: number | null;
-  era_to: number | null;
   deep_cuts: DeepCuts;
   wardrobe_words: string[];
   ambience_words: string[];
+  venue_kinds: VenueKind[];
 }
 
-export function planSchema(toneRefs: string[]): z.ZodType<Plan> {
-  const year = z.number().int().min(1900).max(2030).nullable();
+/**
+ * The plan the code executes. The era is set by code from the "more 90s"
+ * nudge only: left to the model, it pinned an era nobody asked for.
+ */
+export interface Plan extends PlanDraft {
+  era_from: number | null;
+  era_to: number | null;
+}
+
+// Arrays only carry minimums: a model that returns one item too many is
+// trimmed in code (normalizePlan) instead of costing a repair call.
+export function planSchema(toneRefs: string[]): z.ZodType<PlanDraft> {
   const words = (examples: string) =>
-    z.array(z.string().min(2)).min(1).max(3).describe(`1-3 plain words for Qloo tag search, e.g. ${examples}.`);
+    z.array(z.string().min(2)).min(1).describe(`1-3 plain words for Qloo tag search, e.g. ${examples}.`);
   return z.strictObject({
     direction: z.string().min(10).describe("One or two sentences of creative direction."),
     ...(toneRefs.length > 0
-      ? { tone: z.array(z.enum(toneRefs as [string, ...string[]])).min(1).max(5).describe("2-5 tone tag refs, strongest first.") }
+      ? { tone: z.array(z.enum(toneRefs as [string, ...string[]])).min(1).describe("2-5 tone tag refs, strongest first.") }
       : {}),
-    era_from: year.describe("Earliest release year for film references, or null."),
-    era_to: year.describe("Latest release year for film references, or null."),
     deep_cuts: z.enum(["canon", "balanced", "deep"]).describe("How obscure the film references should be."),
     wardrobe_words: words("vintage, streetwear, tailored, minimalist"),
     ambience_words: words("cozy, moody, neon, rooftop, industrial"),
-  }) as unknown as z.ZodType<Plan>;
+    venue_kinds: z.array(z.enum(VENUE_KIND_VALUES)).min(1).describe("2-4 kinds of place to scout for locations."),
+  }) as unknown as z.ZodType<PlanDraft>;
 }
 
 export interface Who {
@@ -110,8 +121,9 @@ export function planPrompt(ctx: PlanContext): string {
     "",
     "TASK",
     "Plan the treatment. Pick the tone tags (by ref) that should drive it, favouring shared tags when present.",
-    "Set era_from/era_to only if the brief calls for an era. Choose deep_cuts.",
+    "Choose deep_cuts.",
     "Give 1-3 common style words each for wardrobe and for location ambience; Qloo's tag search reads them literally.",
+    "Pick 2-4 venue_kinds that suit the story and can be filmed.",
   );
   if (ctx.feedback) parts.push("", "RE-PLAN", ctx.feedback);
   return parts.join("\n");
@@ -128,15 +140,15 @@ export function vibeOf(names: string[], darker = false): Vibe {
   return TENDER.test(text) ? "tender" : "bright";
 }
 
-const WORDS: Record<Vibe, { wardrobe: string[]; ambience: string[] }> = {
-  dark: { wardrobe: ["edgy", "streetwear"], ambience: ["moody", "neon"] },
-  tender: { wardrobe: ["vintage", "bohemian"], ambience: ["cozy", "intimate"] },
-  bright: { wardrobe: ["minimalist", "vintage"], ambience: ["lively", "trendy"] },
+const WORDS: Record<Vibe, { wardrobe: string[]; ambience: string[]; venues: VenueKind[] }> = {
+  dark: { wardrobe: ["edgy", "streetwear"], ambience: ["moody", "neon"], venues: ["bar", "night_club", "music_venue"] },
+  tender: { wardrobe: ["vintage", "bohemian"], ambience: ["cozy", "intimate"], venues: ["cafe", "bookstore", "park"] },
+  bright: { wardrobe: ["minimalist", "vintage"], ambience: ["lively", "trendy"], venues: ["cafe", "bar", "market"] },
 };
 const FALLBACK_WORDS = { wardrobe: ["vintage", "minimalist"], ambience: ["intimate", "lively"] };
 
 /** Deterministic planner for mock mode and for when every LLM fails. */
-export function mockPlan(ctx: PlanContext): Plan {
+export function mockPlan(ctx: PlanContext): PlanDraft {
   const darker = ctx.brief.nudges.includes("darker");
   const ranked = darker
     ? [...ctx.candidates].sort((a, b) => Number(DARK.test(b.tag.name)) - Number(DARK.test(a.tag.name)))
@@ -152,11 +164,10 @@ export function mockPlan(ctx: PlanContext): Plan {
       `${format} ${subjectPhrase(ctx.artistNames, ctx.touchstoneNames)}, built on ${toneNames.slice(0, 3).join(", ") || "the audience's taste"}` +
       (shared ? `, where the director's own taste meets the audience at ${shared.tag.name.toLowerCase()}.` : "."),
     ...(ctx.candidates.length > 0 ? { tone: tone.map((c) => c.ref) } : {}),
-    era_from: ctx.brief.nudges.includes("more_90s") ? 1990 : null,
-    era_to: ctx.brief.nudges.includes("more_90s") ? 1999 : null,
     deep_cuts: ctx.brief.nudges.includes("deeper_cuts") ? "deep" : "balanced",
     wardrobe_words: words.wardrobe,
     ambience_words: words.ambience,
+    venue_kinds: WORDS[vibe].venues,
   };
 }
 

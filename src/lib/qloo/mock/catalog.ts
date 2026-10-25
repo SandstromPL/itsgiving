@@ -114,6 +114,7 @@ export const TAGS: MockTag[] = [
   tag(G_MUSIC, "bollywood", "Bollywood", [ARTIST], ["romantic", "warm", "epic"], 0.8),
   tag(G_MUSIC, "pop", "Pop", [ARTIST], ["playful", "romantic"], 0.95),
   tag(G_MUSIC, "hip_hop", "Hip Hop", [ARTIST], ["urban", "rebellious", "gritty"], 0.9),
+  { id: G_FASHION, name: "Fashion", type: "urn:tag:genre:brand", parents: [BRAND], vibes: [], popularity: 0.95 },
   tag(G_FASHION, "streetwear", "Streetwear", [BRAND], ["urban", "rebellious", "playful"], 0.8),
   tag(G_FASHION, "luxury", "Luxury Fashion", [BRAND], ["maximalist", "romantic"], 0.85),
   tag(G_FASHION, "denim", "Denim", [BRAND], ["retro", "nostalgic"], 0.75),
@@ -138,10 +139,11 @@ export const TAGS: MockTag[] = [
   tag(DECOR, "neon_signage", "Neon Signage", [PLACE], ["neon", "nocturnal", "retro"], 0.4),
   tag(SETTING, "rooftop", "Rooftop", [PLACE], ["urban", "nocturnal", "epic"], 0.55),
   tag(SETTING, "waterfront", "Waterfront", [PLACE], ["dreamy", "romantic", "melancholic"], 0.5),
-  tag(G_PLACE, "cafe", "Cafe", [PLACE], ["warm", "tender"], 0.85),
+  // Same genre IDs as live Qloo, so venue kinds map identically in mock mode.
+  tag(G_PLACE, "restaurant:cafe", "Cafe", [PLACE], ["warm", "tender"], 0.85),
   tag(G_PLACE, "restaurant", "Restaurant", [PLACE], ["warm"], 0.95),
-  tag(G_PLACE, "bar", "Bar", [PLACE], ["nocturnal", "urban"], 0.85),
-  tag(G_PLACE, "music_venue", "Music Venue", [PLACE], ["rebellious", "nocturnal"], 0.6),
+  tag(G_PLACE, "restaurant:bar", "Bar", [PLACE], ["nocturnal", "urban"], 0.85),
+  tag(G_PLACE, "live_music_venue", "Live Music Venue", [PLACE], ["rebellious", "nocturnal"], 0.6),
 ];
 
 export const CITIES: MockCity[] = [
@@ -190,7 +192,8 @@ function artist(name: string, popularity: number, vibes: string[], tags: string[
 }
 
 function brand(name: string, popularity: number, vibes: string[], tags: string[]): MockEntity {
-  return { id: mockId(`${BRAND}:${name}`), name, subtype: BRAND, popularity, vibes, tags, properties: {} };
+  // Live clothing brands carry the parent genre (urn:tag:genre:brand:fashion) as well as the specific ones.
+  return { id: mockId(`${BRAND}:${name}`), name, subtype: BRAND, popularity, vibes, tags: [G_FASHION, ...tags], properties: {} };
 }
 
 function place(
@@ -296,21 +299,21 @@ export const ENTITIES: MockEntity[] = [
   brand("Dr. Martens", 0.85, ["rebellious", "gritty", "retro", "dark"], [f("footwear"), s("edgy")]),
   brand("Jacquemus", 0.8, ["playful", "romantic", "dreamy", "warm"], [f("luxury")]),
 
-  place("Prithvi Cafe", "Mumbai", "Juhu", 1, [19.1057, 72.8264], 0.72, ["warm", "intimate", "nostalgic", "folk", "tender"], [p("cafe"), a("cozy"), a("intimate"), s("bohemian")]),
-  place("Kala Ghoda Cafe", "Mumbai", "Fort", 2, [18.9289, 72.8318], 0.66, ["minimalist", "warm", "tender"], [p("cafe"), a("cozy"), s("minimalist")]),
-  place("Kyani & Co.", "Mumbai", "Dhobi Talao", 1, [18.9445, 72.8296], 0.6, ["nostalgic", "retro", "warm"], [p("cafe"), d("vintage"), a("cozy")]),
-  place("Leopold Cafe", "Mumbai", "Colaba", 2, [18.9227, 72.8317], 0.8, ["retro", "gritty", "urban", "playful"], [p("restaurant"), p("bar"), a("lively"), d("vintage")]),
-  place("Aer", "Mumbai", "Worli", 4, [19.0176, 72.8172], 0.7, ["neon", "nocturnal", "urban", "maximalist", "epic"], [p("bar"), st("rooftop"), a("trendy"), a("upscale")]),
-  place("Bonobo", "Mumbai", "Bandra", 2, [19.0645, 72.8352], 0.62, ["nocturnal", "rebellious", "urban", "playful"], [p("bar"), a("lively"), a("trendy")], false),
+  place("Prithvi Cafe", "Mumbai", "Juhu", 1, [19.1057, 72.8264], 0.72, ["warm", "intimate", "nostalgic", "folk", "tender"], [p("restaurant:cafe"), a("cozy"), a("intimate"), s("bohemian")]),
+  place("Kala Ghoda Cafe", "Mumbai", "Fort", 2, [18.9289, 72.8318], 0.66, ["minimalist", "warm", "tender"], [p("restaurant:cafe"), a("cozy"), s("minimalist")]),
+  place("Kyani & Co.", "Mumbai", "Dhobi Talao", 1, [18.9445, 72.8296], 0.6, ["nostalgic", "retro", "warm"], [p("restaurant:cafe"), d("vintage"), a("cozy")]),
+  place("Leopold Cafe", "Mumbai", "Colaba", 2, [18.9227, 72.8317], 0.8, ["retro", "gritty", "urban", "playful"], [p("restaurant"), p("restaurant:bar"), a("lively"), d("vintage")]),
+  place("Aer", "Mumbai", "Worli", 4, [19.0176, 72.8172], 0.7, ["neon", "nocturnal", "urban", "maximalist", "epic"], [p("restaurant:bar"), st("rooftop"), a("trendy"), a("upscale")]),
+  place("Bonobo", "Mumbai", "Bandra", 2, [19.0645, 72.8352], 0.62, ["nocturnal", "rebellious", "urban", "playful"], [p("restaurant:bar"), a("lively"), a("trendy")], false),
   place("The Bombay Canteen", "Mumbai", "Lower Parel", 3, [18.9965, 72.8251], 0.75, ["playful", "warm", "retro"], [p("restaurant"), a("lively")]),
   place("The Clearing House", "Mumbai", "Ballard Estate", 3, [18.9375, 72.8401], 0.55, ["romantic", "intimate", "retro", "tender"], [p("restaurant"), a("romantic"), a("intimate"), d("vintage")]),
   place("Balthazar", "New York", "SoHo", 3, [40.7226, -73.9981], 0.95, ["romantic", "retro", "maximalist", "urban"], [p("restaurant"), a("lively"), d("art_deco")]),
   place("Veselka", "New York", "East Village", 1, [40.729, -73.9871], 0.78, ["nostalgic", "warm", "urban"], [p("restaurant"), a("cozy")]),
-  place("Bemelmans Bar", "New York", "Upper East Side", 4, [40.7744, -73.9632], 0.8, ["nocturnal", "retro", "intimate", "romantic"], [p("bar"), a("intimate"), a("upscale"), d("art_deco")]),
-  place("Dante", "New York", "West Village", 3, [40.7303, -74.0021], 0.82, ["romantic", "retro", "warm"], [p("bar"), a("romantic"), d("vintage")]),
-  place("Elsewhere", "New York", "Bushwick", 2, [40.7062, -73.9235], 0.7, ["neon", "nocturnal", "rebellious", "urban"], [p("music_venue"), st("rooftop"), a("lively"), s("edgy")]),
+  place("Bemelmans Bar", "New York", "Upper East Side", 4, [40.7744, -73.9632], 0.8, ["nocturnal", "retro", "intimate", "romantic"], [p("restaurant:bar"), a("intimate"), a("upscale"), d("art_deco")]),
+  place("Dante", "New York", "West Village", 3, [40.7303, -74.0021], 0.82, ["romantic", "retro", "warm"], [p("restaurant:bar"), a("romantic"), d("vintage")]),
+  place("Elsewhere", "New York", "Bushwick", 2, [40.7062, -73.9235], 0.7, ["neon", "nocturnal", "rebellious", "urban"], [p("live_music_venue"), st("rooftop"), a("lively"), s("edgy")]),
   place("The Odeon", "New York", "Tribeca", 3, [40.7169, -74.0077], 0.76, ["nocturnal", "retro", "urban", "neon"], [p("restaurant"), d("neon_signage"), d("art_deco"), a("moody")]),
-  place("Russ & Daughters Cafe", "New York", "Lower East Side", 2, [40.7202, -73.9895], 0.72, ["nostalgic", "warm"], [p("cafe"), d("vintage"), a("cozy")], false),
+  place("Russ & Daughters Cafe", "New York", "Lower East Side", 2, [40.7202, -73.9895], 0.72, ["nostalgic", "warm"], [p("restaurant:cafe"), d("vintage"), a("cozy")], false),
 ];
 
 /** ID of a mock entity by name, for examples and tests. Throws if it isn't in the catalog. */

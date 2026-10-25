@@ -1,7 +1,16 @@
-import { llmConfigFromEnv } from "@/lib/llm/config";
-import { qlooConfigFromEnv } from "@/lib/qloo";
+import { Suspense } from "react";
+import { LiveModes } from "./studio/live-modes";
+import { ModesPending } from "./studio/parts";
 import { Studio } from "./studio/studio";
 
 export default function Home() {
-  return <Studio qlooMode={qlooConfigFromEnv().mode} llmMode={llmConfigFromEnv().mode} />;
+  return (
+    <Studio
+      initialBadges={
+        <Suspense fallback={<ModesPending />}>
+          <LiveModes />
+        </Suspense>
+      }
+    />
+  );
 }

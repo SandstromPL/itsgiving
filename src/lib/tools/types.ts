@@ -19,6 +19,8 @@ export interface ToolResult<T = unknown> {
 
 export interface ToolContext {
   qloo: QlooClient;
+  /** Aborts the tool's Qloo requests, e.g. when the treatment run times out. */
+  signal?: AbortSignal;
 }
 
 export interface ToolOutput<T> {

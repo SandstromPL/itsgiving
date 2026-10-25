@@ -26,6 +26,7 @@ import {
   type InsightsResponse,
   type QlooResult,
 } from "../src/lib/qloo";
+import { venueTagIds } from "../src/lib/tools/shared";
 
 type Verdict = "PASS" | "WARN" | "FAIL" | "INFO";
 interface Check {
@@ -285,15 +286,22 @@ async function main() {
     return [tags.length >= 3 ? "PASS" : tags.length > 0 ? "WARN" : "FAIL", `${tags.length} shared traits: ${tags.slice(0, 10).map((t) => t.name).join(", ")}`];
   });
 
-  // 11. Ambience tags for locations.
+  // 11. Ambience tags for locations. /v2/tags needs a query: type filters alone return nothing (2026-10-25).
   const ambienceIds: string[] = [];
   await check("ambience_tags", "Ambience tags exist and semantic tag search works", async () => {
-    const listed = await qloo.tags({ "filter.tag.types": TAG_TYPES.ambience, take: 30 });
+    const listed = await qloo.tags({
+      "filter.query": "cozy",
+      "feature.semantic_search": true,
+      "filter.tag.types": TAG_TYPES.ambience,
+      "filter.parents.types": ENTITY_TYPES.place,
+      take: 10,
+    });
     await save("tags-ambience", listed);
     const ambience = tagList(listed.data).map(compactTag);
     const semantic = await qloo.tags({
       "filter.query": "intimate",
       "feature.semantic_search": true,
+      "filter.tag.types": TAG_TYPES.ambience,
       "filter.parents.types": ENTITY_TYPES.place,
       take: 10,
     });
@@ -301,12 +309,13 @@ async function main() {
     const candidates = tagList(semantic.data).map(compactTag);
     ambienceIds.push(...candidates.slice(0, 3).map((t) => t.id).filter(Boolean));
     const verdict = ambience.length > 0 && candidates.length > 0 ? "PASS" : ambience.length + candidates.length > 0 ? "WARN" : "FAIL";
-    return [verdict, `${ambience.length} ambience tags (${ambience.slice(0, 8).map((t) => t.name).join(", ")}); "intimate" -> ${candidates.slice(0, 5).map((t) => t.id).join(", ") || "none"}`];
+    return [verdict, `"cozy" -> ${ambience.slice(0, 5).map((t) => t.id).join(", ") || "none"}; "intimate" -> ${candidates.slice(0, 5).map((t) => t.id).join(", ") || "none"}`];
   });
 
-  // 12. Locations with photos in demo cities, with and without ambience tags.
+  // 12. Locations with photos in demo cities: as-is, then the way scout_locations asks
+  // (filmable venue kinds as the filter, ambience as a ranking signal).
   for (const city of CITIES) {
-    await check(`locations_${city}`, `Places with photos in ${city}`, async () => {
+    await check(`locations_${city}`, `Filmable places with photos in ${city}`, async () => {
       const base = await insightsEntities(`places-${city}`, {
         "filter.type": ENTITY_TYPES.place,
         "filter.location.query": city,
@@ -320,15 +329,18 @@ async function main() {
           await insightsEntities(`places-${city}-ambience`, {
             "filter.type": ENTITY_TYPES.place,
             "filter.location.query": city,
-            "filter.tags": ambienceIds,
+            "signal.interests.entities": idA,
+            "filter.tags": venueTagIds(["cafe", "bar", "music_venue", "gallery", "bookstore"]),
             "operator.filter.tags": "union",
+            "signal.interests.tags": ambienceIds,
+            "operator.signal.interests.tags": "union",
             "filter.exists": "properties.image",
             take: 15,
           })
         ).entities;
       }
       const verdict = base.entities.length >= 5 ? (tagged.length >= 3 || ambienceIds.length === 0 ? "PASS" : "WARN") : base.entities.length > 0 ? "WARN" : "FAIL";
-      return [verdict, `${base.entities.length} with photos (${names(base.entities, 5)}); ${tagged.length} also matching ambience tags (${names(tagged, 5)})`];
+      return [verdict, `${base.entities.length} with photos (${names(base.entities, 5)}); ${tagged.length} filmable and ranked by ambience (${names(tagged, 5)})`];
     });
   }
 
@@ -361,7 +373,7 @@ async function main() {
     return ["INFO", results.join("; ")];
   });
 
-  // 14. Trending series (used for "is this reference rising?").
+  // 14. Trending series (not used by Mise yet, so informational).
   await check("trending", "/v2/trending returns a weekly series", async () => {
     const id = filmIds[0] ?? baseline[0]?.id;
     if (!id) return ["WARN", "Skipped: no film ID available."];
@@ -375,7 +387,7 @@ async function main() {
     });
     await save("trending", result);
     const points = (result.data as { results?: { trending?: unknown[] } }).results?.trending?.length ?? 0;
-    return [points > 0 ? "PASS" : "WARN", `${points} weekly points`];
+    return ["INFO", `${points} weekly points`];
   });
 }
 

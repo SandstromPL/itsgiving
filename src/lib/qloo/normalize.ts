@@ -86,6 +86,10 @@ export function extractContributions(explainability: unknown, limit = 5): Contri
 }
 
 export interface CompactPlace {
+  /** Qloo's primary genre for the place, e.g. "Lounge bar". */
+  kind?: string;
+  /** Qloo's own one-line read of the atmosphere (properties.ambience_description). */
+  ambience?: string;
   address?: string;
   neighborhood?: string;
   city?: string;
@@ -133,6 +137,37 @@ function round(value: number | undefined | null): number | undefined | null {
   return value === undefined ? undefined : Math.round(value * 1000) / 1000;
 }
 
+/**
+ * Tag families worth showing per kind, best first. Live entities carry dozens
+ * of tags (film keywords like "Smoothie", brand tags like "Website"); these
+ * families describe look and feel, e.g. a film's style:qloo tags read like
+ * cinematography notes ("Stark close ups", "Moody").
+ */
+const TAG_PRIORITY: Partial<Record<EntityKind, string[]>> = {
+  movie: ["urn:tag:style:qloo", "urn:tag:genre:media", "urn:tag:plot:qloo"],
+  tv_show: ["urn:tag:style:qloo", "urn:tag:genre:media", "urn:tag:plot:qloo"],
+  brand: ["urn:tag:aesthetic_property:qloo", "urn:tag:personal_style:qloo", "urn:tag:emotional_tone:qloo"],
+  place: ["urn:tag:genre:place", "urn:tag:ambience:qloo", "urn:tag:decor:qloo", "urn:tag:setting:qloo"],
+  artist: ["urn:tag:genre:music", "urn:tag:style:qloo"],
+};
+
+/** Labels too generic to be evidence of anything. */
+const GENERIC_TAGS = new Set(["place", "website", "other"]);
+
+/** Up to `max` tag names: the kind's priority families first (a few each), then the rest in Qloo's order. */
+export function pickTags(tags: QlooTag[], kind: EntityKind | undefined, max: number): string[] {
+  const useful = tags.filter((tag) => tag.name && !GENERIC_TAGS.has(tag.name.toLowerCase()));
+  const priority = (kind && TAG_PRIORITY[kind]) || [];
+  const perFamily = Math.max(2, Math.ceil(max / Math.max(priority.length, 1)));
+  const first = priority.flatMap((family) => useful.filter((tag) => tag.type === family).slice(0, perFamily));
+  const names: string[] = [];
+  for (const tag of [...first, ...useful]) {
+    if (!names.some((n) => n.toLowerCase() === tag.name.toLowerCase())) names.push(tag.name);
+    if (names.length === max) break;
+  }
+  return names;
+}
+
 export function compactEntity(
   entity: QlooEntity,
   options: { maxTags?: number; maxDescription?: number } = {},
@@ -154,22 +189,25 @@ export function compactEntity(
     image: isRecord(props.image) ? str(props.image.url) : undefined,
     popularity: round(num(entity.popularity)) ?? undefined,
     affinity: entity.query && "affinity" in entity.query ? round(entity.query.affinity ?? null) : undefined,
-    tags: (entity.tags ?? []).slice(0, options.maxTags ?? 8).map((tag) => tag.name),
+    tags: pickTags(entity.tags ?? [], kind, options.maxTags ?? 8),
   };
 
   const because = extractContributions(entity.query?.explainability);
   if (because.length > 0) compact.because = because;
 
   if (kind === "place") {
+    const primary = props.primary_genre;
     compact.place = {
+      kind: isRecord(primary) ? str(primary.name) : str(primary),
+      ambience: truncate(str(props.ambience_description), 220),
       address: str(props.address),
       neighborhood: str(props.neighborhood) ?? str(geocode.neighborhood),
       city: str(geocode.city) ?? str(props.city),
       country_code: str(geocode.country_code) ?? str(props.country_code),
       price_level: num(props.price_level),
       business_rating: num(props.business_rating),
-      lat: num(props.lat) ?? num(props.latitude) ?? num(location.lat) ?? num(geocode.latitude),
-      lon: num(props.lon) ?? num(props.longitude) ?? num(location.lon) ?? num(geocode.longitude),
+      lat: num(entity.location?.lat) ?? num(props.lat) ?? num(props.latitude) ?? num(location.lat) ?? num(geocode.latitude),
+      lon: num(entity.location?.lon) ?? num(props.lon) ?? num(props.longitude) ?? num(location.lon) ?? num(geocode.longitude),
     };
   }
 

@@ -74,27 +74,44 @@ describe("reference_films", () => {
   });
 });
 
+describe("styling_brands", () => {
+  it("keeps to fashion brands and skips explainability when style tags steer the ranking", async () => {
+    const plain = await runTool("styling_brands", { signal_entity_ids: [mockEntityId("Charli xcx")] }, ctx);
+    expect(plain.provenance[0].query).toMatchObject({ "filter.tags": "urn:tag:genre:brand:fashion", "feature.explainability": "true" });
+    const steered = await runTool(
+      "styling_brands",
+      { signal_entity_ids: [mockEntityId("Charli xcx")], style_tag_ids: ["urn:tag:genre:brand:fashion:streetwear"] },
+      ctx,
+    );
+    expect(steered.provenance[0].query).toMatchObject({ "feature.explainability": "false", "signal.interests.tags": "urn:tag:genre:brand:fashion:streetwear" });
+    expect((steered.data as Data<"brands">).brands[0].name).toMatch(/Stüssy|Carhartt WIP/);
+  });
+});
+
 describe("scout_locations", () => {
-  it("keeps places in the city that have photos and the required ambience", async () => {
+  it("keeps the asked-for kinds of venue in the city, with photos, ranked by ambience", async () => {
     const result = await runTool(
       "scout_locations",
-      { city: "Bombay", ambience_tag_ids: ["urn:tag:ambience:qloo:lively"] },
+      { city: "Bombay", venue_kinds: ["bar"], ambience_tag_ids: ["urn:tag:ambience:qloo:lively"] },
       ctx,
     );
     const names = (result.data as Data<"locations">).locations.map((l) => l.name);
-    expect(names).toContain("Leopold Cafe");
-    expect(names).not.toContain("Bonobo"); // lively, but has no photo
+    expect(names).toContain("Leopold Cafe"); // restaurant and bar
+    expect(names).not.toContain("Prithvi Cafe"); // a cafe, not a bar
+    expect(names).not.toContain("Bonobo"); // a bar, but has no photo
     expect(names).not.toContain("Balthazar"); // New York
+    expect(result.provenance[0].query["filter.tags"]).toContain("urn:tag:genre:place:restaurant:bar");
+    expect(result.provenance[0].query["signal.interests.tags"]).toBe("urn:tag:ambience:qloo:lively");
   });
 
   it("suggests how to relax the search when nothing matches", async () => {
     const result = await runTool(
       "scout_locations",
-      { city: "Mumbai", ambience_tag_ids: ["urn:tag:setting:qloo:waterfront"], price_level_max: 1 },
+      { city: "Mumbai", venue_kinds: ["music_venue"], price_level_max: 1 },
       ctx,
     );
     expect(result.status).toBe("empty");
-    expect(result.summary).toContain("tag_mode=bias");
+    expect(result.summary).toContain("more venue_kinds");
   });
 });
 

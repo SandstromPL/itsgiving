@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { audienceList, compactEntity, entityList, extractContributions, tagList } from "./normalize";
+import { audienceList, compactEntity, entityList, extractContributions, pickTags, tagList } from "./normalize";
 
 describe("result readers", () => {
   it("read entities from both the flat and the wrapped shapes", () => {
@@ -60,6 +60,36 @@ describe("compactEntity", () => {
     expect(compact.tags).toHaveLength(8);
     expect(compact.description!.length).toBeLessThanOrEqual(240);
     expect(JSON.stringify(compact)).not.toContain("akas");
+  });
+
+  it("reads live place fields: top-level location, primary genre object and Qloo's ambience note", () => {
+    const compact = compactEntity({
+      name: "Rarities",
+      entity_id: "P2",
+      subtype: "urn:entity:place",
+      location: { lat: 40.76, lon: -73.97, geohash: "dr5ru" },
+      properties: {
+        primary_genre: { id: "urn:tag:genre:place:restaurant:lounge_bar", name: "Lounge bar" },
+        ambience_description: "Gilded Age glamour with velvet furnishings.",
+      },
+    });
+    expect(compact.place).toMatchObject({ kind: "Lounge bar", ambience: "Gilded Age glamour with velvet furnishings.", lat: 40.76, lon: -73.97 });
+  });
+
+  it("puts a film's style tags first and drops noise and generic labels", () => {
+    const tag = (type: string, name: string) => ({ id: `${type}:${name}`, name, type });
+    const tags = [
+      tag("urn:tag:keyword:media", "Smoothie"),
+      tag("urn:tag:keyword:media", "Pencil sharpener"),
+      tag("urn:tag:genre:media", "Drama"),
+      tag("urn:tag:style:qloo", "Stark close ups"),
+      tag("urn:tag:style:qloo", "Moody"),
+      tag("urn:tag:plot:qloo", "Slow burn"),
+    ];
+    expect(pickTags(tags, "movie", 4)).toEqual(["Stark close ups", "Moody", "Drama", "Slow burn"]);
+    expect(pickTags([tag("urn:tag:genre:place", "Place"), tag("urn:tag:genre:place", "Cafe")], "place", 4)).toEqual(["Cafe"]);
+    // Without priority families (e.g. mock data), Qloo's own order is kept.
+    expect(pickTags(tags.slice(0, 2), "movie", 4)).toEqual(["Smoothie", "Pencil sharpener"]);
   });
 
   it("keeps a null affinity (no signal) distinct from a missing one", () => {

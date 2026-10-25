@@ -45,6 +45,9 @@ export interface Draft {
 const text = z.string().min(1);
 const refEnum = (refs: Ref<unknown>[] | ToneCandidate[]) => z.enum(refs.map((r) => r.ref) as [string, ...string[]]);
 
+// Arrays only carry minimums (and refs must come from the enums); the
+// maximums are stated in the descriptions and applied in code, so a model that
+// writes one shot too many isn't sent back for a repair.
 export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
   const { tone, references, brands, places } = ctx;
   return z.strictObject({
@@ -52,7 +55,7 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
     logline: text.describe("One sentence."),
     concept: text.describe("80-140 words, present tense."),
     ...(tone.length > 0
-      ? { tone: z.array(z.strictObject({ ref: refEnum(tone), note: text })).min(1).max(5).describe("How each tone tag shows up on screen.") }
+      ? { tone: z.array(z.strictObject({ ref: refEnum(tone), note: text })).min(1).describe("2-5 items: how each tone tag shows up on screen.") }
       : {}),
     beats: z
       .array(
@@ -63,27 +66,27 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
         }),
       )
       .min(3)
-      .max(6),
+      .describe("3-6 beats in order."),
     ...(references.length > 0
       ? {
           references: z
             .array(z.strictObject({ ref: refEnum(references), why: text, borrow: text.describe("What to borrow: palette, framing, movement or texture.") }))
             .min(Math.min(2, references.length))
-            .max(6),
+            .describe("2-6 film references."),
         }
       : {}),
     ...(brands.length > 0
-      ? { wardrobe: z.array(z.strictObject({ ref: refEnum(brands), look: text.describe("Garments, fabrics, colours.") })).min(1).max(4) }
+      ? { wardrobe: z.array(z.strictObject({ ref: refEnum(brands), look: text.describe("Garments, fabrics, colours.") })).min(1).describe("1-4 looks.") }
       : {}),
     ...(places.length > 0
-      ? { locations: z.array(z.strictObject({ ref: refEnum(places), scene: text.describe("What happens there.") })).min(1).max(4) }
+      ? { locations: z.array(z.strictObject({ ref: refEnum(places), scene: text.describe("What happens there.") })).min(1).describe("1-4 locations.") }
       : {}),
     palette: z
       .array(z.strictObject({ name: text, hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/).describe("#RRGGBB") }))
       .min(3)
-      .max(6),
-    lighting: z.array(text).min(2).max(4),
-    shots: z.array(text).min(3).max(6),
+      .describe("4-6 colours."),
+    lighting: z.array(text).min(2).describe("2-4 lighting notes."),
+    shots: z.array(text).min(3).describe("3-6 shot notes."),
   }) as unknown as z.ZodType<Draft>;
 }
 
@@ -94,6 +97,8 @@ function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): strin
     if (item.place.price_level) bits.push(`price ${item.place.price_level}/4`);
   }
   if (item.tags.length > 0) bits.push(item.tags.slice(0, 4).join(", "));
+  // Qloo's own read of the room, clipped so six places stay within Groq's tokens-per-minute budget.
+  if (item.place?.ambience) bits.push(`"${item.place.ambience.slice(0, 140)}"`);
   // With one subject every pick is "via" it; only spend tokens on this when it discriminates.
   const via = ctx.artistNames.length + ctx.touchstoneNames.length > 1 ? (item.because ?? []).map((b) => ctx.names.get(b.entity_id)).filter(Boolean) : [];
   if (via.length > 0) bits.push(`via ${via.slice(0, 2).join(", ")}`);

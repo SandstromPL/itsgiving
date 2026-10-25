@@ -28,16 +28,23 @@ free-tier limits.
 
 1. **Intake** is a form, so no LLM is spent parsing it.
 2. **Resolve** the artist, touchstone films and the director's own films (`resolve_entities`). Names that match more
-   than one title go to a picker in the UI instead of being guessed; only Qloo's own candidates can be picked.
+   than one title go to a picker in the UI instead of being guessed; only Qloo's own candidates can be picked. A year
+   in brackets, like "Rockstar (2011)", settles it without asking.
 3. **Read the audience** (`read_audience`) and, when the director lists films, **compare** their taste with the
    audience (`taste_overlap`).
 4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, an era, how deep the cuts go, and a
    few plain style words for wardrobe and ambience. Tags are shown to it as short refs (`T1`, `T2`, ...) and the output
    schema only accepts those refs, so it cannot invent a tag ID.
-5. **Execute in code.** The style words go through `find_tags`; then `reference_films`, `styling_brands` and
-   `scout_locations` run in parallel. Empty results are relaxed deterministically (drop the era, lift the deep-cut
-   ceiling, let tags rank instead of filter, allow places without photos, lift the price ceiling), and the treatment
-   says what was relaxed.
+5. **Execute in code.** The style words go through `find_tags` (preferring tags named like the word, never
+   adult-themed ones). Then three Qloo queries run in parallel:
+   - `reference_films`: the artist's audience, with a popularity ceiling for deep cuts and an era only when the
+     director asks for "more 90s".
+   - `styling_brands`: fashion brands only (`urn:tag:genre:brand:fashion`), ranked by the wardrobe style tags.
+   - `scout_locations`: the venue kinds the plan chose (cafe, bar, bookstore, park and so on, mapped to Qloo place
+     genres), ranked by the ambience tags, within the budget's price level, with photos.
+
+   Empty or failed results are relaxed deterministically (widen the venue kinds, allow places without photos, lift
+   the price ceiling, drop style tags, lift the deep-cut ceiling), and the treatment says what was relaxed.
 6. **Re-plan (optional LLM call 2)** only when a whole set of style words matched no Qloo tag.
 7. **Write (last LLM call).** The model writes the treatment as JSON, citing films, brands and places only by ref
    (`R1`, `B1`, `L1`); refs not returned by a tool fail validation. Code maps refs back to Qloo items and attaches each
@@ -45,6 +52,15 @@ free-tier limits.
    wrote it.
 
 Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
+
+### What live Qloo taught the design (2026-10-25)
+
+- Films carry `style:qloo` tags that read like cinematography notes ("Stark close ups", "Domestic scale
+  cinematography"); Mise shows those first and hands them to the writer, so "what to borrow" is grounded in Qloo.
+- Tag signals on film queries made Qloo run 22-60 s and end in a 504, so films use the artist signal alone (about
+  1.4 s). Brand queries without the fashion filter returned snack and drink brands.
+- `tourist_attraction` is on hotels and golf clubs, so it is not a venue kind. Places carry Qloo's own
+  `ambience_description`, shown as evidence on each location.
 
 ### LLM layer (`src/lib/llm`)
 
@@ -54,9 +70,11 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   problems in the prompt.
 - The chain falls through on 429, 5xx, timeouts and invalid output: **Gemini `gemini-3.5-flash-lite`** (Google AI
   Studio free tier, thinking level low for planning and medium for writing), then **Groq `openai/gpt-oss-120b`**
-  (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit), then **`gemini-3.8-flash`**
-  as a last resort. The order comes from live free-tier measurements: Flash-Lite answered in 5-7 s and Groq in 1-3 s,
-  while 3.8 Flash returned 503s or took over 100 s per call.
+  (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit), then, only if a key is
+  set, **DeepSeek `deepseek-flash`** (paid; JSON mode with the schema in the prompt, thinking off), then
+  **`gemini-3.8-flash`** as a last resort. The order comes from live measurements: Flash-Lite answered in 5-7 s, Groq
+  in 1-3 s, DeepSeek in 2-3 s to plan and 15-20 s to write, while 3.8 Flash returned 503s or took over 100 s per call.
+- Array limits ("4-6 colours") are stated to the model but applied in code, so one extra item never costs a repair.
 - A provider that times out, is overloaded or is rate limited rests for one to two minutes (longer if it sends a retry
   delay), so the next step goes straight to one that works. Every call is also bounded by the time left in the run,
   with time held back for the writing step.
@@ -116,7 +134,8 @@ All server-side only.
 | `GEMINI_API_KEY` | Google AI Studio key (free tier) |
 | `GROQ_API_KEY` | Groq key (free tier), the backup provider |
 | `LLM_MODE` | `live` or `mock`; defaults to `live` when either LLM key is set |
-| `GEMINI_MODEL` / `GROQ_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `gemini-3.8-flash`); `none` drops a Gemini one |
+| `DEEPSEEK_API_KEY` | Optional, paid: DeepSeek runs only when both free providers fail (about $0.001 a treatment) |
+| `GEMINI_MODEL` / `GROQ_MODEL` / `DEEPSEEK_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `deepseek-flash`, `gemini-3.8-flash`); `none` drops a Gemini one |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `LLM_TIMEOUT_MS` | Per-call timeout before falling through (default 20000) |
 | `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
@@ -154,7 +173,10 @@ All server-side only.
 ## Limitations
 
 - Rate limits, the daily LLM cap and the treatment cache live in process memory, so each serverless instance keeps its
-  own. That is enough to protect free-tier quota for a demo, not to meter users.
+  own. That is enough to protect free-tier quota for a demo, not to meter users. The per-IP limit trusts
+  `x-forwarded-for`, which is right on Vercel but spoofable behind other proxies, and identical cold briefs arriving
+  at once each run their own pipeline.
+- A treatment that hit a failed Qloo call or a template-written step is shown (and says so) but never cached.
 - The free Gemini tier may use prompts to improve Google's products; Mise only sends public names and Qloo tags.
 - Location results are candidates to scout: availability and filming permission must be confirmed with each venue.
 

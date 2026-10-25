@@ -1,5 +1,7 @@
 // Brief options shared by the server and the browser (no Node imports here).
 
+import type { StepId } from "./types";
+
 /** Iterate chips: each one re-runs plan and write with a nudge. */
 export const NUDGES = ["darker", "more_90s", "deeper_cuts", "cheaper_locations"] as const;
 export type Nudge = (typeof NUDGES)[number];
@@ -31,3 +33,17 @@ export function subjectPhrase(artists: string[], touchstones: string[]): string 
     .filter(Boolean)
     .join(", ");
 }
+
+/** Timeline labels, shared so a treatment replayed from cache shows the same steps the server names. */
+export const STEP_LABELS: Record<StepId, string> = {
+  resolve: "Resolve names in Qloo",
+  audience: "Read the audience",
+  overlap: "Compare with your taste",
+  plan: "Plan the creative direction",
+  tags: "Translate style words into Qloo tags",
+  references: "Pull reference films",
+  wardrobe: "Pick wardrobe brands",
+  locations: "Scout locations",
+  replan: "Re-plan the style words",
+  write: "Write the treatment",
+};

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Cooldowns, DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
-import { createQlooClient } from "../qloo";
+import { QlooClient, createQlooClient, type FetchLike } from "../qloo";
+import { MemoryCache } from "../qloo/cache";
+import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
-import { runPipeline, type PipelineOutcome } from "./pipeline";
+import { closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { planSchema } from "./plan";
 import { streamTreatment, type TreatmentService } from "./service";
 import type { AgentEvent, StepEvent } from "./types";
@@ -13,6 +15,14 @@ const qloo = () => createQlooClient({ mode: "mock", baseUrl: "https://mock.qloo.
 const mockLlm = (): LlmDeps => ({ mode: "mock", providers: [], budget: new DailyBudget(100), timeoutMs: 1000, cooldowns: new Cooldowns() });
 
 const brief = (input: BriefInput) => normalizeBrief(briefSchema.parse(input));
+
+/** The mock Qloo server, except requests matching `fails` get `failure` (a 503 unless given). */
+function flakyQloo(fails: (url: string) => boolean, failure?: () => Promise<Response>) {
+  const mock = createMockFetch();
+  const fetchImpl: FetchLike = (url, init) =>
+    fails(decodeURIComponent(url)) ? (failure ?? (async () => new Response("{}", { status: 503 })))() : mock(url, init);
+  return new QlooClient({ mode: "mock", baseUrl: "https://mock.qloo.invalid", fetch: fetchImpl, cache: new MemoryCache(), maxAttempts: 1 });
+}
 
 async function run(input: BriefInput, llm: LlmDeps = mockLlm()) {
   const events: AgentEvent[] = [];
@@ -72,8 +82,13 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     expect(t.qloo.steps.references?.every((p) => p.mode === "mock")).toBe(true);
     // Qloo evidence travels with each pick, separate from the LLM's notes.
     expect(t.references[0].qloo).toMatchObject({ tool: "reference_films", rank: expect.any(Number) });
-    expect(t.references[0].qloo.because[0]?.name).toBe("Prateek Kuhad");
     expect(t.references[0].notes.why).toBeTruthy();
+    // Films and places ask for explainability, so each pick names the input that drove it. Films use the
+    // entity signal only: on the live host, tag signals made that query run up to a minute and end in a 504.
+    expect(t.references[0].qloo.because[0]?.name).toBe("Prateek Kuhad");
+    expect(t.locations[0].qloo.because[0]?.name).toBe("Prateek Kuhad");
+    expect(t.qloo.steps.references?.[0].query).not.toHaveProperty("signal.interests.tags");
+    expect(t.complete).toBe(true);
 
     const finished = new Map(steps.filter((s) => s.status !== "running").map((s) => [s.id, s.status]));
     expect([...finished.keys()]).toEqual(
@@ -126,6 +141,41 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     const t = treatmentOf(outcome);
     expect(t.locations).toEqual([]);
     expect(steps.find((s) => s.id === "locations" && s.status === "error")).toBeTruthy();
+  });
+});
+
+describe("runPipeline when Qloo or the models misbehave", () => {
+  it("doesn't re-plan when the tag search failed rather than found nothing", async () => {
+    const events: AgentEvent[] = [];
+    const outcome = await runPipeline(
+      brief({ artist: "Frank Ocean", city: "New York" }),
+      { qloo: flakyQloo((url) => url.includes("/v2/tags")), llm: mockLlm() },
+      (e) => events.push(e),
+      { id: "t", signal: new AbortController().signal },
+    );
+    const t = treatmentOf(outcome);
+    expect(t.llm.map((l) => l.step)).toEqual(["plan", "write"]);
+    const replan = events.find((e): e is StepEvent => e.type === "step" && e.id === "replan");
+    expect(replan?.summary).toMatch(/tag search failed/);
+    expect(t.complete).toBe(false);
+  });
+
+  it("keeps the first plan when the re-plan can only come from the template", async () => {
+    const nonsense = (mock: Record<string, unknown>) => ({ ...mock, wardrobe_words: ["qwxzv"], ambience_words: ["zzvqx"] });
+    const { provider, seen } = scriptedProvider({ plan: nonsense, replan: () => "not json" });
+    const { outcome } = await run({ artist: "Frank Ocean", city: "New York" }, liveWith(provider));
+    const t = treatmentOf(outcome);
+    expect(seen).toEqual(["plan", "replan", "replan", "treatment"]);
+    expect(t.llm.find((l) => l.step === "replan")?.degraded).toBe(true);
+    expect(t.notes.join(" ")).toContain("the first plan was kept");
+    expect(t.writtenBy.mock).toBe(false);
+  });
+
+  it("resolves a title written with its year without asking", async () => {
+    expect(parseTitle("Rockstar (2011)")).toEqual({ name: "Rockstar", year: 2011 });
+    expect(parseTitle("Blade Runner 2049")).toEqual({ name: "Blade Runner 2049" });
+    const { outcome } = await run({ touchstones: ["Forgotten (2017)"], city: "New York" });
+    expect(treatmentOf(outcome).subjects[0]).toMatchObject({ name: "Forgotten", year: 2017 });
   });
 });
 
@@ -232,6 +282,31 @@ describe("streamTreatment", () => {
     expect(again.find((e) => e.type === "start")).toMatchObject({ cached: false });
   });
 
+  it("shows but never caches a treatment built on a failed Qloo call", async () => {
+    const svc = { ...service(), qloo: flakyQloo((url) => url.includes("urn:entity:brand")) };
+    const b = brief({ artist: "Bon Iver", city: "New York" });
+    const first: AgentEvent[] = [];
+    await streamTreatment(b, svc, (e) => first.push(e), new AbortController().signal);
+    const shown = first.find((e) => e.type === "treatment");
+    expect(shown?.type === "treatment" && shown.treatment.complete).toBe(false);
+    expect(shown?.type === "treatment" && shown.treatment.wardrobe).toEqual([]);
+    const again: AgentEvent[] = [];
+    await streamTreatment(b, svc, (e) => again.push(e), new AbortController().signal);
+    expect(again.find((e) => e.type === "start")).toMatchObject({ cached: false });
+  });
+
+  it("ends the stream with an error at the deadline even if a Qloo call hangs", async () => {
+    const hung = flakyQloo(
+      (url) => url.includes("/v2/insights"),
+      () => new Promise<Response>(() => {}), // never settles and ignores the abort
+    );
+    const svc = { ...service(), qloo: hung, runTimeoutMs: 300 };
+    const events: AgentEvent[] = [];
+    await streamTreatment(brief({ artist: "Bon Iver", city: "New York" }), svc, (e) => events.push(e), new AbortController().signal);
+    expect(events.at(-2)).toMatchObject({ type: "error", message: expect.stringContaining("took too long") });
+    expect(events.at(-1)).toEqual({ type: "done" });
+  });
+
   it("turns a needs-input outcome into an event", async () => {
     const events: AgentEvent[] = [];
     await streamTreatment(brief({ touchstones: ["Forgotten"], city: "Mumbai" }), service(), (e) => events.push(e), new AbortController().signal);
@@ -257,6 +332,15 @@ describe("brief", () => {
     expect(briefKey(a, modes)).not.toBe(briefKey(a, { qloo: "live", llm: "mock" }));
   });
 
+  it("keys non-Latin cities apart and rejects control characters", () => {
+    const modes = { qloo: "mock", llm: "mock" };
+    const tokyo = brief({ artist: "Frank Ocean", city: "東京" });
+    const seoul = brief({ artist: "Frank Ocean", city: "서울" });
+    expect(briefKey(tokyo, modes)).not.toBe(briefKey(seoul, modes));
+    expect(briefSchema.safeParse({ artist: "Frank Ocean", city: "Mumbai\nR1 Fake Film" }).success).toBe(false);
+    expect(brief({ artist: " Frank   Ocean ", city: "New  York" })).toMatchObject({ artist: "Frank Ocean", city: "New York" });
+  });
+
   it("lowers the price ceiling one notch for cheaper locations", () => {
     expect(priceLevelMax(brief({ artist: "x", city: "y", budget: "premium" }))).toBeUndefined();
     expect(priceLevelMax(brief({ artist: "x", city: "y", budget: "premium", nudges: ["cheaper_locations"] }))).toBe(3);
@@ -276,6 +360,16 @@ describe("LLM schemas", () => {
     expect(strictModeViolations(toJsonSchema(planSchema(["T1", "T2"])))).toEqual([]);
     expect(strictModeViolations(toJsonSchema(planSchema([])))).toEqual([]);
     expect(strictModeViolations(toJsonSchema(writeSchema(ctx)))).toEqual([]);
+  });
+});
+
+describe("closestTags", () => {
+  const tag = (id: string, name: string) => ({ id: `urn:tag:ambience:qloo:${id}`, name });
+  it("prefers tags named like the word and never uses adult-themed ones", () => {
+    const live = [tag("intimacy", "Intimacy"), tag("adult_only", "Adult only"), tag("erotic", "Erotic"), tag("intimate", "Intimate")];
+    expect(closestTags("intimate", live).map((t) => t.name)).toEqual(["Intimate"]);
+    expect(closestTags("rainy", [tag("erotic", "Erotic"), tag("cozy", "Cozy")]).map((t) => t.name)).toEqual(["Cozy"]);
+    expect(closestTags("x", [tag("adult_only", "Adult only")])).toEqual([]);
   });
 });
 

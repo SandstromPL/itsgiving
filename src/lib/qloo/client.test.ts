@@ -116,13 +116,41 @@ describe("QlooClient", () => {
     expect(result.provenance.status).toBe(404);
   });
 
-  it("serves repeat requests from the cache", async () => {
-    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse({ version: "1" }));
+  it("serves repeat requests from the cache, except the health check's info()", async () => {
+    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse({ results: [] }));
     const client = liveClient(fetchImpl, { cache: new MemoryCache() });
-    await client.info();
-    const second = await client.info();
+    await client.search({ query: "Drive" });
+    const second = await client.search({ query: "Drive" });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(second.provenance.cached).toBe(true);
+    await client.info();
+    await client.info();
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("retries a body that fails mid-stream, and stops retrying once the run is aborted", async () => {
+    const broken = () => new Response(new ReadableStream({ start: (c) => c.error(new TypeError("terminated")) }), { status: 200 });
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValueOnce(broken()).mockResolvedValueOnce(jsonResponse({ results: [] }));
+    const result = await liveClient(fetchImpl, { sleep: async () => {} }).search({ query: "Drive" });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(result.data).toEqual({ results: [] });
+
+    const controller = new AbortController();
+    const hanging = vi.fn<FetchLike>(async () => {
+      controller.abort(new Error("run deadline"));
+      throw new DOMException("aborted", "AbortError");
+    });
+    const scoped = liveClient(hanging).recording(() => {}, controller.signal);
+    await expect(scoped.search({ query: "Drive" })).rejects.toThrow("run deadline");
+    expect(hanging).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a good response when the cache write fails", async () => {
+    const cache = { get: async () => undefined, set: async () => Promise.reject(new Error("EROFS")) };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = await liveClient(async () => jsonResponse({ results: [] }), { cache }).search({ query: "Drive" });
+    expect(result.data).toEqual({ results: [] });
+    warn.mockRestore();
   });
 
   it("surfaces silently-ignored parameter warnings", async () => {

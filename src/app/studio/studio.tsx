@@ -1,30 +1,41 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { BriefInput } from "@/lib/agent/brief";
-import type { Nudge } from "@/lib/agent/options";
-import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
+import { STEP_LABELS, type Nudge } from "@/lib/agent/options";
+import type { AgentEvent, Ambiguity, StepEvent, StepId, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
 import { Board, EmptyBoard, type Example } from "./board";
-import { BriefForm, EMPTY_FORM, splitTitles, type FormState } from "./brief-form";
+import { BriefForm, EMPTY_FORM, splitTitles, validateForm, type FormProblem, type FormState } from "./brief-form";
 import { ModeBadges } from "./parts";
 import { Picker } from "./picker";
-import { streamTreatment } from "./stream";
+import { StreamError, streamTreatment } from "./stream";
 import { Timeline } from "./timeline";
 
 type Phase = "idle" | "running" | "needs_input" | "done" | "error";
 
-// Names that exist in Qloo and in the mock catalog, so every example works in both modes.
+/** One request's inputs: kept so iterate chips and the picker re-run the brief behind the board, not the live form. */
+interface RunInput {
+  form: FormState;
+  picks: Record<string, string>;
+  nudges: Nudge[];
+}
+
+/** The server gives up at 55 s and streams events throughout; this much silence means the connection is gone. */
+const STALL_MS = 75_000;
+
+// Names that exist in Qloo and in the mock catalog, so every example works in both modes. Titles
+// that live Qloo knows more than one of carry their year, so only the last example stops to ask.
 const EXAMPLES: Example<FormState>[] = [
   {
     label: "Prateek Kuhad, shot in Mumbai",
-    form: { ...EMPTY_FORM, artist: "Prateek Kuhad", city: "Mumbai", directorFilms: "In the Mood for Love\nDonnie Darko\nRockstar" },
+    form: { ...EMPTY_FORM, artist: "Prateek Kuhad", city: "Mumbai", directorFilms: "In the Mood for Love\nDonnie Darko\nRockstar (2011)" },
   },
   {
     label: "Charli xcx, shot in New York",
-    form: { ...EMPTY_FORM, artist: "Charli xcx", city: "New York", budget: "premium", directorFilms: "Chungking Express\nDrive" },
+    form: { ...EMPTY_FORM, artist: "Charli xcx", city: "New York", budget: "premium", directorFilms: "Chungking Express\nDrive (2011)" },
   },
   {
     label: "A short film after Past Lives and Aftersun",
@@ -36,111 +47,169 @@ const EXAMPLES: Example<FormState>[] = [
   },
 ];
 
-function toBrief(form: FormState, picks: Record<string, string>, nudges: Nudge[]): BriefInput {
+const STEP_ORDER: StepId[] = ["resolve", "audience", "overlap", "plan", "tags", "references", "wardrobe", "locations", "replan", "write"];
+
+function toBrief({ form, picks, nudges }: RunInput): BriefInput {
   return {
     format: form.format,
     artist: form.artist.trim() || undefined,
-    touchstones: splitTitles(form.touchstones).slice(0, 5),
+    touchstones: splitTitles(form.touchstones),
     city: form.city.trim(),
     budget: form.budget,
-    director_films: splitTitles(form.directorFilms).slice(0, 8),
+    director_films: splitTitles(form.directorFilms),
     picks,
     nudges,
   };
 }
 
-export function Studio({ qlooMode, llmMode }: { qlooMode: QlooMode; llmMode: LlmMode }) {
+/** Timeline rows for a treatment replayed from cache: the calls and models that originally made it. */
+function replaySteps(t: Treatment): StepEvent[] {
+  return STEP_ORDER.flatMap((id): StepEvent[] => {
+    const qloo = t.qloo.steps[id];
+    const llm = t.llm.find((trace) => trace.step === id);
+    if (!qloo?.length && !llm) return [];
+    return [{ type: "step", id, status: "done", label: STEP_LABELS[id], summary: "Replayed from cache: no new calls this time.", qloo, llm }];
+  });
+}
+
+const stopRunningSteps = (summary: string) => (steps: StepEvent[]) =>
+  steps.map((s): StepEvent => (s.status === "running" ? { ...s, status: "error", summary } : s));
+
+export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [picks, setPicks] = useState<Record<string, string>>({});
-  const [nudges, setNudges] = useState<Nudge[]>([]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [steps, setSteps] = useState<StepEvent[]>([]);
   const [treatment, setTreatment] = useState<Treatment | null>(null);
+  /** The run in flight (or last attempted), and the run that produced the board. */
+  const [pending, setPending] = useState<RunInput | null>(null);
+  const [shown, setShown] = useState<RunInput | null>(null);
   const [question, setQuestion] = useState<{ message: string; items: Ambiguity[] } | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [modes, setModes] = useState({ qloo: qlooMode, llm: llmMode });
+  const [formProblem, setFormProblem] = useState<FormProblem | null>(null);
+  const [runProblem, setRunProblem] = useState<string | null>(null);
+  const [modes, setModes] = useState<{ qloo: QlooMode; llm: LlmMode } | null>(null);
+  const [status, setStatus] = useState("");
   const active = useRef<AbortController | null>(null);
+  const stopActive = useRef<() => void>(() => {});
+  const focusTitle = useRef(false);
   const running = phase === "running";
 
-  const board = useRef<HTMLElement>(null);
-  /** In the one-column layout the board sits below the form; bring it into view when it lands. */
-  const revealBoard = () => {
-    if (window.matchMedia("(min-width: 64rem)").matches) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    requestAnimationFrame(() => board.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }));
-  };
+  // Leaving the page mid-run shouldn't keep spending free-tier LLM quota.
+  useEffect(() => () => active.current?.abort(), []);
 
-  const onEvent = (event: AgentEvent) => {
-    switch (event.type) {
-      case "start":
-        setModes({ qloo: event.qlooMode, llm: event.llmMode });
-        break;
-      case "step":
-        setSteps((prev) => {
-          const i = prev.findIndex((s) => s.id === event.id);
-          if (i === -1) return [...prev, event];
-          const next = [...prev];
-          next[i] = event;
-          return next;
-        });
-        break;
-      case "needs_input":
-        setQuestion({ message: event.message, items: event.items });
-        setPhase("needs_input");
-        break;
-      case "treatment":
-        setTreatment(event.treatment);
-        setPhase("done");
-        revealBoard();
-        break;
-      case "error":
-        setProblem(event.message);
-        setPhase("error");
-        break;
-      case "done":
-        setPhase((p) => (p === "running" ? "idle" : p));
-        break;
-    }
-  };
+  // Move focus to the new treatment's title once it renders (it also scrolls it into view).
+  useEffect(() => {
+    if (!treatment || !focusTitle.current) return;
+    focusTitle.current = false;
+    document.getElementById("treatment-title")?.focus();
+  }, [treatment]);
 
-  const run = async (nextForm: FormState, nextPicks: Record<string, string>, nextNudges: Nudge[]) => {
-    const brief = toBrief(nextForm, nextPicks, nextNudges);
-    const invalid = !brief.city
-      ? "Add the shoot city."
-      : !brief.artist && brief.touchstones?.length === 0
-        ? "Add an artist or at least one touchstone film."
-        : null;
-    if (invalid) {
-      setProblem(invalid);
-      setPhase((p) => (p === "error" ? "idle" : p));
-      return;
-    }
-
+  const run = async (input: RunInput) => {
     active.current?.abort();
     const controller = new AbortController();
     active.current = controller;
-    setProblem(null);
+    let finished = false;
+    let stalled = false;
+    let stopped = false;
+    stopActive.current = () => {
+      stopped = true;
+      controller.abort();
+    };
+
+    setPending(input);
+    setFormProblem(null);
+    setRunProblem(null);
     setQuestion(null);
     setSteps([]);
     setPhase("running");
-    try {
-      await streamTreatment(brief, onEvent, controller.signal);
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      setProblem(err instanceof Error ? err.message : "The connection dropped. Try again.");
+    setStatus("Building the treatment…");
+
+    const stall = () => {
+      stalled = true;
+      controller.abort();
+    };
+    let watchdog = setTimeout(stall, STALL_MS);
+
+    const fail = (message: string) => {
+      setRunProblem(message);
       setPhase("error");
+      setSteps(stopRunningSteps("Stopped before it finished."));
+      setStatus(`The treatment didn't finish. ${message}`);
+    };
+
+    const onEvent = (event: AgentEvent) => {
+      if (active.current !== controller) return; // a newer run has taken over
+      clearTimeout(watchdog);
+      watchdog = setTimeout(stall, STALL_MS);
+      switch (event.type) {
+        case "start":
+          setModes({ qloo: event.qlooMode, llm: event.llmMode });
+          break;
+        case "step":
+          setSteps((prev) => {
+            const i = prev.findIndex((s) => s.id === event.id);
+            if (i === -1) return [...prev, event];
+            const next = [...prev];
+            next[i] = event;
+            return next;
+          });
+          break;
+        case "needs_input":
+          finished = true;
+          setQuestion({ message: event.message, items: event.items });
+          setPhase("needs_input");
+          setStatus(`Mise needs your choice. ${event.message}`);
+          break;
+        case "treatment":
+          finished = true;
+          focusTitle.current = true;
+          setTreatment(event.treatment);
+          setShown(input);
+          setPhase("done");
+          if (event.cached) setSteps(replaySteps(event.treatment));
+          setStatus(`Treatment ready: ${event.treatment.title}.`);
+          break;
+        case "error":
+          finished = true;
+          fail(event.message);
+          break;
+        case "done":
+          break;
+      }
+    };
+
+    try {
+      await streamTreatment(toBrief(input), onEvent, controller.signal);
+      if (active.current === controller && !finished) fail("The connection closed before the treatment finished. Try again.");
+    } catch (err) {
+      if (active.current !== controller) return;
+      if (stopped) {
+        setPhase(treatment ? "done" : "idle");
+        setSteps(stopRunningSteps("Stopped."));
+        setStatus("Stopped.");
+      } else if (stalled) {
+        fail("The server went quiet for over a minute, so Mise stopped waiting. Try again.");
+      } else {
+        if (err instanceof StreamError && err.detail) console.error(err.detail);
+        else if (!(err instanceof StreamError)) console.error(err);
+        fail(err instanceof StreamError ? err.message : "Something went wrong while building the treatment. Try again.");
+      }
+    } finally {
+      clearTimeout(watchdog);
     }
   };
 
+  /** A new brief starts clean, but only once it is valid: a typo must not wipe the board. */
   const startOver = (nextForm: FormState) => {
-    // A new brief starts clean: earlier picks, nudges and the old board belonged to the last one.
-    setPicks({});
-    setNudges([]);
+    const invalid = validateForm(nextForm);
+    if (invalid) {
+      setFormProblem(invalid);
+      setStatus(invalid.message);
+      return;
+    }
     setTreatment(null);
-    void run(nextForm, {}, []);
+    setShown(null);
+    void run({ form: nextForm, picks: {}, nudges: [] });
   };
-
-  const submit = () => startOver(form);
 
   const tryExample = (example: FormState) => {
     setForm(example);
@@ -148,35 +217,47 @@ export function Studio({ qlooMode, llmMode }: { qlooMode: QlooMode; llmMode: Llm
   };
 
   const pick = (chosen: Record<string, string>) => {
-    const next = { ...picks, ...chosen };
-    setPicks(next);
-    void run(form, next, nudges);
+    if (!pending || running) return;
+    void run({ ...pending, picks: { ...pending.picks, ...chosen } });
   };
 
   const toggleNudge = (nudge: Nudge) => {
-    const next = nudges.includes(nudge) ? nudges.filter((n) => n !== nudge) : [...nudges, nudge];
-    setNudges(next);
-    void run(form, picks, next);
+    if (!shown || running) return;
+    const nudges = shown.nudges.includes(nudge) ? shown.nudges.filter((n) => n !== nudge) : [...shown.nudges, nudge];
+    void run({ ...shown, nudges });
   };
 
   const current = [...steps].reverse().find((s) => s.status === "running")?.label;
+  // Chips show the run in flight while it runs, otherwise the nudges behind the board on screen.
+  const nudgesShown = running && pending ? pending.nudges : (shown?.nudges ?? []);
+  const boardState = running ? "updating" : phase === "error" ? "previous" : "current";
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="border-b border-line">
+      <header className="sticky top-0 z-20 border-b border-line bg-ink/95 backdrop-blur print:static">
         <div className="mx-auto flex w-full max-w-[96rem] flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-8">
           <div className="flex items-baseline gap-4">
             <h1 className="text-lg font-semibold tracking-[0.3em] text-paper">MISE</h1>
             <p className="hidden text-sm text-dim sm:block">Treatments grounded in what the audience loves</p>
           </div>
-          <ModeBadges qloo={modes.qloo} llm={modes.llm} writtenBy={treatment?.writtenBy} />
+          {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={treatment ?? undefined} /> : initialBadges}
         </div>
       </header>
+      <p role="status" aria-live="polite" className="sr-only">
+        {status}
+      </p>
 
-      <main className="mx-auto grid w-full max-w-[96rem] flex-1 grid-cols-[minmax(0,1fr)] gap-10 px-4 py-8 sm:px-8 lg:grid-cols-[21rem_minmax(0,1fr)] lg:gap-12">
-        <aside className="flex min-w-0 flex-col gap-10 print:hidden lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:self-start lg:overflow-y-auto lg:pr-2">
-          <BriefForm form={form} onChange={setForm} onSubmit={submit} running={running} problem={phase === "error" ? null : problem} />
-          <Timeline steps={steps} running={running} />
+      <main className="mx-auto grid w-full max-w-[96rem] flex-1 grid-cols-[minmax(0,1fr)] gap-10 px-4 py-8 sm:px-8 lg:grid-cols-[21rem_minmax(0,1fr)] lg:gap-12 print:block">
+        <aside className="flex min-w-0 flex-col gap-10 print:hidden lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-2">
+          <BriefForm
+            form={form}
+            onChange={setForm}
+            onSubmit={() => startOver(form)}
+            onStop={() => stopActive.current()}
+            running={running}
+            problem={formProblem}
+          />
+          <Timeline steps={steps} />
           {process.env.NODE_ENV !== "production" && (
             <Link href="/playground" className="text-xs text-faint underline decoration-line underline-offset-4 hover:text-dim">
               Tool playground (development)
@@ -184,18 +265,18 @@ export function Studio({ qlooMode, llmMode }: { qlooMode: QlooMode; llmMode: Llm
           )}
         </aside>
 
-        <section ref={board} aria-label="Treatment" className="flex min-w-0 scroll-mt-4 flex-col gap-8">
-          {phase === "error" && problem && (
+        <section aria-label="Treatment" className="flex min-w-0 flex-col gap-8">
+          {phase === "error" && runProblem && (
             <div role="alert" className="rounded-lg border border-safelight/40 bg-safelight/10 px-4 py-3 text-sm text-paper">
               <p className="font-medium text-safelight">The treatment didn&apos;t finish.</p>
-              <p className="mt-1 text-paper/85">{problem}</p>
+              <p className="mt-1 text-paper/85">{runProblem}</p>
             </div>
           )}
           {question && phase === "needs_input" && (
             <Picker key={question.items.map((i) => i.key).join("|")} message={question.message} items={question.items} onPick={pick} running={running} />
           )}
           {treatment ? (
-            <Board treatment={treatment} stale={running} nudges={nudges} onToggleNudge={toggleNudge} running={running} />
+            <Board treatment={treatment} state={boardState} nudges={nudgesShown} onToggleNudge={toggleNudge} running={running} />
           ) : (
             phase !== "needs_input" && <EmptyBoard examples={EXAMPLES} onTry={tryExample} running={running} current={current} />
           )}
@@ -204,4 +285,3 @@ export function Studio({ qlooMode, llmMode }: { qlooMode: QlooMode; llmMode: Llm
     </div>
   );
 }
-

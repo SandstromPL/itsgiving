@@ -102,7 +102,16 @@ export const readAudience = defineTool({
           return [] as DemographicsBlock[];
         }),
     ]);
-    const tasteTags = tagList(tagsResponse.data).map(compactTag);
+    // Qloo can return one word in two tag families ("India" genre, "india" keyword); keep the stronger one.
+    const seen = new Set<string>();
+    const tasteTags = tagList(tagsResponse.data)
+      .map(compactTag)
+      .filter((tag) => {
+        const key = tag.name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     const audience = demographics.map((block) => ({ entity_id: block.entity_id, ...block.query, leans: leans(block) }));
     return {
       status: tasteTags.length + audience.length > 0 ? "ok" : "empty",

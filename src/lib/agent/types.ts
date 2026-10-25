@@ -117,5 +117,7 @@ export interface Treatment {
   writtenBy: ProducedBy;
   qloo: { mode: QlooMode; calls: number; steps: Partial<Record<StepId, Provenance[]>> };
   mock: { qloo: boolean; llm: boolean };
+  /** False when a Qloo call failed along the way: shown as is, but never cached. */
+  complete: boolean;
   priceLevelMax?: number;
 }

@@ -13,6 +13,7 @@
   --line: #292524;
   --dim: #a8a29e;
   --faint: #8c8680;
+  --edge: #78716c;
   --tungsten: #fbbf24;
   --tape: #f9a8d4;
   --safelight: #f87171;
@@ -28,6 +29,7 @@
   --color-line: var(--line);
   --color-dim: var(--dim);
   --color-faint: var(--faint);
+  --color-edge: var(--edge);
   --color-tungsten: var(--tungsten);
   --color-tape: var(--tape);
   --color-safelight: var(--safelight);
