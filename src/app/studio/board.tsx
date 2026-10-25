@@ -2,6 +2,8 @@
 
 import { Fragment, type ReactNode } from "react";
 import { BUDGETS, FORMATS, NUDGES, NUDGE_LABELS, subjectPhrase, type Nudge } from "@/lib/agent/options";
+import type { Example } from "@/lib/agent/examples";
+import type { FeaturedCover } from "@/lib/agent/featured";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { EdgeCode, QlooTags, Still, Tape, Why, modelName } from "./parts";
@@ -434,6 +436,8 @@ export function Board({
 
       <Section id="credits" title="Credits">
         <dl className="grid gap-x-10 gap-y-3 text-sm leading-6 md:grid-cols-[13rem_minmax(0,1fr)]">
+          <dt className="text-dim">Built</dt>
+          <dd>{new Date(t.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</dd>
           <dt className="text-dim">Data</dt>
           <dd>
             {t.qloo.calls} {mock ? "mock " : ""}Qloo requests
@@ -467,12 +471,6 @@ export function Board({
   );
 }
 
-export interface Example<F> {
-  title: string;
-  detail: string;
-  form: F;
-}
-
 /** The steps a treatment goes through, in order: what the run log will show. */
 const PIPELINE = [
   ["Resolve the names", "Your artist and films become Qloo entities. A title that matches several asks which one."],
@@ -482,7 +480,31 @@ const PIPELINE = [
   ["Write the treatment", "It cites only films, brands and places Qloo returned."],
 ] as const;
 
-export function EmptyBoard<F>({ examples, onTry }: { examples: Example<F>[]; onTry: (form: F) => void }) {
+/** A featured treatment's cover in miniature: the same projected frame, title and palette as the board. */
+function CoverCard({ cover, onOpen }: { cover: FeaturedCover; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="relative isolate flex aspect-[2.39/1] w-full flex-col justify-end overflow-hidden rounded-[3px] bg-frame p-5 text-left ring-1 ring-line hover:ring-edge sm:p-6"
+    >
+      {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 -z-10 size-full opacity-30 grayscale" />}
+      <span aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,#0a0908_20%,transparent_90%)]" />
+      <span className="text-xs text-paper/70">{cover.line}</span>
+      <span className="type-poster mt-1.5 text-[clamp(1.75rem,2.4vw,2.5rem)] text-balance text-paper">{cover.title}</span>
+      <span aria-hidden className="absolute inset-x-0 bottom-0 flex h-1">
+        {cover.palette.map((hex) => (
+          <span key={hex} className="flex-1" style={{ background: hex }} />
+        ))}
+      </span>
+    </button>
+  );
+}
+
+export function EmptyBoard({ examples, covers, onTry }: { examples: Example[]; covers: FeaturedCover[]; onTry: (example: Example) => void }) {
+  const coverOf = (example: Example) => covers.find((c) => c.slug === example.slug);
+  const featured = examples.filter(coverOf);
+  const plain = examples.filter((e) => !coverOf(e));
   return (
     <div className="flex flex-col gap-14">
       {/* The empty frame, waiting for its first title card. */}
@@ -493,6 +515,22 @@ export function EmptyBoard<F>({ examples, onTry }: { examples: Example<F>[]; onT
           pitch: reference films, wardrobe, real locations, and the evidence behind every pick.
         </p>
       </div>
+
+      {featured.length > 0 && (
+        <section aria-labelledby="featured-heading">
+          <h3 id="featured-heading" className="text-[13px] font-medium text-dim">
+            Featured treatments
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-faint">Built ahead of time from live Qloo data, so they open at once. Rework any of them, or write your own brief.</p>
+          <ul className="mt-4 grid gap-4 lg:grid-cols-2">
+            {featured.map((example) => (
+              <li key={example.slug}>
+                <CoverCard cover={coverOf(example)!} onOpen={() => onTry(example)} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="how-heading">
         <h3 id="how-heading" className="text-[13px] font-medium text-dim">
@@ -511,25 +549,27 @@ export function EmptyBoard<F>({ examples, onTry }: { examples: Example<F>[]; onT
         </ol>
       </section>
 
-      <section aria-labelledby="examples-heading">
-        <h3 id="examples-heading" className="text-[13px] font-medium text-dim">
-          Start from an example
-        </h3>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-          {examples.map((example) => (
-            <li key={example.title}>
-              <button
-                type="button"
-                onClick={() => onTry(example.form)}
-                className="flex h-full w-full flex-col items-start gap-1 rounded-lg bg-graphite p-4 text-left ring-1 ring-line hover:ring-edge"
-              >
-                <span className="type-head text-xl leading-tight text-paper">{example.title}</span>
-                <span className="text-sm leading-6 text-dim">{example.detail}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {plain.length > 0 && (
+        <section aria-labelledby="examples-heading">
+          <h3 id="examples-heading" className="text-[13px] font-medium text-dim">
+            {featured.length > 0 ? "Or try a live run" : "Start from an example"}
+          </h3>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+            {plain.map((example) => (
+              <li key={example.slug}>
+                <button
+                  type="button"
+                  onClick={() => onTry(example)}
+                  className="flex h-full w-full flex-col items-start gap-1 rounded-lg bg-graphite p-4 text-left ring-1 ring-line hover:ring-edge"
+                >
+                  <span className="type-head text-xl leading-tight text-paper">{example.title}</span>
+                  <span className="text-sm leading-6 text-dim">{example.detail}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

@@ -56,6 +56,20 @@ free-tier limits.
 
 Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
 
+### Featured treatments
+
+Four example briefs (`src/lib/agent/examples.ts`) are pre-built with deep thinking, so the home page opens with
+finished treatments and clicking one shows it at once, whatever the live rate limits are doing.
+
+- `npm run featured` builds them from live Qloo and DeepSeek. A run only counts if every Qloo call worked, no step fell
+  back to the template, and DeepSeek wrote it (when its key is set). Each brief gets two tries, and a failed rebuild
+  keeps the previous treatment.
+- They are written to `.cache/featured/featured.json`, which is gitignored, because Qloo data is never committed. Each
+  deploy builds its own set: `prebuild` runs `npm run featured -- --if-missing` before `next build`. Without live keys it
+  skips, and the examples stay plain buttons that run live.
+- The treatment API answers a featured brief like a cache hit that never expires. A server running on mocks ignores
+  them. `outputFileTracingIncludes` puts the file in the route's server bundle.
+
 ### What live Qloo taught the design (2026-10-25)
 
 - Films carry `style:qloo` tags that read like cinematography notes ("Stark close ups", "Domestic scale
@@ -136,6 +150,7 @@ With no keys at all the app still runs end to end on the synthetic Qloo mock and
 | `npm run typecheck` / `npm run lint` | Static checks |
 | `npm run smoke` | Day-1 checks of the live Qloo data Mise depends on (about 30 requests) |
 | `npm run smoke:mock` | Same script against the mock, to test the script itself |
+| `npm run featured` | Pre-build the featured treatments (live keys; `-- --only=<slug>` rebuilds one) |
 
 ### Environment variables
 

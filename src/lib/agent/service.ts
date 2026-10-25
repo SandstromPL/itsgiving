@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getLlm, LlmError, type LlmDeps } from "../llm";
 import { getQlooClient, type QlooClient } from "../qloo";
 import { briefKey, type Brief } from "./brief";
+import { loadFeatured, type FeaturedItem } from "./featured";
 import { TIMING, runPipeline } from "./pipeline";
 import type { AgentEvent, Treatment } from "./types";
 import { RateLimiter, TtlCache } from "./guards";
@@ -13,6 +14,8 @@ export interface TreatmentService {
   limiter: RateLimiter;
   /** Whole-run budget. Unset, the brief's thinking depth sets it (TIMING), under the route's maxDuration. */
   runTimeoutMs?: number;
+  /** Pre-built treatments (scripts/featured.ts), answered like cache hits that never expire. */
+  featured?: () => FeaturedItem[];
 }
 
 let shared: TreatmentService | undefined;
@@ -24,6 +27,7 @@ export function getTreatmentService(): TreatmentService {
     cache: new TtlCache<Treatment>(200, 24 * 60 * 60 * 1000),
     // Cached briefs skip this; it only meters fresh runs.
     limiter: new RateLimiter(6, 60 * 1000),
+    featured: () => loadFeatured(),
   };
   return shared;
 }
@@ -32,11 +36,24 @@ export function cacheKeyFor(brief: Brief, service: TreatmentService): string {
   return briefKey(brief, { qloo: service.qloo.mode, llm: service.llm.mode });
 }
 
-/** The cached treatment for a brief. A quick brief also takes a deep one: better, and just as instant. */
+function featuredTreatment(key: string, service: TreatmentService): Treatment | undefined {
+  // Featured treatments are built from live data, so a mock run is never answered with one.
+  if (!service.featured || service.qloo.mode !== "live" || service.llm.mode !== "live") return undefined;
+  return service.featured().find((item) => cacheKeyFor(item.treatment.brief, service) === key)?.treatment;
+}
+
+/**
+ * The cached or featured treatment for a brief. A quick brief also takes a deep one: better, and just
+ * as instant.
+ */
 export function cachedTreatment(brief: Brief, service: TreatmentService): Treatment | undefined {
-  const exact = service.cache.get(cacheKeyFor(brief, service));
+  const lookup = (b: Brief) => {
+    const key = cacheKeyFor(b, service);
+    return service.cache.get(key) ?? featuredTreatment(key, service);
+  };
+  const exact = lookup(brief);
   if (exact || brief.thinking === "deep") return exact;
-  return service.cache.get(cacheKeyFor({ ...brief, thinking: "deep" }, service));
+  return lookup({ ...brief, thinking: "deep" });
 }
 
 /**

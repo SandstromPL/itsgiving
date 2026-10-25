@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "tsx scripts/smoke-test.ts",
-    "smoke:mock": "tsx scripts/smoke-test.ts --mock"
+    "smoke:mock": "tsx scripts/smoke-test.ts --mock",
+    "featured": "tsx scripts/featured.ts",
+    "prebuild": "tsx scripts/featured.ts --if-missing"
   },
   "dependencies": {
     "next": "16.4.3",

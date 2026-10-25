@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { BriefInput } from "@/lib/agent/brief";
+import { EXAMPLES } from "@/lib/agent/examples";
+import type { FeaturedCover } from "@/lib/agent/featured";
 import { STEP_LABELS, STEP_ORDER, type Nudge } from "@/lib/agent/options";
 import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
-import { Board, EmptyBoard, type Example } from "./board";
-import { BriefForm, EMPTY_FORM, splitTitles, validateForm, type FormProblem, type FormState } from "./brief-form";
+import { Board, EmptyBoard } from "./board";
+import { BriefForm } from "./brief-form";
+import { EMPTY_FORM, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
 import { ModeBadges } from "./parts";
 import { Picker } from "./picker";
 import { StreamError, streamTreatment } from "./stream";
@@ -29,45 +31,6 @@ interface RunInput {
  */
 const STALL_MS = 75_000;
 
-// Names that exist in Qloo and in the mock catalog, so every example works in both modes. Titles
-// that live Qloo knows more than one of carry their year, so only the last example stops to ask.
-const EXAMPLES: Example<FormState>[] = [
-  {
-    title: "Prateek Kuhad",
-    detail: "Music video in Mumbai on an indie budget, with your taste in films.",
-    form: { ...EMPTY_FORM, artist: "Prateek Kuhad", city: "Mumbai", directorFilms: "In the Mood for Love\nDonnie Darko\nRockstar (2011)" },
-  },
-  {
-    title: "Charli xcx",
-    detail: "Music video in New York on a premium budget.",
-    form: { ...EMPTY_FORM, artist: "Charli xcx", city: "New York", budget: "premium", directorFilms: "Chungking Express\nDrive (2011)" },
-  },
-  {
-    title: "After Past Lives and Aftersun",
-    detail: "A short film in Mumbai on a shoestring.",
-    form: { ...EMPTY_FORM, format: "short_film", touchstones: "Past Lives (2023)\nAftersun (2022)", city: "Mumbai", budget: "shoestring", directorFilms: "Masaan (2015)" },
-  },
-  {
-    title: "Frank Ocean",
-    detail: "Music video in New York, with a title to pick.",
-    form: { ...EMPTY_FORM, artist: "Frank Ocean", touchstones: "Forgotten", city: "New York" },
-  },
-];
-
-function toBrief({ form, picks, nudges }: RunInput): BriefInput {
-  return {
-    format: form.format,
-    artist: form.artist.trim() || undefined,
-    touchstones: splitTitles(form.touchstones),
-    city: form.city.trim(),
-    budget: form.budget,
-    director_films: splitTitles(form.directorFilms),
-    picks,
-    nudges,
-    thinking: form.thinking,
-  };
-}
-
 /** Timeline rows for a treatment replayed from cache: the calls and models that originally made it. */
 function replaySteps(t: Treatment): StepEvent[] {
   return STEP_ORDER.flatMap((id): StepEvent[] => {
@@ -81,7 +44,7 @@ function replaySteps(t: Treatment): StepEvent[] {
 const stopRunningSteps = (summary: string) => (steps: StepEvent[]) =>
   steps.map((s): StepEvent => (s.status === "running" ? { ...s, status: "error", summary } : s));
 
-export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
+export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; featured: FeaturedCover[] }) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [phase, setPhase] = useState<Phase>("idle");
   const [steps, setSteps] = useState<StepEvent[]>([]);
@@ -186,7 +149,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     };
 
     try {
-      await streamTreatment(toBrief(input), onEvent, controller.signal);
+      await streamTreatment(toBrief(input.form, input.picks, input.nudges), onEvent, controller.signal);
       if (active.current === controller && !finished) fail("The connection closed before the treatment finished. Try again.");
     } catch (err) {
       if (active.current !== controller) return;
@@ -300,7 +263,9 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
           ) : treatment ? (
             <Board treatment={treatment} state={boardState} nudges={nudgesShown} onToggleNudge={toggleNudge} running={running} />
           ) : (
-            phase !== "needs_input" && <EmptyBoard examples={EXAMPLES} onTry={tryExample} />
+            phase !== "needs_input" && (
+              <EmptyBoard examples={EXAMPLES} covers={featured} onTry={(example) => tryExample(formFromBrief(example.brief))} />
+            )
           )}
         </section>
       </main>
