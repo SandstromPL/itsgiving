@@ -65,7 +65,7 @@ describe("featured examples", () => {
   });
 
   it("reads nothing from a missing or malformed file, and only well-formed items from a good one", () => {
-    const dir = mkdtempSync(path.join(tmpdir(), "mise-featured-"));
+    const dir = mkdtempSync(path.join(tmpdir(), "itsgiving-featured-"));
     expect(loadFeatured(path.join(dir, "missing.json"))).toEqual([]);
     const bad = path.join(dir, "bad.json");
     writeFileSync(bad, "{ not json");

@@ -3,7 +3,7 @@ import type { Provenance, QlooClient, QlooMode } from "../qloo";
 
 export type ToolStatus = "ok" | "empty" | "needs_input" | "error";
 
-/** What every Mise tool returns, to the agent and to the UI alike. */
+/** What every itsgiving tool returns, to the agent and to the UI alike. */
 export interface ToolResult<T = unknown> {
   tool: string;
   status: ToolStatus;
@@ -34,7 +34,7 @@ export interface ToolOutput<T> {
  * Provider-neutral tool definition: the zod schema validates input at run
  * time and exports to JSON Schema for whichever LLM API calls the tools.
  */
-export interface MiseTool<S extends z.ZodType = z.ZodType, T = unknown> {
+export interface AgentTool<S extends z.ZodType = z.ZodType, T = unknown> {
   name: string;
   description: string;
   inputSchema: S;

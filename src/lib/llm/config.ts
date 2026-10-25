@@ -96,10 +96,10 @@ export function createProviders(config: LlmConfig, fetchImpl?: FetchLike): LlmPr
  */
 export const mockProvider: LlmProvider = {
   kind: "mock",
-  model: "mise-template",
+  model: "itsgiving-template",
   async complete(call) {
     if (call.signal.aborted) {
-      throw new LlmError({ kind: "aborted", message: "Request aborted.", provider: "mock", model: "mise-template" });
+      throw new LlmError({ kind: "aborted", message: "Request aborted.", provider: "mock", model: "itsgiving-template" });
     }
     return { text: JSON.stringify(call.mock()) };
   },

@@ -29,7 +29,7 @@ export async function streamTreatment(brief: BriefInput, onEvent: (event: AgentE
     });
   } catch (err) {
     if (signal.aborted) throw err;
-    throw new StreamError("Mise couldn't reach the server. Check your connection and try again.", String(err));
+    throw new StreamError("itsgiving couldn't reach the server. Check your connection and try again.", String(err));
   }
 
   if (!response.ok || !response.body) {

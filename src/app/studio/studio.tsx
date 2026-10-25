@@ -130,7 +130,7 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
           finished = true;
           setQuestion({ message: event.message, items: event.items });
           setPhase("needs_input");
-          setStatus(`Mise needs your choice. ${event.message}`);
+          setStatus(`itsgiving needs your choice. ${event.message}`);
           break;
         case "treatment":
           finished = true;
@@ -160,7 +160,7 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
         setSteps(stopRunningSteps("Stopped."));
         setStatus("Stopped.");
       } else if (stalled) {
-        fail("The server went quiet for over a minute, so Mise stopped waiting. Try again.");
+        fail("The server went quiet for over a minute, so itsgiving stopped waiting. Try again.");
       } else {
         if (err instanceof StreamError && err.detail) console.error(err.detail);
         else if (!(err instanceof StreamError)) console.error(err);
@@ -215,7 +215,7 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
             <h1 className="flex items-center gap-2.5">
               {/* A 2.39:1 frame with letterbox bars: the mark is the screen the treatment is made for. */}
               <span aria-hidden className="h-[14px] w-[33px] shrink-0 rounded-[2px] border-x border-y-[3px] border-paper" />
-              <span className="type-head text-2xl leading-none text-paper">Mise</span>
+              <span className="type-head text-2xl leading-none text-paper">itsgiving</span>
             </h1>
             <p className="hidden truncate text-sm text-dim md:block">Treatments grounded in what the audience loves</p>
           </div>

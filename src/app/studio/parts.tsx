@@ -128,7 +128,7 @@ export function QlooTags({ tags, max = 3 }: { tags: string[]; max?: number }) {
   return <p className="type-evidence text-[11.5px] leading-5 text-dim">{tags.slice(0, max).join(" / ")}</p>;
 }
 
-/** "Why" popover: Qloo's evidence on top, Mise's interpretation below, never mixed. */
+/** "Why" popover: Qloo's evidence on top, itsgiving's interpretation below, never mixed. */
 export function Why({
   label,
   name,
@@ -204,7 +204,7 @@ export function Why({
           </p>
         </section>
         <section className="mt-5 border-t border-line pt-4">
-          <h3 className="text-xs font-medium text-paper">Mise&apos;s read</h3>
+          <h3 className="text-xs font-medium text-paper">itsgiving&apos;s read</h3>
           <dl className="mt-2 flex flex-col gap-2 text-sm leading-6">
             {read.map((r) => (
               <div key={r.term}>

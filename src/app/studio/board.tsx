@@ -24,7 +24,7 @@ const SECTIONS = [
   ["credits", "Credits"],
 ] as const;
 
-/** Mise's own writing is set in the document face; the tool, labels and evidence stay in the interface face. */
+/** itsgiving's own writing is set in the document face; the tool, labels and evidence stay in the interface face. */
 const prose = "font-serif text-[15.5px] leading-[1.65] text-paper/88";
 
 /**
@@ -231,7 +231,11 @@ export function Board({
         </div>
       </Section>
 
-      <Section id="references" title="References" note={`Films this audience over-indexes on, ranked by ${source}. The notes are Mise's.`}>
+      <Section
+        id="references"
+        title="References"
+        note={`Films this audience over-indexes on, ranked by ${source}. itsgiving wrote the notes.`}
+      >
         {t.references.length === 0 ? (
           <p className="text-sm text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
         ) : (
@@ -287,7 +291,11 @@ export function Board({
         </ol>
       </Section>
 
-      <Section id="wardrobe" title="Wardrobe" note={`Brands this audience over-indexes on, ranked by ${source}. The looks are Mise's.`}>
+      <Section
+        id="wardrobe"
+        title="Wardrobe"
+        note={`Brands this audience over-indexes on, ranked by ${source}. itsgiving wrote the looks.`}
+      >
         {t.wardrobe.length === 0 ? (
           <p className="text-sm text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
@@ -556,8 +564,8 @@ export function EmptyBoard({
       <div className="flex min-h-[24rem] flex-col justify-end rounded-[3px] bg-frame p-6 sm:aspect-[2.39/1] sm:min-h-auto sm:p-10">
         <h2 className="type-poster max-w-[13ch] text-[clamp(3rem,7vw,7rem)] text-balance text-paper">Your voice, their taste.</h2>
         <p className="mt-5 max-w-[54ch] text-base leading-7 text-pretty text-dim sm:text-lg sm:leading-8">
-          Give Mise an artist, a shoot city and a budget. It reads what that audience loves on Qloo, then writes a treatment you can pitch:
-          reference films, wardrobe, real locations, and the evidence behind every pick.
+          Give itsgiving an artist, a shoot city and a budget. It reads what that audience loves on Qloo, then writes a treatment you can
+          pitch: reference films, wardrobe, real locations, and the evidence behind every pick.
         </p>
       </div>
 

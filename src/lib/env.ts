@@ -3,5 +3,5 @@
  * development and only in production when explicitly enabled.
  */
 export function toolPlaygroundEnabled(): boolean {
-  return process.env.NODE_ENV !== "production" || process.env.MISE_TOOL_PLAYGROUND === "1";
+  return process.env.NODE_ENV !== "production" || process.env.ITSGIVING_TOOL_PLAYGROUND === "1";
 }

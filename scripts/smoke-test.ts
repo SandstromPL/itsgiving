@@ -1,5 +1,5 @@
 /**
- * Day-1 smoke test: checks the Qloo data Mise depends on, against the live
+ * Day-1 smoke test: checks the Qloo data itsgiving depends on, against the live
  * hackathon API (~30 requests).
  *
  *   npm run smoke              live; reads QLOO_API_KEY from the env, .env.local or .env
@@ -125,7 +125,7 @@ async function insightsEntities(name: string, params: Parameters<typeof qloo.ins
 }
 
 async function main() {
-  console.log(`Mise day-1 smoke test: ${qloo.mode.toUpperCase()} against ${qloo.baseUrl}\n`);
+  console.log(`itsgiving day-1 smoke test: ${qloo.mode.toUpperCase()} against ${qloo.baseUrl}\n`);
 
   // 0. Connectivity and auth: abort early if the key or host is wrong.
   let authed = true;
@@ -437,7 +437,7 @@ async function main() {
     return ["INFO", results.join("; ")];
   });
 
-  // 14. Trending series (not used by Mise yet, so informational).
+  // 14. Trending series (not used by itsgiving yet, so informational).
   await check("trending", "/v2/trending returns a weekly series", async () => {
     const id = filmIds[0] ?? baseline[0]?.id;
     if (!id) return ["WARN", "Skipped: no film ID available."];

@@ -6,9 +6,9 @@ import { qlooConfigFromEnv } from "@/lib/qloo";
 import { TOOLS } from "@/lib/tools/registry";
 import { Playground, type ToolInfo } from "./playground";
 
-export const metadata: Metadata = { title: "Tool playground · Mise", robots: { index: false } };
+export const metadata: Metadata = { title: "Tool playground · itsgiving", robots: { index: false } };
 
-/** Developer playground for the agent's Qloo tools; 404 in production unless MISE_TOOL_PLAYGROUND=1. */
+/** Developer playground for the agent's Qloo tools; 404 in production unless ITSGIVING_TOOL_PLAYGROUND=1. */
 export default function PlaygroundPage() {
   if (!toolPlaygroundEnabled()) notFound();
   const mode = qlooConfigFromEnv().mode;

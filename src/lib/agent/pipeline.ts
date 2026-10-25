@@ -280,7 +280,7 @@ export async function runPipeline(
       if (resolution.among) {
         const m = resolution.match;
         notes.push(
-          `"${spec.input}" matched ${resolution.among} titles in Qloo; Mise used the far better-known ${m.name}${m.year ? ` (${m.year})` : ""}.`,
+          `"${spec.input}" matched ${resolution.among} titles in Qloo; itsgiving used the far better-known ${m.name}${m.year ? ` (${m.year})` : ""}.`,
         );
       }
       return resolution.match;
@@ -313,7 +313,7 @@ export async function runPipeline(
     // The same title can sit in two lists (touchstones and your taste); one question answers both.
     const questions = uniqueBy(ambiguities, (a) => a.key);
     endResolve("warning", `Need your call on ${questions.map((a) => `"${a.input}"`).join(", ")}.`);
-    return { kind: "needs_input", message: "Some names match more than one title in Qloo, so Mise won't guess.", items: questions };
+    return { kind: "needs_input", message: "Some names match more than one title in Qloo, so itsgiving won't guess.", items: questions };
   }
   if (subjects.length === 0) {
     endResolve("error", `Not found: ${missing.join(", ")}.`);
@@ -501,7 +501,7 @@ export async function runPipeline(
     }
     if (relaxed.relaxations.length > 0) {
       const first = relaxed.firstCount ? `only ${relaxed.firstCount} matched at first` : "nothing matched at first";
-      notes.push(`${what}: ${first}, so Mise ${relaxed.relaxations.join(", then ")}.`);
+      notes.push(`${what}: ${first}, so itsgiving ${relaxed.relaxations.join(", then ")}.`);
     }
     const status: StepStatus = relaxed.items.length === 0 || relaxed.relaxations.length > 0 ? "warning" : "done";
     const summary =
@@ -804,7 +804,11 @@ function assemble(input: AssembleInput): Treatment {
   const cited = new Set([...references, ...wardrobe, ...locations].map((p) => p.entity.id));
   const uncited = (items: CompactEntity[]) => items.filter((e) => !cited.has(e.id));
 
-  const writtenBy = input.traces.find((t) => t.step === "write")?.producedBy ?? { provider: "mock", model: "mise-template", mock: true };
+  const writtenBy = input.traces.find((t) => t.step === "write")?.producedBy ?? {
+    provider: "mock",
+    model: "itsgiving-template",
+    mock: true,
+  };
   const calls = Object.values(input.trail).reduce((sum, list) => sum + (list?.length ?? 0), 0);
 
   return {

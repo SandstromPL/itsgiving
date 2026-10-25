@@ -76,7 +76,7 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     });
     const t = treatmentOf(outcome);
     expect(t.mock).toEqual({ qloo: true, llm: true });
-    expect(t.writtenBy).toEqual({ provider: "mock", model: "mise-template", mock: true });
+    expect(t.writtenBy).toEqual({ provider: "mock", model: "itsgiving-template", mock: true });
     expect(t.llm.length).toBeLessThanOrEqual(3);
     expect(t.references.length).toBeGreaterThan(0);
     expect(t.wardrobe.length).toBeGreaterThan(0);
@@ -252,7 +252,7 @@ describe("runPipeline with a live provider", () => {
     const juhu = base.areas.find((a) => a.ref === "A2")!;
     // Juhu has one mock cafe: too few to base a shoot on, so the search widens and the writer isn't told of a base.
     expect(base).toMatchObject({ chosen: "A2", held: false });
-    expect(t.notes.join(" ")).toContain(`only 1 matched at first, so Mise widened the search from ${juhu.name} to all of Mumbai`);
+    expect(t.notes.join(" ")).toContain(`only 1 matched at first, so itsgiving widened the search from ${juhu.name} to all of Mumbai`);
     expect(prompts.at(-1)).not.toContain("Shoot base:");
     expect(t.locations.length).toBeGreaterThan(1);
   });

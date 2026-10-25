@@ -12,7 +12,7 @@ export async function GET() {
   const llmDeps = getLlm();
   const llm = {
     mode: llmDeps.mode,
-    chain: [...llmDeps.providers.map((p) => `${p.kind}:${p.model}`), "mock:mise-template"],
+    chain: [...llmDeps.providers.map((p) => `${p.kind}:${p.model}`), "mock:itsgiving-template"],
     dailyCallsLeft: llmDeps.budget.remaining(),
   };
   try {

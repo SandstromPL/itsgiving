@@ -73,7 +73,7 @@ function pickLocality(item: z.output<typeof itemSchema>, entities: QlooEntity[])
     input: item.name,
     status: "resolved",
     match,
-    note: `Qloo's first match for "${item.name}" is the ${kind}, so Mise used the city.`,
+    note: `Qloo's first match for "${item.name}" is the ${kind}, so itsgiving used the city.`,
   };
 }
 

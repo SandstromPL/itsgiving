@@ -1,8 +1,10 @@
-# Mise: treatments with taste
+# itsgiving: treatments with taste
 
-Mise is an agentic pre-production assistant for music-video and short-film directors. Give it an artist (or a few
+itsgiving is an agentic pre-production assistant for music-video and short-film directors. Give it an artist (or a few
 reference films), a shoot city and a budget, and it builds a treatment grounded in what that audience actually loves:
 reference films, wardrobe brands and real shoot locations, each with the evidence behind it.
+
+The name is Gen Z slang: "it's giving…" means "this has the vibe of…", which is what a treatment tells a client.
 
 > **Status:** work in progress for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). The treatment builder
 > runs end to end on live Qloo: the Qloo tools, a lean LLM agent (DeepSeek first, free models as fallbacks), the board
@@ -14,7 +16,7 @@ A treatment is the document a director writes to win a job: concept, references,
 the director's own reference memory, while the client cares whether it lands with *their* audience. A general-purpose
 LLM doesn't fix that: it suggests the same canon for every brief, invents locations and has no idea who the fans are.
 
-Mise uses Qloo's taste graph as the source of truth:
+itsgiving uses Qloo's taste graph as the source of truth:
 
 - **Cross-domain affinity:** what an artist's audience over-indexes on in film, fashion and places.
 - **Taste profiles and demographics:** the audience's vocabulary (themes, styles, ambiences) and who they are.
@@ -38,7 +40,7 @@ fast and cheap, and within the free fallback models' limits.
    county that shares its name with a city ("New York") is read as the city.
 3. **Read the audience** (`read_audience`), **map where the fans are** (`audience_heatmap`) and, when the director
    lists films, **compare** their taste with the audience (`taste_overlap`). The calls run at once. The heatmap scores
-   every tile of the city for the audience; Mise groups the hottest tenth into the three strongest areas, 2 km in
+   every tile of the city for the audience; itsgiving groups the hottest tenth into the three strongest areas, 2 km in
    radius, and names each after the neighbourhoods Qloo lists around its centre.
 4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, how deep the cuts go, a few plain
    style words for wardrobe and ambience, and which of the strongest areas to base the shoot in. Tags and areas are
@@ -82,24 +84,24 @@ finished treatments and clicking one shows it at once, whatever the live rate li
 ### What live Qloo taught the design (2026-10-25)
 
 - Films carry `style:qloo` tags that read like cinematography notes ("Stark close ups", "Domestic scale
-  cinematography"); Mise shows those first and hands them to the writer, so "what to borrow" is grounded in Qloo.
+  cinematography"); itsgiving shows those first and hands them to the writer, so "what to borrow" is grounded in Qloo.
 - Tag signals on film queries made Qloo run 22-60 s and end in a 504, so films use the artist signal alone (about
   1.4 s). Brand queries without the fashion filter returned snack and drink brands.
 - `tourist_attraction` is on hotels and golf clubs, so it is not a venue kind. Places carry Qloo's own
   `ambience_description`, shown as evidence on each location. Chain branches ("Starbucks - Juhu") are collapsed to
   the best-ranked one.
 - A city name alone is ambiguous: `filter.location.query=New York` matches New York State, and one treatment got two
-  venues in Hudson, NY, 200 km upstate. Mise now resolves the city to a locality ID first.
+  venues in Hudson, NY, 200 km upstate. itsgiving now resolves the city to a locality ID first.
 - The heatmap's own neighbourhood output (`output.heatmap.boundary=urn:entity:locality`) ships every locality's
   polygon: 5 MB for Mumbai, over 5 MiB for New York, and `take` doesn't trim it. The tile heatmap takes 0.5-1.1 s, and
   a `/search` for localities near a point (sorted by distance, no query) names an area in about 0.3 s. Live Qloo tags
   Manhattan as a "suburb" and returns Mumbai's wards with no kind, so names come from neighbourhood-sized localities
   that no other result lists as its parent.
 - `/entities` by IMDb ID first echoed the IDs as a top-level `external` list of `[{id}]` (2026-10-24), then under
-  `properties.external` as `{id, user_rating, ...}` (2026-10-25). Mise reads both, since the taste import matches each
+  `properties.external` as `{id, user_rating, ...}` (2026-10-25). itsgiving reads both, since the taste import matches each
   film back by its echoed ID.
 - Heatmap `affinity` and `popularity` are percentiles across the city's tiles and track each other closely, but both
-  are the audience's own: five very different artists' hottest tiles in New York overlapped 43% on average. Mise
+  are the audience's own: five very different artists' hottest tiles in New York overlapped 43% on average. itsgiving
   ranks tiles by affinity times popularity, which favours where the fans gather, and where there are places to shoot.
 
 ### LLM layer (`src/lib/llm`)
@@ -123,7 +125,7 @@ finished treatments and clicking one shows it at once, whatever the live rate li
   under a cent. The free fallbacks ignore the setting: more thinking made them slower, not better. A quick brief is
   answered from a cached deep treatment of the same brief when there is one.
 - **Where the time goes.** Profiled live, a deep treatment spends about 31 of its 36-42 s in DeepSeek (plan 4-5 s,
-  write 26-31 s) and about 6 s in Qloo. The time limits are Mise's own (`TIMING` in `src/lib/agent/pipeline.ts`):
+  write 26-31 s) and about 6 s in Qloo. The time limits are itsgiving's own (`TIMING` in `src/lib/agent/pipeline.ts`):
   deep allows 20 s to plan, 60 s to write and 120 s in all, quick 15, 45 and 90 s, each leaving room for one fallback.
   While a model thinks, the timeline counts the seconds, which also keeps the stream alive.
 - Array limits ("4-6 colours") are stated to the model but applied in code, so one extra item never costs a repair.
@@ -171,7 +173,7 @@ With no keys at all the app still runs end to end on the synthetic Qloo mock and
 | `npm run dev` | Dev server: the treatment builder at `/`, the tool playground at `/playground` |
 | `npm test` | Unit tests (always against the mocks and fake LLM providers, never live APIs) |
 | `npm run typecheck` / `npm run lint` | Static checks |
-| `npm run smoke` | Day-1 checks of the live Qloo data Mise depends on (about 30 requests) |
+| `npm run smoke` | Day-1 checks of the live Qloo data itsgiving depends on (about 30 requests) |
 | `npm run smoke:mock` | Same script against the mock, to test the script itself |
 | `npm run featured` | Pre-build the featured treatments (live keys; `-- --only=<slug>` rebuilds one) |
 
@@ -192,7 +194,7 @@ All server-side only.
 | `DEEPSEEK_MODEL` / `GEMINI_MODEL` / `GROQ_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `deepseek-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `gemini-3.8-flash`); `none` drops a Gemini one |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `LLM_TIMEOUT_MS` | Per-call timeout for calls that don't set their own (default 20000); treatment steps use `TIMING` |
-| `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
+| `ITSGIVING_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
 | `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list. IMDb links work without it |
 
 ### API routes
@@ -204,7 +206,7 @@ All server-side only.
   ID, plus the ones it left out. At most 26 TMDB calls and one Qloo call; 8 imports a minute per IP.
 - `GET /api/health`: makes a real Qloo call and reports mode, host and provenance, plus the LLM chain (never called).
 - `GET /api/tools`: tool definitions (JSON Schema) with an example input each.
-- `POST /api/tools/{name}`: runs a tool (development only unless `MISE_TOOL_PLAYGROUND=1`).
+- `POST /api/tools/{name}`: runs a tool (development only unless `ITSGIVING_TOOL_PLAYGROUND=1`).
 
 ## How it works
 
@@ -218,11 +220,11 @@ All server-side only.
 - `src/lib/agent`: the brief schema, plan and write prompts (with their deterministic mocks), the pipeline, and the
   rate limit, cache and SSE service behind `/api/treatment`.
 - `src/app/studio`: the treatment builder UI: intake, live agent timeline with every Qloo request, ambiguity picker,
-  and the board with "why" popovers that keep Qloo's evidence apart from Mise's interpretation.
+  and the board with "why" popovers that keep Qloo's evidence apart from itsgiving's interpretation.
 
 ## Data handling
 
-- No personal data is sent to Qloo or to the LLM; Mise works from names of public works and aggregate audience taste.
+- No personal data is sent to Qloo or to the LLM; itsgiving works from names of public works and aggregate audience taste.
 - Qloo results are presented as aggregate affinities, visibly separate from the agent's own interpretation. The model
   is told never to infer health, politics, finances, identity or eligibility from taste.
 - Keys stay on the server, and Qloo responses are never committed to this repository.
@@ -236,7 +238,7 @@ All server-side only.
   `x-forwarded-for`, which is right on Vercel but spoofable behind other proxies, and identical cold briefs arriving
   at once each run their own pipeline.
 - A treatment that hit a failed Qloo call or a template-written step is shown (and says so) but never cached.
-- The free Gemini tier may use prompts to improve Google's products; Mise only sends public names and Qloo tags.
+- The free Gemini tier may use prompts to improve Google's products; itsgiving only sends public names and Qloo tags.
 - Location results are candidates to scout: availability and filming permission must be confirmed with each venue.
 - The shoot base is where the audience's signal is strongest, not a check on permits, crowds or access. The heatmap is
   aggregate taste by area and says nothing about the people who live there.

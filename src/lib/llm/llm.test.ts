@@ -120,7 +120,7 @@ describe("generateJson", () => {
     const gemini = scripted("gemini", "gemini-3.8-flash", []);
     const budget = new DailyBudget(5);
     const result = await ask(deps([gemini.provider], { mode: "mock", budget }));
-    expect(result.producedBy).toEqual({ provider: "mock", model: "mise-template", mock: true });
+    expect(result.producedBy).toEqual({ provider: "mock", model: "itsgiving-template", mock: true });
     expect(result.degraded).toBe(false);
     expect(budget.remaining()).toBe(5);
     expect(gemini.prompts).toHaveLength(0);

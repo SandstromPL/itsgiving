@@ -4,9 +4,9 @@ import { audienceHeatmap } from "./heatmap";
 import { importExternalIds, resolveEntities } from "./resolve";
 import { findTags, readAudience, tasteOverlap } from "./taste";
 import { referenceFilms, scoutLocations, stylingBrands } from "./treatment";
-import type { MiseTool, ToolContext, ToolResult } from "./types";
+import type { AgentTool, ToolContext, ToolResult } from "./types";
 
-export const TOOLS: readonly MiseTool[] = [
+export const TOOLS: readonly AgentTool[] = [
   resolveEntities,
   importExternalIds,
   findTags,
@@ -18,7 +18,7 @@ export const TOOLS: readonly MiseTool[] = [
   scoutLocations,
 ];
 
-export function getTool(name: string): MiseTool | undefined {
+export function getTool(name: string): AgentTool | undefined {
   return TOOLS.find((tool) => tool.name === name);
 }
 

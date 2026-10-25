@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { EntityKind, TagKind } from "../qloo";
-import type { MiseTool } from "./types";
+import type { AgentTool } from "./types";
 
-export function defineTool<S extends z.ZodType, T>(tool: MiseTool<S, T>): MiseTool<S, T> {
+export function defineTool<S extends z.ZodType, T>(tool: AgentTool<S, T>): AgentTool<S, T> {
   return tool;
 }
 

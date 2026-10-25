@@ -16,7 +16,8 @@ function importSummary(result: TasteImport): string {
   const read = result.found.length + result.missing.length;
   const from = result.source.kind === "tmdb" ? `“${result.source.name}”` : "your links";
   const parts = [`${result.found.length} of ${read} from ${from} ${result.found.length === 1 ? "is" : "are"} in Qloo.`];
-  if (result.source.kind === "tmdb" && result.source.total > read) parts.push(`Mise read the first ${read} of ${result.source.total}.`);
+  if (result.source.kind === "tmdb" && result.source.total > read)
+    parts.push(`itsgiving read the first ${read} of ${result.source.total}.`);
   if (result.missing.length > 0) {
     const names = result.missing.slice(0, 3).map(filmName).join(", ");
     const more = result.missing.length > 3 ? ` and ${result.missing.length - 3} more` : "";
@@ -65,7 +66,7 @@ function TasteImportField({
       setStatus(importSummary(result));
       setText("");
     } catch {
-      setError("Couldn't reach Mise. Check your connection and try again.");
+      setError("Couldn't reach itsgiving. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -104,8 +105,8 @@ function TasteImportField({
         </button>
       </div>
       <p id={`${ids}-import-hint`} className="text-xs leading-5 text-faint">
-        A public TMDB list, or IMDb title links, up to {IMPORT_LIMIT} films. Mise looks each one up in Qloo by its IMDb ID, so nothing is
-        guessed. {TMDB_NOTICE}
+        A public TMDB list, or IMDb title links, up to {IMPORT_LIMIT} films. itsgiving looks each one up in Qloo by its IMDb ID, so nothing
+        is guessed. {TMDB_NOTICE}
       </p>
       <p role="status" className="text-xs leading-5 text-dim empty:hidden">
         {status}
@@ -308,7 +309,7 @@ export function BriefForm({
         />
         <p id={`${ids}-taste-hint`} className="text-xs leading-5 text-faint">
           Feature films you love, one per line, up to {LIMITS.directorFilms}. Add the year, like Rockstar (2011), to skip a question when
-          titles repeat. Qloo doesn&apos;t list short films, your own included. Mise finds where your taste meets the audience&apos;s.
+          titles repeat. Qloo doesn&apos;t list short films, your own included. itsgiving finds where your taste meets the audience&apos;s.
         </p>
         {message("directorFilms")}
       </div>

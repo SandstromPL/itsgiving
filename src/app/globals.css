@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /*
- * Mise: the screening room and the frame. The page is the room, a warm dark grey; only a treatment's
+ * itsgiving: the screening room and the frame. The page is the room, a warm dark grey; only a treatment's
  * cover is true black, like the projected image. Tungsten (amber) is reserved for Qloo evidence, set a
- * little expanded with tabular figures like a camera report; Mise's own writing uses the normal width.
+ * little expanded with tabular figures like a camera report; itsgiving's own writing uses the normal width.
  * Tape pink marks anything mocked, like camera tape on a stand-in prop; safelight red marks errors.
  * Every text pair below passes WCAG AA (the a11y plugin's contrast script, 2026-10-25).
  */
