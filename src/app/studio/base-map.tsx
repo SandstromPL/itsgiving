@@ -124,7 +124,7 @@ const LABEL_SHIFT: Record<Side, string> = {
 
 function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGrid; pins: Pin[]; city: string; mock: boolean }) {
   const f = frame(map, pins);
-  const tone = mock ? "var(--tape)" : "var(--tungsten)";
+  const tone = mock ? "var(--tape)" : "var(--accent)";
   const square = f.size(map.cell.lat);
   const gap = square * 0.09;
   const at = (p: Point) => ({ left: `${(p.x / f.width) * 100}%`, top: `${(p.y / f.height) * 100}%` });
@@ -144,7 +144,7 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
   return (
     <div>
       <div
-        className="relative mx-auto w-full overflow-hidden rounded-[3px] border border-line bg-graphite"
+        className="relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-card"
         style={{ aspectRatio: `${f.width} / ${f.height}`, maxWidth: `${(34 * f.width) / f.height}rem` }}
       >
         <svg viewBox={`0 0 ${f.width} ${f.height}`} role="img" aria-label={summary} className="absolute inset-0 size-full">
@@ -201,8 +201,8 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
             <span
               key={ring.area.ref}
               aria-hidden
-              className={`absolute whitespace-nowrap rounded-[2px] bg-frame/85 px-1 py-[3px] text-[11.5px] leading-none ${
-                ring.area.ref === base.chosen ? "font-semibold text-paper" : "text-dim"
+              className={`absolute whitespace-nowrap rounded-[4px] bg-frame/85 px-1.5 py-[3px] text-[12px] leading-none ${
+                ring.area.ref === base.chosen ? "font-bold text-foreground" : "text-dim"
               }`}
               style={{ ...at(anchor), transform: LABEL_SHIFT[sides[i]] }}
             >
@@ -215,7 +215,7 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
             key={p.n}
             aria-hidden
             title={p.name}
-            className="absolute grid size-[18px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-paper text-[10.5px] font-semibold text-frame ring-2 ring-frame"
+            className="absolute grid size-[20px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-foreground text-[11px] font-bold text-frame ring-2 ring-frame"
             style={at(placed[i])}
           >
             {p.n}
@@ -250,18 +250,21 @@ export function ShootBaseBlock({ t, mock }: { t: Treatment; mock: boolean }) {
   const evidence = mock ? "text-tape" : "text-tungsten";
   const km = `${chosen.radius_m / 1000} km`;
   return (
-    <div className="mb-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_16rem]">
+    <div className="surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem]">
       {base.map && base.map.tiles.length > 0 ? (
         <HeatMap base={base} map={base.map} pins={pins} city={t.brief.city} mock={mock} />
       ) : (
         <p className="text-sm text-dim">The heatmap itself didn&apos;t come back with this treatment.</p>
       )}
       <div>
-        <h4 className="text-[13px] font-medium text-dim">Shoot base</h4>
-        <p className="type-head mt-2 text-[1.75rem] leading-none text-paper">{chosen.name}</p>
-        {chosen.district && <p className="mt-1.5 text-sm text-dim">{chosen.district}</p>}
-        <p className={`type-evidence mt-3 text-[13px] leading-5 ${evidence}`}>
-          {percent(chosen.share)} of this audience&apos;s strongest spots in {t.brief.city}
+        <h4 className="text-[14px] font-semibold text-dim">Shoot base</h4>
+        <p className="type-poster mt-2 text-[clamp(2.4rem,4vw,3.25rem)]">{chosen.name}</p>
+        {chosen.district && <p className="mt-2 text-[15px] text-dim">{chosen.district}</p>}
+        <p className="mt-4 text-[15px] leading-6">
+          <span className={`rounded-md px-1.5 py-0.5 font-bold text-[#121211] ${mock ? "bg-[#ffd6ea]" : "bg-accent"}`}>
+            {percent(chosen.share)}
+          </span>{" "}
+          of this audience&apos;s strongest spots in {t.brief.city}
         </p>
         <p className="mt-3 text-sm leading-6 text-dim">
           {base.held

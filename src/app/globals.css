@@ -1,107 +1,171 @@
 @import "tailwindcss";
 
 /*
- * itsgiving: the screening room and the frame. The page is the room, a warm dark grey; only a treatment's
- * cover is true black, like the projected image. Tungsten (amber) is reserved for Qloo evidence, set a
- * little expanded with tabular figures like a camera report; itsgiving's own writing uses the normal width.
- * Tape pink marks anything mocked, like camera tape on a stand-in prop; safelight red marks errors.
- * Every text pair below passes WCAG AA (the a11y plugin's contrast script, 2026-10-25).
+ * itsgiving: Gen Z, professionally. A warm off-white room, ink type and ink pill buttons, and one highlighter accent
+ * used only where it means something: stickers, the tone shared with your taste, the rank on a receipt. A treatment's
+ * cover and the shoot-base map stay dark like a projected frame; `.surface-dark` swaps the same tokens inside them.
+ * Two voices never mix: Qloo evidence is mono on receipt slips (tungsten), the treatment's own writing is serif.
+ * Tape pink marks anything mocked; safelight red marks errors. Every text pair passes WCAG AA, on both surfaces.
  */
 :root {
-  --background: #141311; /* the room */
-  --foreground: #ece7df; /* 15:1 on the room */
-  --graphite: #1a1917; /* panels */
-  --raised: #211f1c; /* controls */
-  --line: #2b2925; /* rules, decorative only */
-  --edge: #6e685f; /* control borders, 3.2:1 on panels */
-  --dim: #a39d93; /* secondary text, 6.5:1 on panels */
-  --faint: #8e887e; /* hints, 5.0:1 on panels */
-  --frame: #0a0908; /* the projected frame */
+  --background: #f2f0ea; /* the room */
+  --foreground: #121211; /* ink, 17:1 on the room */
+  --card: #ffffff;
+  --field: #f7f5f0;
+  --line: #dad5ca; /* card borders and rules, decorative only */
+  --edge: #8c867b; /* control borders, 3.3:1 on fields */
+  --dim: #4a4741; /* secondary text, 8:1 on the room */
+  --faint: #5e5a52; /* hints, 5.9:1 on the room */
+  --frame: #121211; /* the projected frame */
+  --accent: #e4ff3a; /* the highlighter, always under ink text */
+  --slip: #fffdf6; /* receipt paper */
+  --slip-edge: #c9c1af;
+  --tungsten: #855000; /* Qloo evidence, 5.8:1 on the room */
+  --tape: #a3195b; /* mocked, 6.2:1 on its wash */
+  --tape-wash: #ffe3f0;
+  --safelight: #b42318; /* errors, 6.5:1 on cards */
+  color-scheme: light;
+}
+
+/* The cover, the run stage and the map: the same tokens, set for a dark frame. */
+.surface-dark {
+  --background: #121211;
+  --foreground: #f2f0ea;
+  --card: #1c1b19;
+  --field: #262421;
+  --line: #34312c;
+  --edge: #7a7469;
+  --dim: #cfcbc2;
+  --faint: #aaa498;
+  --frame: #0a0908;
   --tungsten: #e8b04b;
   --tape: #f2a4c8;
+  --tape-wash: #3a1f2c;
   --safelight: #ef6c5d;
-  color-scheme: dark;
+  color: var(--foreground);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-ink: var(--background);
-  --color-paper: var(--foreground);
-  --color-graphite: var(--graphite);
-  --color-raised: var(--raised);
+  --color-card: var(--card);
+  --color-field: var(--field);
   --color-line: var(--line);
+  --color-edge: var(--edge);
   --color-dim: var(--dim);
   --color-faint: var(--faint);
-  --color-edge: var(--edge);
   --color-frame: var(--frame);
+  --color-accent: var(--accent);
+  --color-slip: var(--slip);
+  --color-slip-edge: var(--slip-edge);
   --color-tungsten: var(--tungsten);
   --color-tape: var(--tape);
+  --color-tape-wash: var(--tape-wash);
   --color-safelight: var(--safelight);
-  --font-sans: var(--font-archivo), system-ui, sans-serif;
-  --font-serif: var(--font-newsreader), Georgia, serif;
+  /* The dark design's names, still used by the development-only tool playground. */
+  --color-paper: var(--foreground);
+  --color-ink: var(--background);
+  --color-graphite: var(--card);
+  --color-raised: var(--field);
+  --font-sans: var(--font-bricolage), system-ui, sans-serif;
+  --font-serif: var(--font-instrument), Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
-/* Archivo's width axis carries the hierarchy: condensed for titles, normal for reading, expanded for evidence. */
+/* Bricolage at full weight with tight tracking carries the hierarchy; headlines are lowercase by choice, not by CSS. */
 @utility type-poster {
-  font-stretch: 68%;
-  font-weight: 760;
-  letter-spacing: -0.012em;
-  line-height: 0.92;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 0.88;
 }
 
 @utility type-head {
-  font-stretch: 78%;
-  font-weight: 640;
-  letter-spacing: -0.005em;
+  font-weight: 800;
+  letter-spacing: -0.035em;
 }
 
+/* Qloo evidence: mono with tabular figures, like a receipt. */
 @utility type-evidence {
-  font-stretch: 112%;
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-archivo), system-ui, sans-serif;
+  font-family: var(--font-bricolage), system-ui, sans-serif;
 }
 
+/* The focus ring is the surface's own ink, so it shows on the room and on a dark frame alike. */
 :focus-visible {
-  outline: 2px solid var(--tungsten);
-  outline-offset: 2px;
+  outline: 2px solid var(--foreground);
+  outline-offset: 3px;
 }
 
-/* The brief panel scrolls on its own on wide screens; keep its scrollbar quiet. */
 .quiet-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
 
-/* "Why" popovers: native popover API, light-dismiss and Esc for free. */
+/* Popovers ("why", the title-card window) are windows: white, ink-edged, with a hard shadow. */
+[popover].why,
+[popover].window {
+  border: 2px solid #121211;
+  border-radius: 22px;
+  background: #ffffff;
+  color: #121211;
+  box-shadow: 8px 8px 0 #121211;
+  padding: 0;
+  overflow: auto;
+}
 [popover].why {
   margin: auto;
   max-width: min(30rem, calc(100vw - 2rem));
   max-height: calc(100vh - 4rem);
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: var(--graphite);
-  color: var(--foreground);
-  padding: 1.5rem;
 }
-[popover].why::backdrop {
-  background: rgb(10 9 8 / 0.72);
+[popover].why::backdrop,
+[popover].window::backdrop {
+  background: rgb(18 18 17 / 0.3);
+}
+/* The title-card window sits to the right of the cover, so the title it restyles stays in view. */
+[popover].window {
+  position: fixed;
+  inset: 5.5rem 1.5rem auto auto;
+  margin: 0;
+  width: min(27rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 7rem);
+}
+@media (max-width: 40rem) {
+  [popover].window {
+    inset: auto 0.75rem 0.75rem 0.75rem;
+    width: auto;
+    max-height: 70vh;
+  }
+}
+
+/* Film grain on a dark frame: one dot every 3px. */
+.grain {
+  position: relative;
+  isolation: isolate;
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background-image: radial-gradient(rgb(255 255 255 / 0.08) 1px, transparent 1.2px);
+  background-size: 3px 3px;
 }
 
 /* The one orchestrated moment: the cover's letterbox opens when a treatment lands. */
 @keyframes letterbox-open {
   from {
-    clip-path: inset(50% 0 50% 0);
+    clip-path: inset(50% 0 50% 0 round 2rem);
   }
   to {
-    clip-path: inset(0 0 0 0);
+    clip-path: inset(0 0 0 0 round 2rem);
   }
 }
 .letterbox-open {
@@ -118,7 +182,6 @@ body {
   }
 }
 
-/* Saved as PDF, the board keeps its dark lookbook look. */
 @media print {
   * {
     print-color-adjust: exact;

@@ -124,7 +124,7 @@ export const readAudience = defineTool({
             .slice(0, 6)
             .map((t) => t.name)
             .join(", ") || "no clear tags"
-        }.` + (audience[0] ? ` ${audience[0].leans}.` : ""),
+        }.` + (audience[0] ? ` ${audience[0].leans.charAt(0).toUpperCase()}${audience[0].leans.slice(1)}.` : ""),
       data: { taste_tags: tasteTags, demographics: audience },
       warnings,
     };

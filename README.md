@@ -67,6 +67,18 @@ fast and cheap, and within the free fallback models' limits.
 
 Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
 
+### The board
+
+- **Two voices, never mixed.** Qloo's evidence is printed on receipt slips (rank within its call, affinity, the input
+  that drove it). The treatment's own writing is set in a serif.
+- **"it's giving".** The tone tags Qloo found, with the ones shared with the director's taste highlighted.
+- **Title card.** A window of nine cinematic faces for the cover title, all free Google fonts standing in for a film
+  look: a Futura-like face for Wes Anderson, Roman capitals for the Trajan poster meme, Courier Prime for a script page,
+  and lettering from the Mumbai local's hand-painted signs. The starting face comes from the treatment's own evidence:
+  the Qloo heatmap's shoot base in Mumbai, or a tone tag elsewhere.
+- **unc mode.** The words around the work are Gen Z slang by default. A switch in the header turns them into plain
+  English for producers, label people and judges. The treatment, the receipts and the run log read the same in both.
+
 ### Featured treatments
 
 Four example briefs (`src/lib/agent/examples.ts`) are pre-built with deep thinking, so the home page opens with

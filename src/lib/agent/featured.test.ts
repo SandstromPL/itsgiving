@@ -25,6 +25,7 @@ function fakeTreatment(input: BriefInput, title = "Almost, Every Evening"): Trea
     subjects: [{ id: "a1", name: input.artist ?? "Someone", kind: "artist", tags: [] }],
     palette: [{ name: "Ink", hex: "#0A0908" }],
     references: [{ entity: { id: "f1", name: "Mimi", kind: "movie", tags: [], image: "https://img.example/mimi.jpg" } }],
+    tone: [{ tag: { id: "urn:tag:keyword:qloo:introspective", name: "Introspective" }, source: "audience", note: "Quiet." }],
   } as unknown as Treatment;
 }
 
@@ -85,6 +86,7 @@ describe("featured examples", () => {
       line: "Music video for Prateek Kuhad / Mumbai",
       palette: ["#0A0908"],
       still: "https://img.example/mimi.jpg",
+      tone: "Introspective",
     });
   });
 });

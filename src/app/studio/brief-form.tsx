@@ -4,10 +4,16 @@ import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } f
 import { BUDGETS, FORMATS, IMPORT_LIMIT, THINKING, TMDB_NOTICE, type Budget, type Format, type Thinking } from "@/lib/agent/options";
 import type { ImportedFilm, TasteImport } from "@/lib/agent/taste";
 import { LIMITS, type FieldName, type FormProblem, type FormState } from "./form";
+import { useLingo } from "./lingo";
 
 const field =
-  "w-full rounded-md border border-edge bg-raised px-3 py-2.5 text-[15px] text-paper placeholder:text-faint hover:border-dim focus:border-tungsten aria-invalid:border-safelight";
+  "w-full rounded-2xl border border-edge bg-field px-4 py-3 text-[17px] text-foreground placeholder:text-faint hover:border-foreground focus:border-foreground aria-invalid:border-2 aria-invalid:border-safelight";
 const label = "text-[13px] font-medium text-dim";
+const hint = "text-[13px] leading-5 text-faint";
+/** A two-way switch: the chosen side is a solid pill inside a soft track. */
+const track = "grid grid-cols-2 gap-1 rounded-full bg-[#eeebe4] p-1";
+const option =
+  "cursor-pointer rounded-full px-3 py-2.5 text-center text-[15px] text-dim hover:text-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
 
 const filmName = (film: { title: string; year?: number }) => `${film.title}${film.year ? ` (${film.year})` : ""}`;
 
@@ -90,7 +96,7 @@ function TasteImportField({
               void run();
             }
           }}
-          placeholder="TMDB list link, or IMDb links"
+          placeholder="TMDB list or IMDb links"
           autoComplete="off"
           spellCheck={false}
           aria-describedby={`${ids}-import-hint`}
@@ -99,16 +105,16 @@ function TasteImportField({
           type="button"
           onClick={() => void run()}
           aria-disabled={busy || !text.trim()}
-          className="shrink-0 rounded-md px-3.5 text-sm text-paper ring-1 ring-edge hover:ring-dim aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+          className="shrink-0 rounded-2xl border border-foreground bg-card px-4 text-[15px] font-bold hover:bg-foreground hover:text-background aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:bg-card aria-disabled:hover:text-foreground"
         >
           {busy ? "Importing…" : "Import"}
         </button>
       </div>
-      <p id={`${ids}-import-hint`} className="text-xs leading-5 text-faint">
+      <p id={`${ids}-import-hint`} className={hint}>
         A public TMDB list, or IMDb title links, up to {IMPORT_LIMIT} films. itsgiving looks each one up in Qloo by its IMDb ID, so nothing
         is guessed. {TMDB_NOTICE}
       </p>
-      <p role="status" className="text-xs leading-5 text-dim empty:hidden">
+      <p role="status" className="text-[13px] leading-5 text-dim empty:hidden">
         {status}
       </p>
       {error && (
@@ -117,9 +123,9 @@ function TasteImportField({
         </p>
       )}
       {imported.length > 0 && (
-        <div className="rounded-md bg-frame p-3 ring-1 ring-line">
+        <div className="rounded-2xl border border-line bg-field p-3">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="text-xs text-dim">
+            <p className="text-[13px] text-dim">
               {imported.length} film{imported.length === 1 ? "" : "s"} from {from}
             </p>
             <button
@@ -128,7 +134,7 @@ function TasteImportField({
                 onChange([], "");
                 setStatus("Import cleared.");
               }}
-              className="text-xs text-dim underline decoration-edge underline-offset-4 hover:text-paper"
+              className="text-[13px] font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
             >
               Clear
             </button>
@@ -137,7 +143,7 @@ function TasteImportField({
             {imported.map((film) => (
               <li
                 key={film.imdb}
-                className="flex items-center gap-0.5 rounded-full bg-graphite py-0.5 pr-0.5 pl-2.5 text-xs text-paper ring-1 ring-line"
+                className="flex items-center gap-0.5 rounded-full border border-line bg-card py-0.5 pr-0.5 pl-3 text-[13px]"
               >
                 {filmName(film)}
                 <button
@@ -149,7 +155,7 @@ function TasteImportField({
                       from,
                     )
                   }
-                  className="grid size-6 place-items-center rounded-full text-dim hover:bg-raised hover:text-paper"
+                  className="grid size-6 place-items-center rounded-full text-dim hover:bg-field hover:text-foreground"
                 >
                   <span aria-hidden>×</span>
                 </button>
@@ -178,6 +184,7 @@ export function BriefForm({
   problem: FormProblem | null;
 }) {
   const ids = useId();
+  const { t } = useLingo();
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => onChange({ ...form, [key]: value });
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -192,27 +199,32 @@ export function BriefForm({
   });
   const message = (name: FieldName) =>
     problem?.field === name ? (
-      <p id={errorId} role="alert" className="text-sm text-safelight">
+      <p id={errorId} role="alert" className="text-sm font-medium text-safelight">
         {problem.message}
       </p>
     ) : null;
 
   return (
-    <form onSubmit={submit} aria-labelledby={`${ids}-title`} className="flex flex-col gap-5" noValidate>
-      <div>
-        <h2 id={`${ids}-title`} className="type-head text-2xl text-paper">
+    <form
+      onSubmit={submit}
+      aria-labelledby={`${ids}-title`}
+      className="flex flex-col gap-4 rounded-[28px] border border-line bg-card p-6 sm:p-7"
+      noValidate
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 id={`${ids}-title`} className="type-head text-[1.6rem] leading-none">
           The brief
         </h2>
-        <p className="mt-1 text-xs leading-5 text-dim">Names of public works only. Nothing personal goes to Qloo or the language model.</p>
+        <p className="text-[13px] text-faint">Nothing personal goes to Qloo</p>
       </div>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className={`mb-2 ${label}`}>Format</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-frame p-1 ring-1 ring-line">
+      <fieldset>
+        <legend className="sr-only">Format</legend>
+        <div className={track}>
           {(Object.keys(FORMATS) as Format[]).map((format) => (
             <label
               key={format}
-              className="cursor-pointer rounded-md px-3 py-2 text-center text-sm text-dim hover:text-paper has-checked:bg-paper has-checked:font-medium has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
+              className={`${option} has-checked:bg-foreground has-checked:font-bold has-checked:text-background has-checked:hover:text-background`}
             >
               <input
                 type="radio"
@@ -237,7 +249,7 @@ export function BriefForm({
           className={field}
           value={form.artist}
           onChange={(e) => set("artist", e.target.value)}
-          placeholder="Prateek Kuhad"
+          placeholder="e.g. Prateek Kuhad"
           autoComplete="off"
           {...describe("artist")}
         />
@@ -254,17 +266,17 @@ export function BriefForm({
           rows={2}
           value={form.touchstones}
           onChange={(e) => set("touchstones", e.target.value)}
-          placeholder={"Past Lives\nAftersun"}
+          placeholder={"e.g. Past Lives\nAftersun"}
           {...describe("touchstones", `${ids}-touchstones-hint`)}
         />
-        <p id={`${ids}-touchstones-hint`} className="text-xs leading-5 text-faint">
+        <p id={`${ids}-touchstones-hint`} className={hint}>
           One title per line, up to {LIMITS.touchstones}. The client&apos;s references, if any. Feature films only: Qloo doesn&apos;t list
           short films.
         </p>
         {message("touchstones")}
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] gap-2.5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${ids}-city`} className={label}>
             Shoot city
@@ -274,7 +286,7 @@ export function BriefForm({
             className={field}
             value={form.city}
             onChange={(e) => set("city", e.target.value)}
-            placeholder="Mumbai"
+            placeholder="e.g. Mumbai"
             autoComplete="address-level2"
             {...describe("city")}
           />
@@ -304,10 +316,10 @@ export function BriefForm({
           rows={3}
           value={form.directorFilms}
           onChange={(e) => set("directorFilms", e.target.value)}
-          placeholder={"In the Mood for Love\nDonnie Darko"}
+          placeholder={"e.g. In the Mood for Love\nDonnie Darko"}
           {...describe("directorFilms", `${ids}-taste-hint`)}
         />
-        <p id={`${ids}-taste-hint`} className="text-xs leading-5 text-faint">
+        <p id={`${ids}-taste-hint`} className={hint}>
           Feature films you love, one per line, up to {LIMITS.directorFilms}. Add the year, like Rockstar (2011), to skip a question when
           titles repeat. Qloo doesn&apos;t list short films, your own included. itsgiving finds where your taste meets the audience&apos;s.
         </p>
@@ -321,13 +333,13 @@ export function BriefForm({
         onChange={(imported, importedFrom) => onChange((current) => ({ ...current, imported, importedFrom }))}
       />
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className={`mb-2 ${label}`}>Thinking</legend>
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-frame p-1 ring-1 ring-line">
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className={`mb-1.5 ${label}`}>Thinking</legend>
+        <div className={track}>
           {(Object.keys(THINKING) as Thinking[]).map((thinking) => (
             <label
               key={thinking}
-              className="cursor-pointer rounded-md px-3 py-2 text-center text-sm text-dim hover:text-paper has-checked:bg-paper has-checked:font-medium has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
+              className={`${option} has-checked:bg-card has-checked:font-bold has-checked:text-foreground has-checked:shadow-[0_1px_2px_rgb(0_0_0/0.12)]`}
             >
               <input
                 type="radio"
@@ -338,26 +350,27 @@ export function BriefForm({
                 aria-describedby={`${ids}-thinking-hint`}
                 className="sr-only"
               />
-              {THINKING[thinking].label}
+              {t.thinking[thinking]}
             </label>
           ))}
         </div>
-        <p id={`${ids}-thinking-hint`} className="text-xs leading-5 text-faint">
-          {THINKING[form.thinking].hint}
+        <p id={`${ids}-thinking-hint`} className={hint}>
+          {THINKING[form.thinking].label} thinking:{" "}
+          {THINKING[form.thinking].hint.charAt(0).toLowerCase() + THINKING[form.thinking].hint.slice(1)}
         </p>
       </fieldset>
 
-      <div className="flex gap-2">
+      <div className="mt-1 flex gap-2">
         {/* aria-disabled, not disabled: the button keeps focus while the run it started is going. */}
         <button
           type="submit"
           aria-disabled={running}
-          className="h-11 flex-1 rounded-md bg-paper px-4 text-[15px] font-semibold text-ink hover:bg-white aria-disabled:cursor-progress aria-disabled:opacity-60"
+          className="h-14 flex-1 rounded-full bg-foreground px-5 text-[18px] font-bold text-background hover:bg-[#2b2925] aria-disabled:cursor-progress aria-disabled:opacity-60"
         >
           {running ? "Building treatment…" : "Build treatment"}
         </button>
         {running && (
-          <button type="button" onClick={onStop} className="h-11 rounded-md px-4 text-[15px] text-paper ring-1 ring-edge hover:ring-dim">
+          <button type="button" onClick={onStop} className="h-14 rounded-full border border-foreground px-5 text-[16px] font-semibold">
             Stop
           </button>
         )}

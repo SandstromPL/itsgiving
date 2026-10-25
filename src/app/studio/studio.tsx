@@ -8,9 +8,12 @@ import { STEP_LABELS, STEP_ORDER, type Nudge } from "@/lib/agent/options";
 import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
-import { Board, EmptyBoard } from "./board";
+import { Board } from "./board";
 import { BriefForm } from "./brief-form";
+import { DirectorsCut, Wordmark, useConsoleNote, useDirectorsCut } from "./eggs";
 import { EMPTY_FORM, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
+import { FeaturedPosters, Hero, HowItWorks, TryExamples } from "./landing";
+import { LingoProvider, UncSwitch, useLingo } from "./lingo";
 import { ModeBadges } from "./parts";
 import { Picker } from "./picker";
 import { StreamError, streamTreatment } from "./stream";
@@ -46,7 +49,66 @@ function replaySteps(t: Treatment): StepEvent[] {
 const stopRunningSteps = (summary: string) => (steps: StepEvent[]) =>
   steps.map((s): StepEvent => (s.status === "running" ? { ...s, status: "error", summary } : s));
 
-export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; featured: FeaturedCover[] }) {
+/** A fresh treatment lands with a short toast; the live region already announced it, so this is for the eyes. */
+function Toast({ toast }: { toast: { title: string; line: string } | null }) {
+  if (!toast) return null;
+  return (
+    <div
+      aria-hidden
+      className="fixed right-4 bottom-4 z-40 flex max-w-[min(25rem,calc(100vw-2rem))] items-center gap-3.5 rounded-[20px] bg-[#121211] px-4 py-3.5 text-white shadow-[6px_6px_0_rgb(0_0_0/0.15)] print:hidden"
+    >
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#121211"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M5 12l5 5 9-10" />
+        </svg>
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[19px] leading-tight font-extrabold tracking-[-0.03em]">{toast.title}</span>
+        <span className="truncate text-[14px] text-[#d9d5cc]">{toast.line}</span>
+      </span>
+    </div>
+  );
+}
+
+function FailCard({ problem, onRetry }: { problem: string; onRetry?: () => void }) {
+  const { t } = useLingo();
+  const rateLimited = /too many|rate limit/i.test(problem);
+  return (
+    <div role="alert" className="flex flex-col gap-3 rounded-[24px] border-2 border-safelight bg-[#fff6f4] p-6">
+      <p className="type-head text-[clamp(1.75rem,3vw,2.25rem)] leading-none text-[#8f1a10]">{rateLimited ? t.rateTitle : t.failTitle}</p>
+      <p className="text-[16px] leading-6 text-[#3a2420]">{problem}</p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="self-start rounded-full bg-foreground px-5 py-3 text-[15px] font-bold text-background"
+        >
+          Try again
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function Studio(props: { initialBadges: ReactNode; featured: FeaturedCover[] }) {
+  return (
+    <LingoProvider>
+      <StudioScreen {...props} />
+    </LingoProvider>
+  );
+}
+
+function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; featured: FeaturedCover[] }) {
+  const { t: lingo } = useLingo();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [phase, setPhase] = useState<Phase>("idle");
   const [steps, setSteps] = useState<StepEvent[]>([]);
@@ -60,10 +122,18 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
   const [modes, setModes] = useState<{ qloo: QlooMode; llm: LlmMode } | null>(null);
   const [status, setStatus] = useState("");
   const [startedAt, setStartedAt] = useState(0);
+  /** Which take of the brief is on the board: 1, then one more per rework. */
+  const [take, setTake] = useState(1);
+  const [briefOpen, setBriefOpen] = useState(false);
+  const [toast, setToast] = useState<{ title: string; line: string } | null>(null);
   const active = useRef<AbortController | null>(null);
   const stopActive = useRef<() => void>(() => {});
   const focusTitle = useRef(false);
+  const failedBefore = useRef(false);
+  const briefPanel = useRef<HTMLDivElement>(null);
+  const [cut, exitCut] = useDirectorsCut();
   const running = phase === "running";
+  useConsoleNote(treatment);
 
   // Leaving the page mid-run shouldn't keep spending model quota and credit.
   useEffect(() => () => active.current?.abort(), []);
@@ -75,6 +145,19 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
     document.getElementById("treatment-title")?.focus();
   }, [treatment]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  // "New brief" opens the form above the board and puts the cursor in it.
+  useEffect(() => {
+    if (!briefOpen) return;
+    briefPanel.current?.scrollIntoView({ block: "start" });
+    briefPanel.current?.querySelector<HTMLInputElement>("input:not([type=radio])")?.focus();
+  }, [briefOpen]);
+
   const run = async (input: RunInput) => {
     active.current?.abort();
     const controller = new AbortController();
@@ -82,6 +165,7 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
     let finished = false;
     let stalled = false;
     let stopped = false;
+    const began = Date.now();
     stopActive.current = () => {
       stopped = true;
       controller.abort();
@@ -92,7 +176,7 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
     setRunProblem(null);
     setQuestion(null);
     setSteps([]);
-    setStartedAt(Date.now());
+    setStartedAt(began);
     setPhase("running");
     setStatus("Building the treatment…");
 
@@ -103,6 +187,7 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
     let watchdog = setTimeout(stall, STALL_MS);
 
     const fail = (message: string) => {
+      failedBefore.current = true;
       setRunProblem(message);
       setPhase("error");
       setSteps(stopRunningSteps("Stopped before it finished."));
@@ -138,7 +223,14 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
           setTreatment(event.treatment);
           setShown(input);
           setPhase("done");
+          setBriefOpen(false);
           if (event.cached) setSteps(replaySteps(event.treatment));
+          else
+            setToast({
+              title: failedBefore.current ? lingo.back : lingo.done,
+              line: `${event.treatment.title}: ${Math.round((Date.now() - began) / 1000)} s, ${event.treatment.qloo.calls} Qloo calls`,
+            });
+          failedBefore.current = false;
           setStatus(`Treatment ready: ${event.treatment.title}.`);
           break;
         case "error":
@@ -181,12 +273,15 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
     }
     setTreatment(null);
     setShown(null);
+    setTake(1);
+    setBriefOpen(false);
     void run({ form: nextForm, picks: {}, nudges: [] });
   };
 
   const tryExample = (example: FormState) => {
     setForm(example);
     startOver(example);
+    window.scrollTo({ top: 0 });
   };
 
   const pick = (chosen: Record<string, string>) => {
@@ -197,86 +292,149 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
   const toggleNudge = (nudge: Nudge) => {
     if (!shown || running) return;
     const nudges = shown.nudges.includes(nudge) ? shown.nudges.filter((n) => n !== nudge) : [...shown.nudges, nudge];
+    setTake((n) => n + 1);
     void run({ ...shown, nudges });
   };
 
+  const retry = pending && !running ? () => void run(pending) : undefined;
   const current = [...steps].reverse().find((s) => s.status === "running")?.label;
   // Chips show the run in flight while it runs, otherwise the nudges behind the board on screen.
   const nudgesShown = running && pending ? pending.nudges : (shown?.nudges ?? []);
   const boardState = running ? "updating" : phase === "error" ? "previous" : "current";
-  // A first build takes the stage with its run log; the rail keeps the log the rest of the time.
-  const logOnStage = running && !treatment;
+
+  const brief = (
+    <BriefForm
+      form={form}
+      onChange={setForm}
+      onSubmit={() => startOver(form)}
+      onStop={() => stopActive.current()}
+      running={running}
+      problem={formProblem}
+    />
+  );
+  const picker = question && phase === "needs_input" && (
+    <Picker
+      key={question.items.map((i) => i.key).join("|")}
+      message={question.message}
+      items={question.items}
+      onPick={pick}
+      running={running}
+    />
+  );
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      <header className="sticky top-0 z-30 border-b border-line bg-background/90 backdrop-blur print:static">
-        <div className="mx-auto flex h-14 w-full max-w-[100rem] items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-4">
-            <h1 className="flex items-center gap-2.5">
-              {/* A 2.39:1 frame with letterbox bars: the mark is the screen the treatment is made for. */}
-              <span aria-hidden className="h-[14px] w-[33px] shrink-0 rounded-[2px] border-x border-y-[3px] border-paper" />
-              <span className="type-head text-2xl leading-none text-paper">itsgiving</span>
+      {/* On phones: the wordmark and the switch on one row, the badges under them, and the header scrolls away. */}
+      <header className="top-0 z-30 border-b border-line/80 bg-background/90 backdrop-blur sm:sticky print:static print:border-0">
+        <div className="mx-auto flex min-h-[4.5rem] w-full max-w-[80rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-8">
+          <div className="flex min-w-0 items-center gap-5">
+            <h1>
+              <Wordmark />
             </h1>
-            <p className="hidden truncate text-sm text-dim md:block">Treatments grounded in what the audience loves</p>
+            <p className="hidden text-[14px] text-faint xl:block">Treatments grounded in what the audience loves</p>
           </div>
-          {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={treatment ?? undefined} /> : initialBadges}
+          <div className="sm:order-3">
+            <UncSwitch />
+          </div>
+          <div className="order-3 flex w-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:w-auto print:hidden">
+            {treatment && (
+              <button
+                type="button"
+                aria-expanded={briefOpen}
+                onClick={() => setBriefOpen((open) => !open)}
+                className="min-h-11 rounded-full px-4 text-[15px] font-semibold hover:bg-card"
+              >
+                {briefOpen ? "Hide brief" : "New brief"}
+              </button>
+            )}
+            {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={treatment ?? undefined} /> : initialBadges}
+          </div>
         </div>
       </header>
       <p role="status" aria-live="polite" className="sr-only">
         {status}
       </p>
 
-      <main className="mx-auto grid w-full max-w-[100rem] flex-1 grid-cols-[minmax(0,1fr)] lg:grid-cols-[23rem_minmax(0,1fr)] print:block">
-        <aside className="quiet-scroll flex min-w-0 flex-col gap-10 border-line px-4 py-6 sm:px-6 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto lg:border-r lg:bg-graphite/40 lg:py-8 print:hidden">
-          <BriefForm
-            form={form}
-            onChange={setForm}
-            onSubmit={() => startOver(form)}
-            onStop={() => stopActive.current()}
-            running={running}
-            problem={formProblem}
-          />
-          {!logOnStage && <Timeline steps={steps} />}
-          {process.env.NODE_ENV !== "production" && (
-            <Link href="/playground" className="text-xs text-faint underline decoration-line underline-offset-4 hover:text-dim">
-              Tool playground (development)
-            </Link>
-          )}
-        </aside>
-
-        <section aria-label="Treatment" className="flex min-w-0 flex-col gap-8 px-4 py-8 sm:px-8 lg:px-12 lg:py-10 xl:px-16 print:p-0">
-          {phase === "error" && runProblem && (
-            <div role="alert" className="rounded-lg border border-safelight/40 bg-safelight/10 px-4 py-3 text-sm text-paper">
-              <p className="font-medium text-safelight">The treatment didn&apos;t finish.</p>
-              <p className="mt-1 text-paper/85">{runProblem}</p>
-            </div>
-          )}
-          {running && treatment && (
-            <p className="flex items-center gap-3 text-sm text-dim print:hidden">
-              <span aria-hidden className="size-1.5 rounded-full bg-tungsten motion-safe:animate-pulse" />
-              Reworking the treatment{current ? `: ${current.toLowerCase()}` : ""}…
-            </p>
-          )}
-          {question && phase === "needs_input" && (
-            <Picker
-              key={question.items.map((i) => i.key).join("|")}
-              message={question.message}
-              items={question.items}
-              onPick={pick}
+      <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-16 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
+        {treatment ? (
+          <div className="flex flex-col gap-8">
+            {briefOpen && (
+              <div ref={briefPanel} className="w-full max-w-[34rem] scroll-mt-28 print:hidden">
+                {brief}
+              </div>
+            )}
+            {phase === "error" && runProblem && <FailCard problem={runProblem} onRetry={retry} />}
+            {running && (
+              <div className="top-[5.25rem] z-20 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-foreground bg-card py-2 pr-2 pl-5 sm:sticky sm:rounded-full print:hidden">
+                <span aria-hidden className="size-2.5 rounded-full bg-foreground motion-safe:animate-pulse" />
+                <span className="font-bold">{lingo.cookingAgain}</span>
+                {current && <span className="text-[15px] text-dim">{current}</span>}
+                <button
+                  type="button"
+                  onClick={() => stopActive.current()}
+                  className="ml-auto min-h-10 rounded-full border border-foreground px-4 text-sm font-semibold"
+                >
+                  Stop
+                </button>
+              </div>
+            )}
+            {picker}
+            <Board
+              treatment={treatment}
+              state={boardState}
+              nudges={nudgesShown}
+              onToggleNudge={toggleNudge}
               running={running}
+              take={take}
+              log={<Timeline steps={steps} />}
             />
-          )}
-          {logOnStage ? (
-            <RunStage steps={steps} startedAt={startedAt} thinking={pending?.form.thinking ?? "deep"} />
-          ) : treatment ? (
-            <Board treatment={treatment} state={boardState} nudges={nudgesShown} onToggleNudge={toggleNudge} running={running} />
-          ) : (
-            phase !== "needs_input" && (
-              <EmptyBoard examples={EXAMPLES} covers={featured} onTry={(example) => tryExample(formFromBrief(example.brief))} />
-            )
-          )}
-        </section>
+          </div>
+        ) : (
+          <>
+            <section aria-label="Studio" className="flex flex-wrap items-start gap-x-10 gap-y-8">
+              <div className="min-w-0 flex-[999_1_32rem]">
+                {running ? (
+                  <RunStage steps={steps} startedAt={startedAt} thinking={pending?.form.thinking ?? "deep"} />
+                ) : picker ? (
+                  picker
+                ) : phase === "error" && runProblem ? (
+                  <div className="flex flex-col gap-5">
+                    <FailCard problem={runProblem} onRetry={retry} />
+                    {steps.length > 0 && (
+                      <div className="rounded-[28px] border border-line bg-card p-5 sm:p-6">
+                        <Timeline steps={steps} size="stage" />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Hero />
+                )}
+              </div>
+              <div className="w-full min-w-0 flex-[1_1_22rem] lg:max-w-[29rem]">{brief}</div>
+            </section>
+            <FeaturedPosters examples={EXAMPLES} covers={featured} onTry={(example) => tryExample(formFromBrief(example.brief))} />
+            <HowItWorks />
+            <TryExamples examples={EXAMPLES} covers={featured} onTry={(example) => tryExample(formFromBrief(example.brief))} />
+          </>
+        )}
       </main>
+
+      <footer className="mx-auto w-full max-w-[80rem] px-4 pb-10 sm:px-8 print:hidden">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t border-line pt-6 text-[15px] text-dim">
+          <span className="font-bold text-foreground">{lingo.footer}</span>
+          <span className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            {process.env.NODE_ENV !== "production" && (
+              <Link href="/playground" className="text-[14px] text-faint underline decoration-line underline-offset-4 hover:text-dim">
+                Tool playground (development)
+              </Link>
+            )}
+            <span>Built on Qloo&apos;s taste graph. itsgiving, 2026.</span>
+          </span>
+        </div>
+      </footer>
+
+      <Toast toast={toast} />
+      <DirectorsCut on={cut} onExit={exitCut} />
     </div>
   );
 }

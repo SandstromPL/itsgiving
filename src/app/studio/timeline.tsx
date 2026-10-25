@@ -5,6 +5,7 @@ import { STEP_LABELS, STEP_ORDER, THINKING, type Thinking } from "@/lib/agent/op
 import type { LlmTrace, StepEvent, StepStatus } from "@/lib/agent/types";
 import { describeKind } from "@/lib/llm/types";
 import type { Provenance } from "@/lib/qloo/client";
+import { useLingo } from "./lingo";
 import { Tape, thinkingName } from "./parts";
 
 const STATUS_TEXT: Record<StepStatus, string> = {
@@ -16,20 +17,20 @@ const STATUS_TEXT: Record<StepStatus, string> = {
 };
 
 function Mark({ status }: { status: StepStatus }) {
-  const base = "mt-1 grid size-4 shrink-0 place-items-center rounded-full";
+  const base = "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold";
   const mark =
     status === "running" ? (
-      <span className={`${base} ring-1 ring-tungsten`}>
-        <span className="size-1.5 rounded-full bg-tungsten motion-safe:animate-pulse" />
+      <span className={`${base} border-2 border-foreground`}>
+        <span className="size-2 rounded-full bg-foreground motion-safe:animate-pulse" />
       </span>
     ) : status === "done" ? (
-      <span className={`${base} bg-paper text-[10px] font-bold text-ink`}>✓</span>
+      <span className={`${base} bg-foreground text-background`}>✓</span>
     ) : status === "warning" ? (
-      <span className={`${base} text-[10px] font-bold text-tungsten ring-1 ring-tungsten`}>!</span>
+      <span className={`${base} border-2 border-tungsten text-tungsten`}>!</span>
     ) : status === "error" ? (
-      <span className={`${base} bg-safelight text-[10px] font-bold text-ink`}>×</span>
+      <span className={`${base} bg-safelight text-white`}>×</span>
     ) : (
-      <span className={`${base} ring-1 ring-edge`} />
+      <span className={`${base} border-2 border-line`} />
     );
   return (
     <>
@@ -44,7 +45,7 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
   const cached = calls.filter((c) => c.cached).length;
   return (
     <details className="group mt-1.5">
-      <summary className="type-evidence cursor-pointer text-[11.5px] text-tungsten marker:text-edge hover:text-paper">
+      <summary className="cursor-pointer font-mono text-[12px] text-tungsten marker:text-edge hover:text-foreground">
         {calls.length} Qloo {calls.length === 1 ? "call" : "calls"}
         {cached > 0 ? `, ${cached} cached` : ""}
       </summary>
@@ -53,9 +54,9 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
           // The request itself is code, so it keeps a code face.
           <li
             key={i}
-            className="overflow-x-auto whitespace-nowrap rounded-sm bg-frame px-2 py-1 font-mono text-[10.5px] leading-4 text-dim"
+            className="overflow-x-auto rounded-lg bg-field px-2.5 py-1.5 font-mono text-[11px] leading-4 whitespace-nowrap text-dim"
           >
-            <span className="text-paper">GET {call.path}</span> {new URLSearchParams(call.query).toString()}{" "}
+            <span className="text-foreground">GET {call.path}</span> {new URLSearchParams(call.query).toString()}{" "}
             <span className="text-faint">
               {call.status} {call.cached ? "cached" : `${call.durationMs} ms`}
               {call.mode === "mock" ? " mock" : ""}
@@ -70,9 +71,9 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
 function LlmLine({ trace }: { trace: LlmTrace }) {
   const tried = trace.attempts.filter((a) => a.outcome !== "ok" && a.outcome !== "repaired");
   return (
-    <div className="mt-1.5 flex flex-col gap-1 text-xs leading-5">
+    <div className="mt-1.5 flex flex-col gap-1 text-[13px] leading-5">
       <p className="flex flex-wrap items-center gap-x-2 text-dim">
-        {trace.producedBy.mock ? <Tape>Mock LLM</Tape> : <span className="text-paper">{trace.producedBy.model}</span>}
+        {trace.producedBy.mock ? <Tape>Mock LLM</Tape> : <span className="font-semibold text-foreground">{trace.producedBy.model}</span>}
         {trace.producedBy.reasoning && <span>{thinkingName(trace.producedBy.reasoning)}</span>}
         {trace.attempts.some((a) => a.outcome === "repaired") && <span>fixed its JSON on a retry</span>}
       </p>
@@ -86,10 +87,10 @@ function LlmLine({ trace }: { trace: LlmTrace }) {
 }
 
 /**
- * Every step of the run with the Qloo requests and model calls behind it. The rail shows it compact
- * after a run; while a treatment is first being built it takes the stage, larger, without its heading.
+ * Every step of the run with the Qloo requests and model calls behind it: on the stage while a first treatment
+ * is built, in the credits after.
  */
-export function Timeline({ steps, size = "rail" }: { steps: StepEvent[]; size?: "rail" | "stage" }) {
+export function Timeline({ steps, size = "credits" }: { steps: StepEvent[]; size?: "credits" | "stage" }) {
   const current = [...steps].reverse().find((s) => s.status === "running");
   const stage = size === "stage";
   // No aria-busy here: screen readers may hold back the live region below until it clears.
@@ -97,14 +98,14 @@ export function Timeline({ steps, size = "rail" }: { steps: StepEvent[]; size?: 
     <section
       aria-labelledby={stage ? undefined : "agent-heading"}
       aria-label={stage ? "Run log" : undefined}
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-4"
     >
       {!stage && (
         <div>
-          <h2 id="agent-heading" className="type-head text-lg text-paper">
+          <h4 id="agent-heading" className="type-head text-[1.4rem] leading-none">
             Run log
-          </h2>
-          <p className="mt-1 text-xs leading-5 text-dim">
+          </h4>
+          <p className="mt-1.5 text-[13px] leading-5 text-faint">
             Code makes every Qloo call. The model only plans and writes, citing what Qloo returned.
           </p>
         </div>
@@ -113,22 +114,24 @@ export function Timeline({ steps, size = "rail" }: { steps: StepEvent[]; size?: 
         {current ? `${current.label}…` : ""}
       </p>
       {steps.length === 0 ? (
-        <p className="rounded-md border border-dashed border-line px-3 py-4 text-xs leading-5 text-faint">
+        <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-[13px] leading-5 text-faint">
           Each step and every Qloo request behind it will show here.
         </p>
       ) : (
         <ol className="flex flex-col">
           {steps.map((step) => (
-            <li key={step.id} className={`flex gap-3 border-l border-line pl-3 last:border-transparent ${stage ? "pb-5" : "pb-4"}`}>
+            <li key={step.id} className="flex gap-3 border-b border-line py-3 last:border-0">
               <Mark status={step.status} />
               <div className="min-w-0 flex-1">
-                <p className={`${stage ? "text-base" : "text-sm"} ${step.status === "skipped" ? "text-faint" : "text-paper"}`}>
-                  {step.label}
+                <p
+                  className={`flex flex-wrap items-baseline justify-between gap-x-3 text-[16px] ${step.status === "skipped" ? "text-faint" : ""}`}
+                >
+                  <span className={step.status === "running" ? "font-bold" : ""}>{step.label}</span>
                   {step.ms !== undefined && step.status !== "skipped" && (
-                    <span className="type-evidence ml-2 text-xs text-faint">{(step.ms / 1000).toFixed(1)} s</span>
+                    <span className="font-mono text-[13px] text-faint">{(step.ms / 1000).toFixed(1)} s</span>
                   )}
                 </p>
-                {step.summary && <p className={`mt-0.5 leading-5 text-dim ${stage ? "text-sm" : "text-xs"}`}>{step.summary}</p>}
+                {step.summary && <p className="mt-0.5 text-[14px] leading-5 text-dim">{step.summary}</p>}
                 {step.llm && <LlmLine trace={step.llm} />}
                 {step.qloo && step.qloo.length > 0 && <QlooCalls calls={step.qloo} />}
               </div>
@@ -142,10 +145,10 @@ export function Timeline({ steps, size = "rail" }: { steps: StepEvent[]; size?: 
 
 const STRIP_TONE: Record<StepStatus | "pending", string> = {
   pending: "bg-line",
-  running: "bg-tungsten motion-safe:animate-pulse",
-  done: "bg-paper",
+  running: "bg-foreground motion-safe:animate-pulse",
+  done: "bg-foreground",
   warning: "bg-tungsten",
-  skipped: "bg-edge/40",
+  skipped: "bg-line/60",
   error: "bg-safelight",
 };
 
@@ -159,31 +162,54 @@ function useElapsed(startedAt: number): number {
   return Math.max(0, Math.round((now - startedAt) / 1000));
 }
 
+/** A film leader: the sweep fills over the expected run, the number counts down from 5. */
+function Leader({ elapsed, expected }: { elapsed: number; expected: number }) {
+  const progress = Math.min(elapsed / expected, 0.97);
+  const count = Math.max(1, 5 - Math.floor((elapsed / expected) * 5));
+  return (
+    <span
+      aria-hidden
+      className="relative grid size-[120px] shrink-0 place-items-center rounded-full sm:size-[132px]"
+      style={{ background: `conic-gradient(var(--accent) 0 ${progress * 360}deg, #3a3936 ${progress * 360}deg 360deg)` }}
+    >
+      <span className="absolute inset-x-1.5 top-1/2 h-0.5 -translate-y-1/2 bg-[#121211]" />
+      <span className="absolute inset-y-1.5 left-1/2 w-0.5 -translate-x-1/2 bg-[#121211]" />
+      <span className="relative grid size-[84px] place-items-center rounded-full border-2 border-foreground bg-background text-[50px] leading-none font-extrabold sm:size-[92px] sm:text-[54px]">
+        {count}
+      </span>
+    </span>
+  );
+}
+
 /** The stage while a first treatment is being built: the run itself, step by step, instead of an empty frame. */
 export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; startedAt: number; thinking: Thinking }) {
   const elapsed = useElapsed(startedAt);
+  const { t } = useLingo();
   const status = (id: (typeof STEP_ORDER)[number]) => steps.find((s) => s.id === id)?.status ?? "pending";
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-          <h2 className="type-poster text-[clamp(2.5rem,5vw,4rem)]">Building the treatment</h2>
-          <p className="type-evidence text-sm text-dim" aria-hidden>
-            {elapsed} s
+    <div className="flex flex-col gap-5">
+      <div className="surface-dark grain flex flex-wrap items-center gap-x-8 gap-y-6 rounded-[2rem] bg-background p-7 sm:p-9">
+        <Leader elapsed={elapsed} expected={thinking === "deep" ? 40 : 30} />
+        <div className="min-w-0 flex-[1_1_16rem]">
+          <h2 className="type-poster text-[clamp(3rem,6vw,5.25rem)]">{t.cooking}</h2>
+          <p className="mt-3 text-[17px] leading-6 text-dim">
+            {THINKING[thinking].hint} Qloo first, then the writer.{" "}
+            <span aria-hidden className="font-mono text-foreground">
+              {elapsed} s
+            </span>
           </p>
+          {elapsed >= 60 && <p className="mt-2 font-serif text-[1.6rem] leading-tight italic">{t.slowBurn}</p>}
         </div>
-        <p className="max-w-[62ch] text-sm leading-6 text-dim">
-          {THINKING[thinking].label} thinking: {THINKING[thinking].hint.charAt(0).toLowerCase() + THINKING[thinking].hint.slice(1)} Each
-          Qloo request appears below as it happens.
-        </p>
       </div>
       {/* One cell per pipeline step, like frames on a strip: a sequence, so it reads left to right. */}
-      <ol aria-hidden className="grid grid-cols-10 gap-1">
+      <ol aria-hidden className="grid grid-cols-11 gap-1">
         {STEP_ORDER.map((id) => (
           <li key={id} title={STEP_LABELS[id]} className={`h-1.5 rounded-full ${STRIP_TONE[status(id)]}`} />
         ))}
       </ol>
-      <Timeline steps={steps} size="stage" />
+      <div className="rounded-[28px] border border-line bg-card p-5 sm:p-6">
+        <Timeline steps={steps} size="stage" />
+      </div>
     </div>
   );
 }

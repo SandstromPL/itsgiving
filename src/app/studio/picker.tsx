@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type FormEvent } from "react";
 import type { Ambiguity, Role } from "@/lib/agent/types";
+import { useLingo } from "./lingo";
 import { Still } from "./parts";
 
 const ROLE: Record<Role, string> = {
@@ -22,6 +23,7 @@ export function Picker({
   onPick: (picks: Record<string, string>) => void;
   running: boolean;
 }) {
+  const { t } = useLingo();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
 
@@ -33,29 +35,29 @@ export function Picker({
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-7 rounded-lg bg-graphite p-6 ring-1 ring-line sm:p-8">
+    <form onSubmit={submit} className="flex flex-col gap-7 rounded-[28px] border border-line bg-card p-6 sm:p-8">
       <div>
-        <h2 ref={heading} tabIndex={-1} className="type-head text-3xl leading-none text-paper focus:outline-none">
-          Which one do you mean?
+        <h2 ref={heading} tabIndex={-1} className="type-poster text-[clamp(2.5rem,5vw,3.75rem)] focus:outline-none">
+          {t.pickTitle}
         </h2>
-        <p className="mt-2 text-sm leading-6 text-dim">{message}</p>
+        <p className="mt-3 text-[16px] leading-6 text-dim">{message}</p>
       </div>
       {items.map((item) => (
         <fieldset key={item.key} className="flex flex-col gap-2">
-          <legend className="mb-2 text-sm text-paper">
+          <legend className="mb-2 text-[15px] font-semibold">
             &ldquo;{item.input}&rdquo;, from {ROLE[item.role]}
           </legend>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2.5 sm:grid-cols-2">
             {item.candidates.map((candidate) => (
               <label
                 key={candidate.id}
-                className="flex cursor-pointer items-center gap-3 rounded-md bg-raised p-2 ring-1 ring-edge hover:ring-dim has-checked:ring-2 has-checked:ring-paper has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
+                className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-card p-2.5 hover:border-edge has-checked:border-foreground has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground"
               >
                 <input type="radio" name={item.key} value={candidate.id} required className="sr-only" />
-                <Still src={candidate.image} alt="" className="aspect-video w-20 shrink-0 rounded-sm" />
+                <Still src={candidate.image} alt="" className="aspect-video w-20 shrink-0 rounded-lg" />
                 <span className="min-w-0">
-                  <span className="block truncate text-sm text-paper">{candidate.name}</span>
-                  <span className="block truncate text-xs text-dim">
+                  <span className="block truncate text-[16px] font-bold text-[#121211]">{candidate.name}</span>
+                  <span className="block truncate text-[13px] text-[#4a4741]">
                     {[candidate.disambiguation ?? candidate.year, candidate.kind?.replace("_", " ")].filter(Boolean).join(", ")}
                   </span>
                 </span>
@@ -67,7 +69,7 @@ export function Picker({
       <button
         type="submit"
         aria-disabled={running}
-        className="h-11 self-start rounded-md bg-paper px-5 text-[15px] font-semibold text-ink hover:bg-white aria-disabled:opacity-60"
+        className="h-14 self-start rounded-full bg-foreground px-6 text-[17px] font-bold text-background aria-disabled:opacity-60"
       >
         Continue with these
       </button>

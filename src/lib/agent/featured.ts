@@ -28,6 +28,8 @@ export interface FeaturedCover {
   line: string;
   palette: string[];
   still?: string;
+  /** The first tone tag Qloo gave the treatment, for the poster's "it's giving" sticker. */
+  tone?: string;
 }
 
 let memo: { file: string; mtimeMs: number; items: FeaturedItem[] } | undefined;
@@ -66,5 +68,6 @@ export function featuredCovers(items: FeaturedItem[] = loadFeatured()): Featured
     )} / ${t.brief.city}`,
     palette: t.palette.map((c) => c.hex),
     still: t.references.find((r) => r.entity.image && !r.entity.image.startsWith("/mock/"))?.entity.image,
+    tone: t.tone[0]?.tag.name,
   }));
 }

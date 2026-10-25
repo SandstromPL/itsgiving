@@ -1,13 +1,14 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { BUDGETS, FORMATS, NUDGES, NUDGE_LABELS, subjectPhrase, type Nudge } from "@/lib/agent/options";
-import type { Example } from "@/lib/agent/examples";
-import type { FeaturedCover } from "@/lib/agent/featured";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { ShootBaseBlock } from "./base-map";
-import { EdgeCode, QlooTags, Still, Tape, Why, modelName } from "./parts";
+import { darkOf } from "./landing";
+import { useLingo } from "./lingo";
+import { QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
+import { TitleCardPicker, suggestTitleFont, titleFont, titleStyle } from "./title-card";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
 
@@ -24,28 +25,20 @@ const SECTIONS = [
   ["credits", "Credits"],
 ] as const;
 
-/** itsgiving's own writing is set in the document face; the tool, labels and evidence stay in the interface face. */
-const prose = "font-serif text-[15.5px] leading-[1.65] text-paper/88";
+/** itsgiving's own writing is set in the serif; the tool, labels and Qloo's evidence stay in the interface faces. */
+const prose = "font-serif text-[1.25rem] leading-[1.38]";
+const card = "rounded-[26px] border border-line bg-card";
 
-/**
- * A titled section of the treatment. On wide screens the title sits in its own column and stays in view
- * while the section scrolls, the way a printed treatment labels its pages.
- */
-function Section({ id, title, note, first, children }: { id: string; title: string; note?: string; first?: boolean; children: ReactNode }) {
+function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
-    <section
-      aria-labelledby={id}
-      className={`scroll-mt-32 xl:grid xl:grid-cols-[11rem_minmax(0,1fr)] xl:gap-10 ${first ? "" : "border-t border-line pt-8"}`}
-    >
-      <div className="xl:sticky xl:top-32 xl:self-start">
-        <h3 id={id} className="type-head text-[1.75rem] leading-none text-paper">
+    <section aria-labelledby={id} className="flex scroll-mt-40 flex-col gap-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <h3 id={id} className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
           {title}
         </h3>
+        {note && <p className="max-w-[60ch] text-[15px] leading-6 text-faint">{note}</p>}
       </div>
-      <div className="mt-4 min-w-0 xl:mt-0">
-        {note && <p className="mb-6 max-w-[70ch] text-sm leading-6 text-dim">{note}</p>}
-        {children}
-      </div>
+      {children}
     </section>
   );
 }
@@ -54,14 +47,23 @@ function names(entities: CompactEntity[]): string {
   return entities.map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`).join(", ");
 }
 
-/** Tungsten marks Qloo evidence; tape pink marks the synthetic mock standing in for it. */
+/** Qloo evidence set in prose: mono, tungsten for Qloo, tape pink for the synthetic mock standing in for it. */
 const evidenceTone = (mock: boolean) => (mock ? "text-tape" : "text-tungsten");
 
-function TagList({ tags, mock }: { tags: CompactTag[]; mock: boolean }) {
+function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boolean; shared?: boolean }) {
   return (
-    <ul className={`type-evidence flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] leading-5 ${evidenceTone(mock)}`}>
+    <ul className="flex flex-wrap gap-2">
       {tags.map((tag) => (
-        <li key={tag.id}>{tag.name}</li>
+        <li
+          key={tag.id}
+          className={`rounded-full px-3 py-1.5 font-mono text-[13px] ${
+            shared
+              ? "bg-accent font-semibold text-[#121211]"
+              : `border border-dashed border-slip-edge bg-slip ${mock ? "text-[#a3195b]" : "text-[#855000]"}`
+          }`}
+        >
+          {tag.name}
+        </li>
       ))}
     </ul>
   );
@@ -70,65 +72,129 @@ function TagList({ tags, mock }: { tags: CompactTag[]; mock: boolean }) {
 function Also({ label, items, mock }: { label: string; items: CompactEntity[]; mock: boolean }) {
   if (items.length === 0) return null;
   return (
-    <p className="mt-8 text-sm leading-6 text-dim">
-      {label} <span className={`type-evidence text-[13px] ${evidenceTone(mock)}`}>{names(items)}</span>
+    <p className="text-[15px] leading-6 text-dim">
+      {label} <span className={`font-mono text-[13px] ${evidenceTone(mock)}`}>{names(items)}</span>
     </p>
   );
 }
 
-function Cover({ t }: { t: Treatment }) {
+function Cover({
+  t,
+  fontId,
+  suggestion,
+  onPickFont,
+}: {
+  t: Treatment;
+  fontId: string;
+  suggestion: { id: string; why: string };
+  onPickFont: (id: string) => void;
+}) {
   // Mock placeholders carry their own "not Qloo data" text, which would fight the title.
   const still = t.references.find((r) => r.entity.image && !r.entity.image.startsWith("/mock/"))?.entity.image;
-  const [a, b] = [t.palette[0]?.hex ?? "#1A1917", t.palette[1]?.hex ?? "#2B2925"];
   const subject = subjectPhrase(
     t.subjects.filter((s) => s.kind === "artist").map((s) => s.name),
     t.subjects.filter((s) => s.kind !== "artist").map((s) => s.name),
   );
   return (
-    // No overflow-hidden and an automatic min-height: an aspect-ratio box only grows to fit a long title with both.
     <header
       key={`${t.id}-${t.createdAt}`}
-      className="letterbox-open relative isolate flex min-h-[30rem] flex-col justify-between rounded-[3px] bg-frame sm:aspect-[2.39/1] sm:min-h-auto"
+      className="letterbox-open surface-dark grain relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10"
+      style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
     >
-      <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden rounded-[3px]">
-        {still && <Still src={still} alt="" className="absolute inset-0 size-full opacity-35 grayscale" />}
-        <div
-          className="absolute inset-0"
-          style={{
-            background: `linear-gradient(100deg, #0a0908 12%, ${a}55 60%, ${b}33 100%), linear-gradient(0deg, #0a0908 0%, transparent 70%)`,
-          }}
-        />
+      <div aria-hidden className="absolute inset-0 -z-10">
+        {still && <Still src={still} alt="" className="absolute inset-0 size-full opacity-50" />}
+        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgb(10_9_8/0.9)_0%,rgb(10_9_8/0.35)_55%,rgb(10_9_8/0.6)_100%)]" />
       </div>
-      <p className="flex flex-wrap items-center gap-3 p-6 text-[13px] text-paper/75 sm:p-10">
-        <span>
-          {FORMATS[t.brief.format]} {subject} / {t.brief.city} / {BUDGETS[t.brief.budget].label} budget
-        </span>
-        {t.mock.qloo && <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>}
-      </p>
-      <div className="px-6 pb-8 sm:px-10 sm:pb-10">
-        <h2 id="treatment-title" tabIndex={-1} className="type-poster max-w-[15ch] text-[clamp(3rem,7vw,7rem)] text-balance text-paper">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-edge px-3.5 py-2 text-[14px] text-dim">
+            {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
+          </span>
+          {t.mock.qloo && <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>}
+        </div>
+        <TitleCardPicker title={t.title} fontId={fontId} suggestion={suggestion} onPick={onPickFont} />
+      </div>
+      <div className="flex flex-col gap-6">
+        <h2 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
           {t.title}
         </h2>
-        <p className="mt-5 max-w-[48ch] font-serif text-lg leading-7 text-pretty text-paper/85 sm:text-xl sm:leading-8">{t.logline}</p>
+        <p className="max-w-[40ch] font-serif text-[clamp(1.4rem,2.4vw,1.9rem)] leading-[1.2] text-pretty italic">{t.logline}</p>
+        <ul aria-label="Palette" className="flex flex-wrap gap-2">
+          {t.palette.map((c) => (
+            <li key={c.hex} className="flex items-center gap-2 rounded-full bg-black/40 py-1.5 pr-3.5 pl-1.5 text-[13px]">
+              <span aria-hidden className="size-[22px] rounded-full ring-1 ring-white/25" style={{ background: c.hex }} />
+              {c.name}
+            </li>
+          ))}
+        </ul>
       </div>
-      <ul aria-label="Palette" className="flex h-2 shrink-0">
-        {t.palette.map((c) => (
-          <li key={c.hex} title={`${c.name} ${c.hex}`} className="flex-1" style={{ background: c.hex }}>
-            <span className="sr-only">
-              {c.name} {c.hex}
-            </span>
-          </li>
-        ))}
-      </ul>
     </header>
   );
 }
 
-function Rework({ nudges, onToggle, running }: { nudges: Nudge[]; onToggle: (nudge: Nudge) => void; running: boolean }) {
+/** "it's giving": the tone tags Qloo found, with the ones shared with the director's taste highlighted. */
+function Giving({ t, mock }: { t: Treatment; mock: boolean }) {
+  const lingo = useLingo().t;
+  if (t.tone.length === 0) return null;
+  const shared = t.tone.some((tone) => tone.source === "overlap");
+  return (
+    <section aria-labelledby="giving-title" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h3 id="giving-title" className="mr-2 font-serif text-[clamp(2.5rem,4.5vw,3.25rem)] leading-none font-normal italic">
+          {lingo.giving}
+        </h3>
+        {t.tone.map((tone) =>
+          tone.source === "overlap" ? (
+            <span
+              key={tone.tag.id}
+              className="flex items-center gap-2 rounded-full bg-accent px-4 py-2.5 text-[17px] font-bold text-[#121211]"
+            >
+              {tone.tag.name}
+              <span className="text-[13px] font-normal">{lingo.shared}</span>
+            </span>
+          ) : (
+            <span key={tone.tag.id} className="rounded-full border border-line bg-card px-4 py-2.5 text-[17px]">
+              {tone.tag.name}
+            </span>
+          ),
+        )}
+        {mock && <Tape>Mock data</Tape>}
+      </div>
+      <p className="text-[15px] text-faint">
+        Tone tags from {mock ? "the synthetic mock, not Qloo" : "Qloo"}: what this audience over-indexes on.
+        {shared ? " The highlighted one is shared with the films you love." : ""}
+      </p>
+    </section>
+  );
+}
+
+/** The rework bar: a slate with the take number, and the nudges that re-run the plan and the writing. */
+function Rework({
+  nudges,
+  onToggle,
+  running,
+  take,
+}: {
+  nudges: Nudge[];
+  onToggle: (nudge: Nudge) => void;
+  running: boolean;
+  take: number;
+}) {
+  const lingo = useLingo().t;
   return (
     <div className="flex flex-col gap-2 print:hidden">
-      <div role="group" aria-label="Rework this treatment" className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-sm text-dim">Rework it</span>
+      <div
+        role="group"
+        aria-label="Rework this treatment"
+        className="flex flex-wrap items-center gap-2.5 rounded-[28px] border border-line bg-card p-3"
+      >
+        <span className="w-[96px] shrink-0 overflow-hidden rounded-lg border-2 border-foreground bg-card">
+          <span
+            aria-hidden
+            className="block h-4 border-b-2 border-foreground bg-[repeating-linear-gradient(-45deg,var(--foreground)_0_9px,var(--card)_9px_18px)]"
+          />
+          <span className="block px-2 py-1 font-mono text-[13px] font-semibold">{lingo.take(take)}</span>
+        </span>
         {NUDGES.map((nudge) => (
           <button
             key={nudge}
@@ -136,35 +202,32 @@ function Rework({ nudges, onToggle, running }: { nudges: Nudge[]; onToggle: (nud
             aria-pressed={nudges.includes(nudge)}
             aria-disabled={running}
             onClick={() => onToggle(nudge)}
-            className="rounded-full bg-graphite px-3.5 py-1.5 text-sm text-paper ring-1 ring-line hover:ring-edge aria-disabled:cursor-progress aria-disabled:opacity-50 aria-pressed:bg-paper aria-pressed:text-ink aria-pressed:ring-paper"
+            className="rounded-full border border-line bg-field px-4 py-2.5 text-[15px] hover:border-foreground aria-disabled:cursor-progress aria-disabled:opacity-50 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:font-semibold aria-pressed:text-background"
           >
-            {NUDGE_LABELS[nudge]}
+            {lingo.nudges[nudge]}
+            {lingo.nudges[nudge] !== NUDGE_LABELS[nudge] && <span className="sr-only">: {NUDGE_LABELS[nudge]}</span>}
           </button>
         ))}
         <button
           type="button"
           onClick={() => window.print()}
-          className="ml-auto rounded-md px-3.5 py-1.5 text-sm text-dim ring-1 ring-edge hover:text-paper hover:ring-dim"
+          className="ml-auto rounded-full border border-foreground px-4 py-2.5 text-[15px] font-semibold hover:bg-foreground hover:text-background"
         >
           Save as PDF
         </button>
       </div>
-      <p className="text-xs text-faint">Each change re-runs the plan and the writing. Qloo lookups are cached.</p>
+      <p className="px-3 text-[13px] text-faint">Each change re-runs the plan and the writing. Qloo lookups are cached.</p>
     </div>
   );
 }
 
 function SectionIndex() {
   return (
-    // The negative margins match the stage's padding so the bar spans it edge to edge.
-    <nav
-      aria-label="Treatment sections"
-      className="sticky top-14 z-20 -mx-4 border-b border-line bg-background/90 px-4 backdrop-blur sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12 xl:-mx-16 xl:px-16 print:hidden"
-    >
-      <ul className="flex gap-6 overflow-x-auto py-3 text-sm text-dim">
+    <nav aria-label="Treatment sections" className="top-[5.25rem] z-20 sm:sticky print:hidden">
+      <ul className="flex gap-1 overflow-x-auto rounded-full border border-line bg-card/90 p-1.5 backdrop-blur">
         {SECTIONS.map(([id, label]) => (
           <li key={id} className="shrink-0">
-            <a href={`#${id}`} className="rounded-sm hover:text-paper">
+            <a href={`#${id}`} className="block rounded-full px-3.5 py-2 text-[14px] text-dim hover:bg-field hover:text-foreground">
               {label}
             </a>
           </li>
@@ -174,12 +237,54 @@ function SectionIndex() {
   );
 }
 
+/** A strip of film under the beats, edge-printed with the house stock and the beat numbers. */
+function FilmEdge({ count }: { count: number }) {
+  const holes = "mx-2.5 h-2.5 rounded-[3px] bg-[repeating-linear-gradient(90deg,#f2f0ea_0_14px,transparent_14px_26px)]";
+  return (
+    <div aria-hidden className="flex flex-col gap-2 rounded-2xl bg-[#1b1a17] py-2.5 print:hidden">
+      <span className={holes} />
+      <span className="truncate px-4 font-mono text-[14px] tracking-[0.14em] text-[#f2b33d]">
+        ITSGIVING 400 {Array.from({ length: count }, (_, i) => `▸ ${i + 1}`).join(" ")}
+      </span>
+      <span className={holes} />
+    </div>
+  );
+}
+
+/** Halfway down the board, an interval card, the way a Hindi film breaks for chai. */
+function Interval() {
+  const lingo = useLingo().t;
+  return (
+    <aside
+      aria-label={lingo.interval.title}
+      className="flex flex-col items-center gap-2 rounded-[28px] bg-[#7a1238] px-6 py-10 text-center print:hidden"
+    >
+      <p
+        className="text-[clamp(2.75rem,6vw,4rem)] leading-none tracking-[0.04em] text-[#ffe7a3]"
+        style={{ fontFamily: "var(--font-tc-yatra), serif" }}
+      >
+        {lingo.interval.title}
+      </p>
+      <p className="text-[16px] text-[#fff3d6]">{lingo.interval.line}</p>
+    </aside>
+  );
+}
+
+/** A digicam's date stamp, 'YY MM DD, for the day the treatment was built. */
+function dateStamp(iso: string): string {
+  const d = new Date(iso);
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `'${two(d.getFullYear() % 100)} ${two(d.getMonth() + 1)} ${two(d.getDate())}`;
+}
+
 export function Board({
   treatment: t,
   state,
   nudges,
   onToggleNudge,
   running,
+  take,
+  log,
 }: {
   treatment: Treatment;
   /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
@@ -187,42 +292,52 @@ export function Board({
   nudges: Nudge[];
   onToggleNudge: (nudge: Nudge) => void;
   running: boolean;
+  /** Which take of this brief is on screen: 1, then one more per rework. */
+  take: number;
+  /** The run log, shown with the credits. */
+  log: ReactNode;
 }) {
+  const lingo = useLingo().t;
   const mock = t.mock.qloo;
   const source = mock ? "the synthetic mock, not Qloo" : "Qloo";
   const templated = t.llm.filter((l) => l.producedBy.mock).map((l) => STEP_NAME[l.step].toLowerCase());
+  const suggestion = suggestTitleFont(t);
+  // The suggestion follows each rework until the director picks a face themselves.
+  const [picked, setPicked] = useState<string | null>(null);
+  const stamp = dateStamp(t.createdAt);
   return (
     <article
       aria-labelledby="treatment-title"
       aria-busy={state === "updating"}
-      className={`flex flex-col gap-12 transition-opacity duration-300 ${state === "current" ? "" : "opacity-50"}`}
+      className={`flex flex-col gap-14 transition-opacity duration-300 ${state === "current" ? "" : "opacity-50"}`}
     >
       {state === "previous" && (
-        <p className="-mb-6 text-sm text-dim">
+        <p className="-mb-8 text-[15px] text-dim">
           This is the previous version. The latest change didn&apos;t finish, so nothing below reflects it.
         </p>
       )}
-      <div className="flex flex-col gap-5">
-        <Cover t={t} />
-        <Rework nudges={nudges} onToggle={onToggleNudge} running={running} />
+      <div className="flex flex-col gap-6">
+        <Cover t={t} fontId={picked ?? suggestion.id} suggestion={suggestion} onPickFont={setPicked} />
+        <Giving t={t} mock={mock} />
+        <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} />
       </div>
 
       <SectionIndex />
 
-      <Section id="concept" title="Concept" first>
-        <div className="grid gap-10 2xl:grid-cols-[minmax(0,1fr)_21rem]">
-          <p className="max-w-[60ch] font-serif text-[1.1875rem] leading-[1.7] text-pretty text-paper/90">{t.concept}</p>
+      <Section id="concept" title="Concept">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <p className="max-w-[44ch] font-serif text-[clamp(1.5rem,2.3vw,1.9rem)] leading-[1.32] text-pretty">{t.concept}</p>
           {t.tone.length > 0 && (
-            <div>
-              <h4 className="text-[13px] font-medium text-dim">Tone</h4>
-              <ul className="mt-3 flex flex-col gap-4">
+            <div className={`${card} flex flex-col gap-4 p-5`}>
+              <h4 className="text-[14px] font-semibold text-dim">How the tone reads</h4>
+              <ul className="flex flex-col gap-4">
                 {t.tone.map((tone) => (
-                  <li key={tone.tag.id}>
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
-                      <span className={`type-evidence ${evidenceTone(mock)}`}>{tone.tag.name}</span>
-                      <span className="text-dim">{tone.source === "overlap" ? "shared with your taste" : "audience taste"}</span>
+                  <li key={tone.tag.id} className="flex flex-col gap-1">
+                    <p className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+                      <span className={`font-mono font-semibold ${evidenceTone(mock)}`}>{tone.tag.name}</span>
+                      <span className="text-faint">{tone.source === "overlap" ? lingo.shared : "audience taste"}</span>
                     </p>
-                    <p className={`mt-1 ${prose}`}>{tone.note}</p>
+                    <p className="font-serif text-[1.2rem] leading-snug">{tone.note}</p>
                   </li>
                 ))}
               </ul>
@@ -237,26 +352,26 @@ export function Board({
         note={`Films this audience over-indexes on, ranked by ${source}. itsgiving wrote the notes.`}
       >
         {t.references.length === 0 ? (
-          <p className="text-sm text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
+          <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
         ) : (
-          <ul className="grid gap-x-8 gap-y-12 sm:grid-cols-2 2xl:grid-cols-3">
+          <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {t.references.map((r) => (
-              <li key={r.entity.id} className="flex flex-col">
-                <Still src={r.entity.image} alt={`Still from ${r.entity.name}`} className="aspect-video w-full rounded-[3px]" />
-                <div className="mt-4 flex items-baseline justify-between gap-3">
-                  <h4 className="type-head text-xl leading-tight">{r.entity.name}</h4>
-                  {r.entity.year && <span className="type-evidence shrink-0 text-xs text-dim">{r.entity.year}</span>}
-                </div>
-                <div className="mt-1 flex flex-col">
-                  <EdgeCode qloo={r.qloo} mock={mock} />
-                  <QlooTags tags={r.qloo.tags} />
-                </div>
-                <p className={`mt-3 ${prose}`}>{r.notes.why}</p>
-                <p className={`mt-2 ${prose}`}>
-                  <span className="font-sans text-[13px] font-medium text-dim">Borrow </span>
-                  {r.notes.borrow}
-                </p>
-                <div className="mt-3">
+              <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden`}>
+                <Still src={r.entity.image} alt={`Still from ${r.entity.name}`} className="aspect-video w-full" />
+                <div className="flex flex-1 flex-col gap-3.5 p-5">
+                  <div className="flex flex-col gap-1">
+                    <h4 className="type-head text-[1.7rem] leading-tight">
+                      {r.entity.name}
+                      {r.entity.year && <span className="ml-2 text-[1.1rem] font-normal tracking-normal text-faint">{r.entity.year}</span>}
+                    </h4>
+                    <QlooTags tags={r.qloo.tags} />
+                  </div>
+                  <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
+                  <p className={prose}>
+                    <span className="font-sans text-[13px] font-semibold text-faint">Borrow </span>
+                    {r.notes.borrow}
+                  </p>
+                  <Receipt qloo={r.qloo} mock={mock} className="mt-auto" />
                   <Why
                     label="Why this film"
                     name={r.entity.name}
@@ -277,19 +392,22 @@ export function Board({
       </Section>
 
       <Section id="beats" title="Beats">
-        <ol className="grid gap-x-8 gap-y-10 sm:grid-cols-2 2xl:grid-cols-3">
+        <ol className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {t.beats.map((beat, i) => (
-            <li key={i} className="border-t border-edge/50 pt-4">
-              <p aria-hidden className="type-poster text-4xl text-paper/25">
+            <li key={i} className={`${card} flex flex-col gap-2.5 p-5`}>
+              <span aria-hidden className="type-poster text-[3.25rem] text-foreground/20">
                 {i + 1}
-              </p>
-              <h4 className="type-head mt-3 text-xl leading-tight">{beat.title}</h4>
-              <p className={`mt-2 ${prose}`}>{beat.description}</p>
-              {beat.reference && <p className="mt-2 text-xs text-dim">After {beat.reference.name}</p>}
+              </span>
+              <h4 className="type-head text-[1.45rem] leading-tight">{beat.title}</h4>
+              <p className={prose}>{beat.description}</p>
+              {beat.reference && <p className="mt-auto pt-1 text-[13px] text-faint">After {beat.reference.name}</p>}
             </li>
           ))}
         </ol>
+        <FilmEdge count={t.beats.length} />
       </Section>
+
+      <Interval />
 
       <Section
         id="wardrobe"
@@ -297,27 +415,25 @@ export function Board({
         note={`Brands this audience over-indexes on, ranked by ${source}. itsgiving wrote the looks.`}
       >
         {t.wardrobe.length === 0 ? (
-          <p className="text-sm text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
+          <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
-          <ul className="grid gap-x-10 gap-y-10 md:grid-cols-2">
+          <ul className="grid gap-5 md:grid-cols-2">
             {t.wardrobe.map((w) => (
-              <li key={w.entity.id} className="flex flex-col border-t border-edge/50 pt-4">
-                <h4 className="type-head text-xl leading-tight">{w.entity.name}</h4>
-                <div className="mt-1 flex flex-col">
-                  <EdgeCode qloo={w.qloo} mock={mock} />
+              <li key={w.entity.id} className={`${card} flex flex-col gap-3.5 p-5`}>
+                <div className="flex flex-col gap-1">
+                  <h4 className="type-head text-[1.7rem] leading-tight">{w.entity.name}</h4>
                   <QlooTags tags={w.qloo.tags} />
                 </div>
-                <p className={`mt-3 ${prose}`}>{w.notes.look}</p>
-                <div className="mt-3">
-                  <Why
-                    label="Why this brand"
-                    name={w.entity.name}
-                    qloo={w.qloo}
-                    read={[{ term: "The look", text: w.notes.look }]}
-                    writtenBy={t.writtenBy}
-                    mock={mock}
-                  />
-                </div>
+                <p className={prose}>{w.notes.look}</p>
+                <Receipt qloo={w.qloo} mock={mock} className="mt-auto" />
+                <Why
+                  label="Why this brand"
+                  name={w.entity.name}
+                  qloo={w.qloo}
+                  read={[{ term: "The look", text: w.notes.look }]}
+                  writtenBy={t.writtenBy}
+                  mock={mock}
+                />
               </li>
             ))}
           </ul>
@@ -332,9 +448,9 @@ export function Board({
       >
         <ShootBaseBlock t={t} mock={mock} />
         {t.locations.length === 0 ? (
-          <p className="text-sm text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
+          <p className="text-[15px] text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
         ) : (
-          <ul className="grid gap-x-8 gap-y-12 sm:grid-cols-2 2xl:grid-cols-3">
+          <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {t.locations.map((l, i) => {
               const place = l.entity.place;
               const where = [place?.kind, place?.neighborhood, place?.price_level ? `price level ${place.price_level} of 4` : undefined]
@@ -345,50 +461,56 @@ export function Board({
                   ? `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=17/${place.lat}/${place.lon}`
                   : undefined;
               return (
-                <li key={l.entity.id} className="flex flex-col">
-                  <Still src={l.entity.image} alt={`Photo of ${l.entity.name}`} className="aspect-[3/2] w-full rounded-[3px]" />
-                  <h4 className="type-head mt-4 text-xl leading-tight">
+                <li key={l.entity.id} className={`${card} flex flex-col overflow-hidden`}>
+                  <div className="relative">
+                    <Still src={l.entity.image} alt={`Photo of ${l.entity.name}`} className="aspect-[3/2] w-full" />
+                    <span
+                      aria-hidden
+                      className="absolute right-3 bottom-2.5 rounded-md bg-black/45 px-1.5 font-mono text-[17px] font-semibold tracking-[0.08em] text-[#ff9a3c] [text-shadow:0_0_6px_rgb(255_140_40/0.8)]"
+                    >
+                      {stamp}
+                    </span>
                     {t.base?.map && map && (
-                      <>
-                        <span className="type-evidence mr-1 align-[0.1em] text-sm text-dim">
-                          <span className="sr-only">Location </span>
-                          {i + 1}
-                        </span>{" "}
-                      </>
+                      <span className="absolute top-3 left-3 grid size-8 place-items-center rounded-full bg-[#121211] text-[14px] font-bold text-white">
+                        <span className="sr-only">Location </span>
+                        {i + 1}
+                      </span>
                     )}
-                    {l.entity.name}
-                  </h4>
-                  {where && <p className="mt-0.5 text-xs text-dim">{where}</p>}
-                  <div className="mt-1">
-                    <EdgeCode qloo={l.qloo} mock={mock} />
                   </div>
-                  {place?.ambience && (
-                    <p className="mt-2 line-clamp-3 text-[13px] leading-5 text-dim">
-                      <span className={`type-evidence text-[11.5px] ${evidenceTone(mock)}`}>{mock ? "Mock note" : "Qloo"} </span>
-                      {place.ambience}
-                    </p>
-                  )}
-                  <p className={`mt-3 ${prose}`}>{l.notes.scene}</p>
-                  <div className="mt-3 flex items-center gap-4">
-                    <Why
-                      label="Why this place"
-                      name={l.entity.name}
-                      qloo={l.qloo}
-                      note={place?.ambience}
-                      read={[{ term: "The scene", text: l.notes.scene }]}
-                      writtenBy={t.writtenBy}
-                      mock={mock}
-                    />
-                    {map && (
-                      <a
-                        href={map}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-dim underline decoration-edge underline-offset-4 hover:text-paper"
-                      >
-                        Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
-                      </a>
+                  <div className="flex flex-1 flex-col gap-3 p-5">
+                    <div>
+                      <h4 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h4>
+                      {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
+                    </div>
+                    {place?.ambience && (
+                      <p className="line-clamp-3 text-[14px] leading-5 text-dim">
+                        <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>{mock ? "Mock note" : "Qloo"} </span>
+                        {place.ambience}
+                      </p>
                     )}
+                    <p className={prose}>{l.notes.scene}</p>
+                    <Receipt qloo={l.qloo} mock={mock} className="mt-auto" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Why
+                        label="Why this place"
+                        name={l.entity.name}
+                        qloo={l.qloo}
+                        note={place?.ambience}
+                        read={[{ term: "The scene", text: l.notes.scene }]}
+                        writtenBy={t.writtenBy}
+                        mock={mock}
+                      />
+                      {map && (
+                        <a
+                          href={map}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-full px-3 py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
+                        >
+                          Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </li>
               );
@@ -399,16 +521,16 @@ export function Board({
       </Section>
 
       <Section id="camera" title="Camera and light">
-        <div className="grid gap-10 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           {(
             [
               ["Lighting", t.lighting],
               ["Shots", t.shots],
             ] as const
           ).map(([label, lines]) => (
-            <div key={label}>
-              <h4 className="text-[13px] font-medium text-dim">{label}</h4>
-              <ul className="mt-3 flex flex-col divide-y divide-line border-y border-line">
+            <div key={label} className={`${card} p-5`}>
+              <h4 className="text-[14px] font-semibold text-dim">{label}</h4>
+              <ul className="mt-1 flex flex-col divide-y divide-line">
                 {lines.map((line, i) => (
                   <li key={i} className={`py-3 ${prose}`}>
                     {line}
@@ -424,9 +546,9 @@ export function Board({
         <ul className="grid grid-cols-3 gap-4 sm:grid-cols-6">
           {t.palette.map((c) => (
             <li key={c.hex}>
-              <span aria-hidden className="block aspect-[4/5] w-full rounded-[3px] ring-1 ring-white/10" style={{ background: c.hex }} />
-              <span className="mt-2 block text-sm leading-tight">{c.name}</span>
-              <span className="type-evidence block text-xs text-dim">{c.hex}</span>
+              <span aria-hidden className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10" style={{ background: c.hex }} />
+              <span className="mt-2 block text-[15px] leading-tight font-semibold">{c.name}</span>
+              <span className="block font-mono text-[13px] text-faint">{c.hex}</span>
             </li>
           ))}
         </ul>
@@ -441,190 +563,84 @@ export function Board({
             : "What Qloo's taste graph says about this audience: aggregate affinities, never facts about any one person."
         }
       >
-        <dl className="grid gap-x-10 gap-y-6 md:grid-cols-[13rem_minmax(0,1fr)]">
-          {t.audience.overlap.length > 0 && (
-            <>
-              <dt className="text-sm text-paper">Shared by your films and the audience</dt>
-              <dd>
-                <TagList tags={t.audience.overlap} mock={mock} />
-              </dd>
-            </>
-          )}
-          <dt className="text-sm text-paper">The audience over-indexes on</dt>
-          <dd>
-            {t.audience.taste_tags.length > 0 ? (
-              <TagList tags={t.audience.taste_tags} mock={mock} />
-            ) : (
-              <p className="text-sm text-dim">No taste tags came back.</p>
+        <div className={`${card} p-6`}>
+          <dl className="grid gap-x-10 gap-y-6 md:grid-cols-[14rem_minmax(0,1fr)]">
+            {t.audience.overlap.length > 0 && (
+              <>
+                <dt className="text-[15px] font-semibold">Shared by your films and the audience</dt>
+                <dd>
+                  <EvidenceChips tags={t.audience.overlap} mock={mock} shared />
+                </dd>
+              </>
             )}
-          </dd>
-          {t.audience.leans.length > 0 && (
-            <>
-              <dt className="text-sm text-paper">Who over-indexes</dt>
-              <dd className={`type-evidence text-[13px] leading-5 ${evidenceTone(mock)}`}>{t.audience.leans.join("; ")}</dd>
-            </>
-          )}
-        </dl>
+            <dt className="text-[15px] font-semibold">The audience over-indexes on</dt>
+            <dd>
+              {t.audience.taste_tags.length > 0 ? (
+                <EvidenceChips tags={t.audience.taste_tags} mock={mock} />
+              ) : (
+                <p className="text-[15px] text-dim">No taste tags came back.</p>
+              )}
+            </dd>
+            {t.audience.leans.length > 0 && (
+              <>
+                <dt className="text-[15px] font-semibold">Who over-indexes</dt>
+                <dd className={`font-mono text-[13px] leading-6 ${evidenceTone(mock)}`}>{t.audience.leans.join("; ")}</dd>
+              </>
+            )}
+          </dl>
+        </div>
       </Section>
 
       <Section id="credits" title="Credits">
-        <dl className="grid gap-x-10 gap-y-3 text-sm leading-6 md:grid-cols-[13rem_minmax(0,1fr)]">
-          <dt className="text-dim">Built</dt>
-          <dd>{new Date(t.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</dd>
-          <dt className="text-dim">Data</dt>
-          <dd>
-            {t.qloo.calls} {mock ? "mock " : ""}Qloo requests
-          </dd>
-          {t.llm.map((l) => (
-            <Fragment key={l.step}>
-              <dt className="text-dim">{STEP_NAME[l.step]}</dt>
-              <dd>{modelName(l.producedBy)}</dd>
-            </Fragment>
-          ))}
-          {t.director.length > 0 && (
-            <>
-              <dt className="text-dim">Your taste</dt>
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className={`${card} p-6`}>
+            <dl className="grid gap-x-8 gap-y-3 text-[15px] leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
+              <dt className="text-faint">Built</dt>
+              <dd>{new Date(t.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</dd>
+              <dt className="text-faint">Data</dt>
               <dd>
-                {names(t.director.slice(0, 8))}
-                {t.director.length > 8 ? ` and ${t.director.length - 8} more` : ""}
+                {t.qloo.calls} {mock ? "mock " : ""}Qloo requests
               </dd>
-            </>
-          )}
-          <dt className="text-dim">Creative direction</dt>
-          <dd className={prose}>{t.direction}</dd>
-        </dl>
-        {t.notes.length > 0 && (
-          <ul className="mt-6 flex list-disc flex-col gap-1 pl-5 text-sm leading-6 text-dim marker:text-edge">
-            {t.notes.map((note, i) => (
-              <li key={i}>{note}</li>
-            ))}
-          </ul>
-        )}
-        {t.mock.qloo && (
-          <p className="mt-4 text-sm text-tape">
-            Mock data: the names are real, but every score, tag, photo and ranking here is synthetic, not Qloo&apos;s.
-          </p>
-        )}
-        {templated.length > 0 && (
-          <p className="mt-2 text-sm text-tape">
-            Mock LLM: a deterministic template did the {templated.join(" and ")} {templated.length === 1 ? "step" : "steps"}, not a language
-            model.
-          </p>
-        )}
+              {t.llm.map((l) => (
+                <Fragment key={l.step}>
+                  <dt className="text-faint">{STEP_NAME[l.step]}</dt>
+                  <dd>{modelName(l.producedBy)}</dd>
+                </Fragment>
+              ))}
+              {t.director.length > 0 && (
+                <>
+                  <dt className="text-faint">Your taste</dt>
+                  <dd>
+                    {names(t.director.slice(0, 8))}
+                    {t.director.length > 8 ? ` and ${t.director.length - 8} more` : ""}
+                  </dd>
+                </>
+              )}
+              <dt className="text-faint">Creative direction</dt>
+              <dd className="font-serif text-[1.15rem] leading-snug">{t.direction}</dd>
+            </dl>
+            {t.notes.length > 0 && (
+              <ul className="mt-6 flex list-disc flex-col gap-1 pl-5 text-[14px] leading-6 text-dim marker:text-edge">
+                {t.notes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
+            )}
+            {t.mock.qloo && (
+              <p className="mt-4 text-[14px] text-tape">
+                Mock data: the names are real, but every score, tag, photo and ranking here is synthetic, not Qloo&apos;s.
+              </p>
+            )}
+            {templated.length > 0 && (
+              <p className="mt-2 text-[14px] text-tape">
+                Mock LLM: a deterministic template did the {templated.join(" and ")} {templated.length === 1 ? "step" : "steps"}, not a
+                language model.
+              </p>
+            )}
+          </div>
+          <div className={`${card} p-6 print:hidden`}>{log}</div>
+        </div>
       </Section>
     </article>
-  );
-}
-
-/** The steps a treatment goes through, in order: what the run log will show. */
-const PIPELINE = [
-  ["Resolve the names", "Your artist and films become Qloo entities. A title that matches several asks which one."],
-  ["Read the audience", "What these fans over-index on, and where it meets your own taste."],
-  ["Plan the direction", "The model picks a direction and the style words to look up."],
-  ["Scout with Qloo", "Reference films, wardrobe brands and real places in your city."],
-  ["Write the treatment", "It cites only films, brands and places Qloo returned."],
-] as const;
-
-/** A featured treatment's cover in miniature: the same projected frame, title and palette as the board. */
-function CoverCard({ cover, onOpen }: { cover: FeaturedCover; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="relative isolate flex aspect-[2.39/1] w-full flex-col justify-end overflow-hidden rounded-[3px] bg-frame p-5 text-left ring-1 ring-line hover:ring-edge sm:p-6"
-    >
-      {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 -z-10 size-full opacity-30 grayscale" />}
-      <span aria-hidden className="absolute inset-0 -z-10 bg-[linear-gradient(100deg,#0a0908_20%,transparent_90%)]" />
-      <span className="text-xs text-paper/70">{cover.line}</span>
-      <span className="type-poster mt-1.5 text-[clamp(1.75rem,2.4vw,2.5rem)] text-balance text-paper">{cover.title}</span>
-      <span aria-hidden className="absolute inset-x-0 bottom-0 flex h-1">
-        {cover.palette.map((hex) => (
-          <span key={hex} className="flex-1" style={{ background: hex }} />
-        ))}
-      </span>
-    </button>
-  );
-}
-
-export function EmptyBoard({
-  examples,
-  covers,
-  onTry,
-}: {
-  examples: Example[];
-  covers: FeaturedCover[];
-  onTry: (example: Example) => void;
-}) {
-  const coverOf = (example: Example) => covers.find((c) => c.slug === example.slug);
-  const featured = examples.filter(coverOf);
-  const plain = examples.filter((e) => !coverOf(e));
-  return (
-    <div className="flex flex-col gap-14">
-      {/* The empty frame, waiting for its first title card. */}
-      <div className="flex min-h-[24rem] flex-col justify-end rounded-[3px] bg-frame p-6 sm:aspect-[2.39/1] sm:min-h-auto sm:p-10">
-        <h2 className="type-poster max-w-[13ch] text-[clamp(3rem,7vw,7rem)] text-balance text-paper">Your voice, their taste.</h2>
-        <p className="mt-5 max-w-[54ch] text-base leading-7 text-pretty text-dim sm:text-lg sm:leading-8">
-          Give itsgiving an artist, a shoot city and a budget. It reads what that audience loves on Qloo, then writes a treatment you can
-          pitch: reference films, wardrobe, real locations, and the evidence behind every pick.
-        </p>
-      </div>
-
-      {featured.length > 0 && (
-        <section aria-labelledby="featured-heading">
-          <h3 id="featured-heading" className="text-[13px] font-medium text-dim">
-            Featured treatments
-          </h3>
-          <p className="mt-1 text-sm leading-6 text-faint">
-            Built ahead of time from live Qloo data, so they open at once. Rework any of them, or write your own brief.
-          </p>
-          <ul className="mt-4 grid gap-4 lg:grid-cols-2">
-            {featured.map((example) => (
-              <li key={example.slug}>
-                <CoverCard cover={coverOf(example)!} onOpen={() => onTry(example)} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section aria-labelledby="how-heading">
-        <h3 id="how-heading" className="text-[13px] font-medium text-dim">
-          How a treatment gets made
-        </h3>
-        <ol className="mt-4 grid gap-x-8 gap-y-6 border-t border-line pt-5 sm:grid-cols-2 xl:grid-cols-5">
-          {PIPELINE.map(([title, text], i) => (
-            <li key={title}>
-              <p aria-hidden className="type-poster text-3xl text-paper/25">
-                {i + 1}
-              </p>
-              <p className="type-head mt-2 text-lg leading-tight text-paper">{title}</p>
-              <p className="mt-1 text-sm leading-6 text-dim">{text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {plain.length > 0 && (
-        <section aria-labelledby="examples-heading">
-          <h3 id="examples-heading" className="text-[13px] font-medium text-dim">
-            {featured.length > 0 ? "Or try a live run" : "Start from an example"}
-          </h3>
-          <ul className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
-            {plain.map((example) => (
-              <li key={example.slug}>
-                <button
-                  type="button"
-                  onClick={() => onTry(example)}
-                  className="flex h-full w-full flex-col items-start gap-1 rounded-lg bg-graphite p-4 text-left ring-1 ring-line hover:ring-edge"
-                >
-                  <span className="type-head text-xl leading-tight text-paper">{example.title}</span>
-                  <span className="text-sm leading-6 text-dim">{example.detail}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
   );
 }
