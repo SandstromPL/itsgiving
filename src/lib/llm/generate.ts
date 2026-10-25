@@ -226,7 +226,11 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
         record("repaired", { message: `First reply: ${firstCheck.problem.slice(0, 240)}` });
         return finish(secondCheck.data, provider);
       }
-      record("invalid", { kind: "invalid_output", message: secondCheck.problem.slice(0, 300) });
+      // Keep both problems: whether the repair got closer or went wrong elsewhere is the first thing to check.
+      record("invalid", {
+        kind: "invalid_output",
+        message: `First reply: ${firstCheck.problem.slice(0, 200)} Repair: ${secondCheck.problem.slice(0, 200)}`,
+      });
     } catch (err) {
       if (!(err instanceof LlmError)) throw err;
       if (err.kind === "aborted") throw err;

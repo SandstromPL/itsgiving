@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Cooldowns, DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
 import { QlooClient, createQlooClient, type FetchLike } from "../qloo";
 import { MemoryCache } from "../qloo/cache";
@@ -316,6 +316,23 @@ describe("streamTreatment", () => {
     const svc2 = service();
     await streamTreatment(quick, svc2, () => {}, new AbortController().signal);
     expect(cachedTreatment(deep, svc2)).toBeUndefined();
+  });
+
+  it("logs what a rejected reply got wrong, so a failed write can be diagnosed", async () => {
+    // Every write cites a ref no tool returned, so the repair fails too and the template takes over.
+    const { provider } = scriptedProvider({
+      treatment: (mock) => ({ ...mock, references: [{ ...(mock.references as object[])[0], ref: "R99" }] }),
+    });
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((line: string) => void logs.push(line));
+    try {
+      await streamTreatment(brief({ artist: "Charli xcx", city: "New York" }), service(liveWith(provider)), () => {}, new AbortController().signal);
+    } finally {
+      spy.mockRestore();
+    }
+    const entry = JSON.parse(logs.find((line) => line.includes('"evt":"treatment"')) ?? "{}");
+    expect(entry).toMatchObject({ outcome: "ok", degraded: true });
+    expect(entry.problems).toEqual([expect.stringMatching(/^write:fake-flash: First reply: .*references.* Repair: .*references/)]);
   });
 
   it("does not cache a degraded live treatment", async () => {

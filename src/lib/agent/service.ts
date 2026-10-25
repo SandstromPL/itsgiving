@@ -87,6 +87,7 @@ export async function streamTreatment(
       // Only pin a full treatment: a template-written one (live models down) or one missing a Qloo
       // section (a failed call) would otherwise be replayed for 24 hours after the cause has passed.
       const degraded = treatment.llm.some((t) => t.degraded);
+      const problems = validationProblems(treatment);
       if (!degraded && treatment.complete) service.cache.set(key, treatment);
       emit({ type: "treatment", treatment, cached: false });
       log({
@@ -98,6 +99,7 @@ export async function streamTreatment(
         qlooCalls: treatment.qloo.calls,
         // Why each step went the way it did: which models failed and how, without the raw upstream text.
         attempts: treatment.llm.map((t) => `${t.step}:${t.attempts.map((a) => `${a.model}=${a.kind ?? a.outcome}`).join(",")}`),
+        ...(problems.length > 0 ? { problems } : {}),
       });
     } else if (outcome.kind === "needs_input") {
       emit({ type: "needs_input", message: outcome.message, items: outcome.items });
@@ -120,6 +122,18 @@ export async function streamTreatment(
     if (!aborted) console.error(err);
   }
   emit({ type: "done" });
+}
+
+/**
+ * What each rejected reply got wrong, in the validator's words, one line per invalid or repaired attempt:
+ * the server log keeps it so a failed write can be diagnosed after the fact.
+ */
+export function validationProblems(treatment: Treatment): string[] {
+  return treatment.llm.flatMap((t) =>
+    t.attempts
+      .filter((a) => (a.outcome === "invalid" || a.outcome === "repaired") && a.message)
+      .map((a) => `${t.step}:${a.model}: ${a.message?.replace(/\s+/g, " ")}`),
+  );
 }
 
 /** Server-sent event framing: one named event per line block. */

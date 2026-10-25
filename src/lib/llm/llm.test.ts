@@ -99,6 +99,7 @@ describe("generateJson", () => {
       ["gemini-3.5-flash-lite", "invalid", "invalid_output"],
       ["openai/gpt-oss-120b", "ok", undefined],
     ]);
+    expect(result.attempts[1].message).toMatch(/^First reply: Not valid JSON[\s\S]* Repair: [\s\S]*title/);
   });
 
   it("degrades to the labelled mock when every live provider fails", async () => {
