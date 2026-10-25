@@ -8,6 +8,7 @@ import {
   type LlmErrorKind,
   type LlmProvider,
   type LlmProviderKind,
+  type Reasoning,
   type SkipReason,
 } from "./types";
 
@@ -30,7 +31,11 @@ export interface GenerateJsonOptions<T> {
   /** Deterministic output the labelled mock returns. Must satisfy `schema`. */
   mock: () => T;
   effort?: Effort;
+  /** DeepSeek's thinking depth for this step; unset leaves thinking off. */
+  reasoning?: Reasoning;
   maxOutputTokens?: number;
+  /** Fixes harmless shape slips in the parsed reply before validation, so they don't cost a repair call. */
+  normalize?: (value: unknown) => unknown;
   signal?: AbortSignal;
   /** Epoch ms by which a result is needed; real providers are skipped once too little time is left. */
   deadline?: number;
@@ -55,6 +60,8 @@ export interface ProducedBy {
   provider: LlmProviderKind;
   model: string;
   mock: boolean;
+  /** How deeply the model thought, when it honours the request (DeepSeek). */
+  reasoning?: Reasoning;
 }
 
 export interface LlmResult<T> {
@@ -102,14 +109,14 @@ export function extractJson(text: string): unknown {
 
 type Checked<T> = { ok: true; data: T } | { ok: false; problem: string };
 
-function check<T>(schema: z.ZodType<T>, text: string): Checked<T> {
+function check<T>(schema: z.ZodType<T>, text: string, normalize?: (value: unknown) => unknown): Checked<T> {
   let value: unknown;
   try {
     value = extractJson(text);
   } catch (err) {
     return { ok: false, problem: `Not valid JSON: ${err instanceof Error ? err.message : String(err)}` };
   }
-  const parsed = schema.safeParse(value);
+  const parsed = schema.safeParse(normalize ? normalize(value) : value);
   return parsed.success ? { ok: true, data: parsed.data } : { ok: false, problem: z.prettifyError(parsed.error) };
 }
 
@@ -173,6 +180,7 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
         schemaName: options.name,
         maxOutputTokens: options.maxOutputTokens ?? 4096,
         effort: options.effort ?? "low",
+        reasoning: options.reasoning,
         signal: AbortSignal.any([signal, timeout]),
         mock: options.mock,
       };
@@ -198,7 +206,7 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
         continue;
       }
       const first = await run(options.prompt, firstTurn.budgetMs);
-      const firstCheck = check(options.schema, first);
+      const firstCheck = check(options.schema, first, options.normalize);
       if (firstCheck.ok) {
         record("ok");
         return finish(firstCheck.data, provider);
@@ -212,7 +220,7 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
         continue;
       }
       const second = await run(repairPrompt(options.prompt, first, firstCheck.problem), repairTurn.budgetMs);
-      const secondCheck = check(options.schema, second);
+      const secondCheck = check(options.schema, second, options.normalize);
       if (secondCheck.ok) {
         // Keep what the first reply got wrong: it shows which provider needs prompt help.
         record("repaired", { message: `First reply: ${firstCheck.problem.slice(0, 240)}` });
@@ -235,7 +243,12 @@ export async function generateJson<T>(options: GenerateJsonOptions<T>, deps: Llm
     const mock = provider.kind === "mock";
     return {
       data,
-      producedBy: { provider: provider.kind, model: provider.model, mock },
+      producedBy: {
+        provider: provider.kind,
+        model: provider.model,
+        mock,
+        ...(provider.thinks && options.reasoning ? { reasoning: options.reasoning } : {}),
+      },
       attempts,
       calls,
       degraded: mock && deps.mode === "live",

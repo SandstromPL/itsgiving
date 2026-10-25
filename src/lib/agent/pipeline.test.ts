@@ -5,11 +5,11 @@ import { MemoryCache } from "../qloo/cache";
 import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
-import { closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
+import { clipSentences, closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { planSchema } from "./plan";
-import { streamTreatment, type TreatmentService } from "./service";
+import { cachedTreatment, streamTreatment, type TreatmentService } from "./service";
 import type { AgentEvent, StepEvent } from "./types";
-import { writeSchema, type WriteContext } from "./write";
+import { refScrubber, writeSchema, type WriteContext } from "./write";
 
 const qloo = () => createQlooClient({ mode: "mock", baseUrl: "https://mock.qloo.invalid" });
 const mockLlm = (): LlmDeps => ({ mode: "mock", providers: [], budget: new DailyBudget(100), timeoutMs: 1000, cooldowns: new Cooldowns() });
@@ -41,17 +41,20 @@ function treatmentOf(outcome: PipelineOutcome) {
 /** A "live" provider that answers through the mock but can be scripted per step. */
 function scriptedProvider(script: Partial<Record<string, (mock: Record<string, unknown>) => unknown>>) {
   const seen: string[] = [];
+  /** schemaName:reasoning for every call, to check how hard each step was asked to think. */
+  const depths: string[] = [];
   const provider: LlmProvider = {
     kind: "gemini",
     model: "fake-flash",
     async complete(call) {
       seen.push(call.schemaName);
+      depths.push(`${call.schemaName}:${call.reasoning ?? "off"}`);
       const mock = call.mock() as Record<string, unknown>;
       const answer = script[call.schemaName]?.(mock) ?? mock;
       return { text: typeof answer === "string" ? answer : JSON.stringify(answer) };
     },
   };
-  return { provider, seen };
+  return { provider, seen, depths };
 }
 
 const liveWith = (...providers: LlmProvider[]): LlmDeps => ({
@@ -182,10 +185,11 @@ describe("runPipeline when Qloo or the models misbehave", () => {
 describe("runPipeline with a live provider", () => {
   it("re-plans once when the plan's style words find no Qloo tags (3 LLM calls total)", async () => {
     const nonsense = (mock: Record<string, unknown>) => ({ ...mock, wardrobe_words: ["qwxzv"], ambience_words: ["zzvqx"] });
-    const { provider, seen } = scriptedProvider({ plan: nonsense });
+    const { provider, seen, depths } = scriptedProvider({ plan: nonsense });
     const { outcome, steps } = await run({ artist: "Frank Ocean", city: "New York" }, liveWith(provider));
     const t = treatmentOf(outcome);
     expect(seen).toEqual(["plan", "replan", "treatment"]);
+    expect(depths).toEqual(["plan:high", "replan:low", "treatment:high"]);
     expect(t.llm.map((l) => l.step)).toEqual(["plan", "replan", "write"]);
     expect(t.writtenBy).toEqual({ provider: "gemini", model: "fake-flash", mock: false });
     expect(t.mock.llm).toBe(false);
@@ -207,6 +211,39 @@ describe("runPipeline with a live provider", () => {
     expect(tries).toBe(2);
     expect(t.llm.find((l) => l.step === "write")?.attempts[0].outcome).toBe("repaired");
     expect(t.references.length).toBeGreaterThan(0);
+  });
+
+  it("thinks deeply by default and briefly for a quick treatment", async () => {
+    const deep = scriptedProvider({});
+    await run({ artist: "Frank Ocean", city: "New York" }, liveWith(deep.provider));
+    expect(deep.depths).toEqual(["plan:high", "treatment:high"]);
+    const quick = scriptedProvider({});
+    await run({ artist: "Frank Ocean", city: "New York", thinking: "quick" }, liveWith(quick.provider));
+    expect(quick.depths).toEqual(["plan:low", "treatment:low"]);
+  });
+
+  it("flattens lighting notes sent as objects instead of spending a repair call", async () => {
+    const { provider, seen } = scriptedProvider({
+      treatment: (mock) => ({ ...mock, lighting: [{ setup: "One tungsten fresnel through muslin", purpose: "warm skin" }, "Practicals on dimmers."] }),
+    });
+    const t = treatmentOf((await run({ artist: "Charli xcx", city: "New York" }, liveWith(provider))).outcome);
+    expect(seen).toEqual(["plan", "treatment"]);
+    expect(t.llm.find((l) => l.step === "write")?.attempts[0].outcome).toBe("ok");
+    expect(t.lighting).toEqual(["One tungsten fresnel through muslin — warm skin", "Practicals on dimmers."]);
+  });
+
+  it("swaps refs the writer leaked into the prose for the names they stand for", async () => {
+    const { provider } = scriptedProvider({
+      treatment: (mock) => ({ ...mock, concept: "Borrow the stillness of R1, then end at L1.", lighting: ["Hide one lamp at L1.", "Keep R02 gels off."] }),
+    });
+    const t = treatmentOf((await run({ artist: "Charli xcx", city: "New York" }, liveWith(provider))).outcome);
+    const first = (picks: { entity: { name: string }; qloo: { rank: number } }[], extras: { name: string }[]) =>
+      picks.find((p) => p.qloo.rank === 1)?.entity.name ?? extras[0].name;
+    const film = first(t.references, t.extras.references);
+    const place = first(t.locations, t.extras.locations);
+    expect(t.concept).toBe(`Borrow the stillness of ${film}, then end at ${place}.`);
+    // Only real refs are swapped: a gel number that merely looks like one is left alone.
+    expect(t.lighting).toEqual([`Hide one lamp at ${place}.`, "Keep R02 gels off."]);
   });
 
   it("stops waiting on an overloaded primary for the write step once the plan step tripped it", async () => {
@@ -264,6 +301,21 @@ describe("streamTreatment", () => {
     await streamTreatment(b, svc, (e) => second.push(e), new AbortController().signal);
     expect(second.map((e) => e.type)).toEqual(["start", "treatment", "done"]);
     expect(second[1]).toMatchObject({ cached: true });
+  });
+
+  it("answers a quick brief with a cached deep treatment of the same brief", async () => {
+    const svc = service();
+    const deep = brief({ artist: "Bon Iver", city: "New York" });
+    await streamTreatment(deep, svc, () => {}, new AbortController().signal);
+    const quick = brief({ artist: "Bon Iver", city: "New York", thinking: "quick" });
+    expect(cachedTreatment(quick, svc)?.brief.thinking).toBe("deep");
+    const events: AgentEvent[] = [];
+    await streamTreatment(quick, svc, (e) => events.push(e), new AbortController().signal);
+    expect(events.map((e) => e.type)).toEqual(["start", "treatment", "done"]);
+    // Not the other way round: a deep brief never settles for a quick treatment.
+    const svc2 = service();
+    await streamTreatment(quick, svc2, () => {}, new AbortController().signal);
+    expect(cachedTreatment(deep, svc2)).toBeUndefined();
   });
 
   it("does not cache a degraded live treatment", async () => {
@@ -341,6 +393,14 @@ describe("brief", () => {
     expect(brief({ artist: " Frank   Ocean ", city: "New  York" })).toMatchObject({ artist: "Frank Ocean", city: "New York" });
   });
 
+  it("thinks deeply unless asked otherwise, and keys quick treatments apart", () => {
+    const modes = { qloo: "mock", llm: "mock" };
+    const deep = brief({ artist: "Frank Ocean", city: "New York" });
+    expect(deep.thinking).toBe("deep");
+    expect(briefKey(deep, modes)).not.toBe(briefKey(brief({ artist: "Frank Ocean", city: "New York", thinking: "quick" }), modes));
+    expect(briefSchema.safeParse({ artist: "Frank Ocean", city: "New York", thinking: "max" }).success).toBe(false);
+  });
+
   it("lowers the price ceiling one notch for cheaper locations", () => {
     expect(priceLevelMax(brief({ artist: "x", city: "y", budget: "premium" }))).toBeUndefined();
     expect(priceLevelMax(brief({ artist: "x", city: "y", budget: "premium", nudges: ["cheaper_locations"] }))).toBe(3);
@@ -396,5 +456,20 @@ describe("guards", () => {
     expect(cache.get("a")).toBe(1);
     now = 200;
     expect(cache.get("a")).toBeUndefined();
+  });
+});
+
+describe("text helpers", () => {
+  it("clips a long direction on a sentence boundary", () => {
+    const direction = `${"A long first sentence about rain and doorways. ".repeat(8)}Then a last one.`;
+    const clipped = clipSentences(direction, 200);
+    expect(clipped.length).toBeLessThanOrEqual(200);
+    expect(clipped.endsWith("doorways.")).toBe(true);
+    expect(clipSentences("Short.", 200)).toBe("Short.");
+  });
+
+  it("swaps whole refs only, longest first", () => {
+    const scrub = refScrubber(new Map([["T1", "Moody"], ["T13", "Quirkily Humorous"], ["L1", "Bar Orai"]]));
+    expect(scrub("The T13 tag, the T1 tag, at L1; not T130 or L10.")).toBe("The Quirkily Humorous tag, the Moody tag, at Bar Orai; not T130 or L10.");
   });
 });

@@ -3,7 +3,7 @@
 import type { LlmTrace, StepEvent, StepStatus } from "@/lib/agent/types";
 import { describeKind } from "@/lib/llm/types";
 import type { Provenance } from "@/lib/qloo/client";
-import { Tape } from "./parts";
+import { Tape, thinkingName } from "./parts";
 
 const STATUS_TEXT: Record<StepStatus, string> = {
   running: "In progress",
@@ -67,6 +67,7 @@ function LlmLine({ trace }: { trace: LlmTrace }) {
     <div className="mt-1.5 flex flex-col gap-1 text-[11px] leading-4">
       <p className="flex flex-wrap items-center gap-2 text-dim">
         {trace.producedBy.mock ? <Tape>Mock LLM</Tape> : <span className="text-paper">{trace.producedBy.model}</span>}
+        {trace.producedBy.reasoning && <span>{thinkingName(trace.producedBy.reasoning)}</span>}
         {trace.attempts.some((a) => a.outcome === "repaired") && <span>fixed its JSON on a retry</span>}
       </p>
       {tried.length > 0 && (

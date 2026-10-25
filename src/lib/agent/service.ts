@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getLlm, LlmError, type LlmDeps } from "../llm";
 import { getQlooClient, type QlooClient } from "../qloo";
 import { briefKey, type Brief } from "./brief";
-import { runPipeline } from "./pipeline";
+import { TIMING, runPipeline } from "./pipeline";
 import type { AgentEvent, Treatment } from "./types";
 import { RateLimiter, TtlCache } from "./guards";
 
@@ -11,8 +11,8 @@ export interface TreatmentService {
   llm: LlmDeps;
   cache: TtlCache<Treatment>;
   limiter: RateLimiter;
-  /** Whole-run budget, under the route's maxDuration. */
-  runTimeoutMs: number;
+  /** Whole-run budget. Unset, the brief's thinking depth sets it (TIMING), under the route's maxDuration. */
+  runTimeoutMs?: number;
 }
 
 let shared: TreatmentService | undefined;
@@ -24,13 +24,19 @@ export function getTreatmentService(): TreatmentService {
     cache: new TtlCache<Treatment>(200, 24 * 60 * 60 * 1000),
     // Cached briefs skip this; it only meters fresh runs.
     limiter: new RateLimiter(6, 60 * 1000),
-    runTimeoutMs: 55_000,
   };
   return shared;
 }
 
 export function cacheKeyFor(brief: Brief, service: TreatmentService): string {
   return briefKey(brief, { qloo: service.qloo.mode, llm: service.llm.mode });
+}
+
+/** The cached treatment for a brief. A quick brief also takes a deep one: better, and just as instant. */
+export function cachedTreatment(brief: Brief, service: TreatmentService): Treatment | undefined {
+  const exact = service.cache.get(cacheKeyFor(brief, service));
+  if (exact || brief.thinking === "deep") return exact;
+  return service.cache.get(cacheKeyFor({ ...brief, thinking: "deep" }, service));
 }
 
 /**
@@ -49,7 +55,7 @@ export async function streamTreatment(
   const log = (fields: Record<string, unknown>) =>
     console.log(JSON.stringify({ evt: "treatment", runId, key, ms: Date.now() - started, ...fields }));
 
-  const cached = service.cache.get(key);
+  const cached = cachedTreatment(brief, service);
   emit({ type: "start", runId, qlooMode: service.qloo.mode, llmMode: service.llm.mode, cached: Boolean(cached) });
   if (cached) {
     emit({ type: "treatment", treatment: cached, cached: true });
@@ -58,7 +64,8 @@ export async function streamTreatment(
     return;
   }
 
-  const timeout = AbortSignal.timeout(service.runTimeoutMs);
+  const runMs = service.runTimeoutMs ?? TIMING[brief.thinking].runMs;
+  const timeout = AbortSignal.timeout(runMs);
   const signal = AbortSignal.any([clientSignal, timeout]);
   // Every await in the pipeline honours `signal`, but racing it as well guarantees the client gets
   // "error" and "done" at the deadline even if some call ignores the abort.
@@ -69,7 +76,7 @@ export async function streamTreatment(
   const pipeline = runPipeline(brief, { qloo: service.qloo, llm: service.llm }, emit, {
     id: key,
     signal,
-    deadline: started + service.runTimeoutMs,
+    deadline: started + runMs,
   });
   pipeline.catch(() => {}); // if the race is lost, its later rejection is expected
   stopped.catch(() => {});

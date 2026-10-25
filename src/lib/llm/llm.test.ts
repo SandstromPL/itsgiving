@@ -48,6 +48,27 @@ const ask = (d: LlmDeps, signal?: AbortSignal) =>
   generateJson({ name: "test", system: "sys", prompt: "brief", schema, mock: () => MOCK, signal }, d);
 
 describe("generateJson", () => {
+  it("normalizes a reply before validating it, so a harmless slip costs no repair call", async () => {
+    const notes = z.strictObject({ notes: z.array(z.string()).min(1) });
+    const reply = scripted("gemini", "m", ['{"notes":[{"setup":"One tungsten fresnel","why":"warm skin"}]}']);
+    const flatten = (v: unknown) => {
+      const value = v as { notes: unknown[] };
+      return { notes: value.notes.map((n) => (typeof n === "object" && n ? Object.values(n).join(", ") : n)) };
+    };
+    const result = await generateJson({ name: "notes", system: "s", prompt: "p", schema: notes, mock: () => ({ notes: ["x"] }), normalize: flatten }, deps([reply.provider]));
+    expect(result.data).toEqual({ notes: ["One tungsten fresnel, warm skin"] });
+    expect(result.calls).toBe(1);
+    expect(result.attempts[0].outcome).toBe("ok");
+  });
+
+  it("credits the thinking depth only to a provider that honours it", async () => {
+    const thinker = { ...scripted("gemini", "thinker", ['{"title":"A","tone":"T1"}']).provider, thinks: true };
+    const plain = scripted("gemini", "plain", ['{"title":"A","tone":"T1"}']).provider;
+    const ask = (p: LlmProvider) => generateJson({ name: "t", system: "s", prompt: "p", schema, mock: () => MOCK, reasoning: "high" }, deps([p]));
+    expect((await ask(thinker)).producedBy).toEqual({ provider: "gemini", model: "thinker", mock: false, reasoning: "high" });
+    expect((await ask(plain)).producedBy).toEqual({ provider: "gemini", model: "plain", mock: false });
+  });
+
   it("returns the first valid output and names the model", async () => {
     const gemini = scripted("gemini", "gemini-3.8-flash", ['{"title":"Neon Monsoon","tone":"T2"}']);
     const result = await ask(deps([gemini.provider]));
@@ -343,6 +364,12 @@ describe("geminiProvider", () => {
     }
   });
 
+  it("ignores the call's reasoning depth (more thinking didn't help the free tier)", async () => {
+    const { fetchImpl, requests } = recordingFetch(200, { candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }] });
+    await geminiProvider({ apiKey: "k", model: "m", fetch: fetchImpl }).complete(call({ reasoning: "high" }));
+    expect(JSON.parse(String(requests[0].init.body)).generationConfig.thinkingConfig).toEqual({ thinkingLevel: "low" });
+  });
+
   it("lets thinkingLevel override the step's effort", async () => {
     const { fetchImpl, requests } = recordingFetch(200, { candidates: [{ content: { parts: [{ text: "{}" }] }, finishReason: "STOP" }] });
     await geminiProvider({ apiKey: "k", model: "m", fetch: fetchImpl, thinkingLevel: "high" }).complete(call());
@@ -380,6 +407,12 @@ describe("groqProvider", () => {
     await expect(groqProvider({ apiKey: "k", model: "m", fetch: miss.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "invalid_output" });
   });
 
+  it("stays at low effort whatever depth the call asks for", async () => {
+    const { fetchImpl, requests } = recordingFetch(200, { choices: [{ message: { content: "{}" }, finish_reason: "stop" }] });
+    await groqProvider({ apiKey: "k", model: "m", fetch: fetchImpl }).complete(call({ reasoning: "high" }));
+    expect(JSON.parse(String(requests[0].init.body)).reasoning_effort).toBe("low");
+  });
+
   it("sends a higher reasoning effort when asked", async () => {
     const { fetchImpl, requests } = recordingFetch(200, { choices: [{ message: { content: "{}" }, finish_reason: "stop" }] });
     await groqProvider({ apiKey: "k", model: "m", fetch: fetchImpl, reasoningEffort: "high" }).complete(call());
@@ -405,6 +438,7 @@ describe("deepseekProvider", () => {
       thinking: { type: "disabled" },
       max_tokens: 2048,
     });
+    expect(body).not.toHaveProperty("reasoning_effort");
     // DeepSeek requires the word "json" and an example of the shape in the prompt.
     expect(body.messages[1].content).toContain("json object");
     expect(body.messages[1].content).toContain('"tone"');
@@ -420,10 +454,14 @@ describe("deepseekProvider", () => {
     await expect(deepseekProvider({ apiKey: "k", model: "m", fetch: empty.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "empty" });
   });
 
-  it("turns thinking on when asked", async () => {
+  it("thinks at the call's depth, with room for the reasoning on top of the answer's tokens", async () => {
     const { fetchImpl, requests } = recordingFetch(200, { choices: [{ message: { content: "{}" }, finish_reason: "stop" }] });
-    await deepseekProvider({ apiKey: "k", model: "m", fetch: fetchImpl, thinking: true }).complete(call());
-    expect(JSON.parse(String(requests[0].init.body)).thinking).toEqual({ type: "enabled" });
+    const provider = deepseekProvider({ apiKey: "k", model: "m", fetch: fetchImpl });
+    await provider.complete(call({ reasoning: "high" }));
+    await provider.complete(call({ reasoning: "low" }));
+    const [deep, quick] = requests.map((r) => JSON.parse(String(r.init.body)));
+    expect(deep).toMatchObject({ thinking: { type: "enabled" }, reasoning_effort: "high", max_tokens: 2048 + 8192 });
+    expect(quick).toMatchObject({ thinking: { type: "enabled" }, reasoning_effort: "low", max_tokens: 2048 + 4096 });
   });
 });
 

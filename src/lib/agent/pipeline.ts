@@ -1,10 +1,10 @@
-import { describeKind, generateJson, type LlmDeps, type LlmResult } from "../llm";
+import { describeKind, generateJson, type LlmDeps, type LlmResult, type Reasoning } from "../llm";
 import type { CompactEntity, CompactTag, Provenance, QlooClient } from "../qloo";
 import { runTool } from "../tools/registry";
 import { VENUE_KIND_VALUES, normalizeName } from "../tools/shared";
 import type { ToolResult } from "../tools/types";
 import { pickKey, priceLevelMax, type Brief } from "./brief";
-import { STEP_LABELS } from "./options";
+import { STEP_LABELS, type Thinking } from "./options";
 import {
   DEEP_CUT_CEILING,
   SYSTEM_PROMPT,
@@ -18,7 +18,7 @@ import {
   type ToneCandidate,
 } from "./plan";
 import type { AgentEvent, Ambiguity, LlmStep, LlmTrace, Pick, QlooEvidence, Role, StepId, StepStatus, Treatment } from "./types";
-import { mockDraft, writePrompt, writeSchema, type Draft, type Ref, type WriteContext } from "./write";
+import { mockDraft, normalizeDraft, refScrubber, writePrompt, writeSchema, type Draft, type Ref, type WriteContext } from "./write";
 
 // The lean agent: code runs every Qloo tool deterministically and the LLM is
 // called at most three times (plan, an optional re-plan, write). Resolve ->
@@ -77,17 +77,33 @@ interface Execution {
 }
 
 const MAX_TONE_CANDIDATES = 16;
-/** Time held back for the write step while planning: DeepSeek writes take 12-23 s, plus room for one fallback. */
-const WRITE_RESERVE_MS = 30_000;
-/** Per-call limits: a plan is a short reply; a DeepSeek write can take over 20 s before it is slow. */
-const PLAN_TIMEOUT_MS = 15_000;
-const WRITE_TIMEOUT_MS = 35_000;
-/** A re-plan means another LLM call, a second round of Qloo calls and the write: skip it when less time is left. */
-const REPLAN_MIN_MS = 30_000;
+
+/**
+ * Time limits per thinking depth, sized from live DeepSeek runs (2026-10-25): deep plans took 4-6 s and
+ * deep writes 22-35 s; quick plans about 3 s and quick writes 12-18 s. Each limit leaves room for one
+ * fallback to a free model, and the run limit sits under the route's maxDuration.
+ */
+export const TIMING: Record<Thinking, { planMs: number; writeMs: number; runMs: number }> = {
+  deep: { planMs: 20_000, writeMs: 60_000, runMs: 120_000 },
+  quick: { planMs: 15_000, writeMs: 45_000, runMs: 90_000 },
+};
+const REASONING: Record<Thinking, Reasoning> = { deep: "high", quick: "low" };
+/** Held back while planning, on top of the write's own limit: the Qloo calls before it and one fallback. */
+const WRITE_MARGIN_MS = 15_000;
+/** How often a model call that is still thinking says so: it keeps the stream and the timeline alive. */
+const TICK_MS = 5_000;
 
 function clip(text: string, max: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
   return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+}
+
+/** Like clip, but ends on a whole sentence when one fits: a direction cut off mid-word reads as broken. */
+export function clipSentences(text: string, max: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const end = clean.lastIndexOf(". ", max - 1);
+  return end > max / 2 ? clean.slice(0, end + 1) : clip(clean, max);
 }
 
 function uniqueBy<T>(items: T[], key: (item: T) => string): T[] {
@@ -126,7 +142,7 @@ export function normalizePlan(plan: PlanDraft, brief: Brief): Plan {
   const nineties = brief.nudges.includes("more_90s");
   return {
     ...plan,
-    direction: clip(plan.direction, 400),
+    direction: clipSentences(plan.direction, 500),
     tone: plan.tone ? [...new Set(plan.tone)].slice(0, 5) : undefined,
     era_from: nineties ? 1990 : null,
     era_to: nineties ? 1999 : null,
@@ -145,6 +161,8 @@ export async function runPipeline(
 ): Promise<PipelineOutcome> {
   const { signal } = options;
   const runDeadline = options.deadline ?? Number.POSITIVE_INFINITY;
+  const timing = TIMING[brief.thinking];
+  const writeReserveMs = timing.writeMs + WRITE_MARGIN_MS;
   const trail: Partial<Record<StepId, Provenance[]>> = {};
   const notes: string[] = [];
   const traces: LlmTrace[] = [];
@@ -174,7 +192,17 @@ export async function runPipeline(
   const llm = async <T>(step: LlmStep, label: string, call: () => Promise<LlmResult<T>>, summarize: (data: T) => string): Promise<T> => {
     const end = begin(step, label);
     llmCalls += 1;
-    const result = await call();
+    const started = Date.now();
+    const tick = setInterval(
+      () => emit({ type: "step", id: step, status: "running", label, summary: `Thinking: ${Math.round((Date.now() - started) / 1000)} s so far.` }),
+      TICK_MS,
+    );
+    let result: LlmResult<T>;
+    try {
+      result = await call();
+    } finally {
+      clearInterval(tick);
+    }
     const trace: LlmTrace = {
       step,
       producedBy: result.producedBy,
@@ -267,13 +295,18 @@ export async function runPipeline(
   const directorIds = director.map((e) => e.id);
   const entityNames = new Map([...subjects, ...director].map((e) => [e.id, e.name]));
 
-  // 2. Read the audience, and where it meets the director's own taste.
+  // 2. Read the audience, and where it meets the director's own taste. The two don't depend on each other.
   const endAudience = begin("audience", STEP_LABELS.audience);
-  const audience = await tool<{ taste_tags: CompactTag[]; demographics: { entity_id: string; leans: string }[] }>(
-    "audience",
-    "read_audience",
-    { entity_ids: subjectIds, take: 15 },
-  );
+  const endOverlap = director.length > 0 ? begin("overlap", STEP_LABELS.overlap) : undefined;
+  const [audience, shared] = await Promise.all([
+    tool<{ taste_tags: CompactTag[]; demographics: { entity_id: string; leans: string }[] }>("audience", "read_audience", {
+      entity_ids: subjectIds,
+      take: 15,
+    }),
+    endOverlap
+      ? tool<{ shared_traits: CompactTag[] }>("overlap", "taste_overlap", { group_a_ids: directorIds, group_b_ids: subjectIds, take: 10 })
+      : undefined,
+  ]);
   const tasteTags = audience.data?.taste_tags ?? [];
   const leans = (audience.data?.demographics ?? []).map((d) =>
     subjects.length > 1 ? `${entityNames.get(d.entity_id) ?? "audience"}: ${d.leans}` : d.leans,
@@ -283,15 +316,9 @@ export async function runPipeline(
   endAudience(audience.status === "ok" ? "done" : "warning", audience.summary);
 
   let overlap: CompactTag[] = [];
-  if (director.length > 0) {
-    const endOverlap = begin("overlap", STEP_LABELS.overlap);
-    const result = await tool<{ shared_traits: CompactTag[] }>("overlap", "taste_overlap", {
-      group_a_ids: directorIds,
-      group_b_ids: subjectIds,
-      take: 10,
-    });
-    overlap = result.data?.shared_traits ?? [];
-    endOverlap(result.status === "ok" ? "done" : "warning", result.summary);
+  if (endOverlap && shared) {
+    overlap = shared.data?.shared_traits ?? [];
+    endOverlap(shared.status === "ok" ? "done" : "warning", shared.summary);
   } else {
     emit({ type: "step", id: "overlap", status: "skipped", label: STEP_LABELS.overlap, summary: "Add your own favourite films to find the overlap." });
   }
@@ -332,11 +359,13 @@ export async function runPipeline(
             schema: planSchema(toneRefs),
             mock: () => mockPlan(ctx),
             effort: "low",
+            // A re-plan only swaps style words that found no tags, so it needn't think hard.
+            reasoning: step === "plan" ? REASONING[brief.thinking] : "low",
             maxOutputTokens: 2048,
             signal,
-            deadline: runDeadline - WRITE_RESERVE_MS,
+            deadline: runDeadline - writeReserveMs,
             minCallMs: 4_000,
-            timeoutMs: PLAN_TIMEOUT_MS,
+            timeoutMs: timing.planMs,
           },
           deps.llm,
         ),
@@ -405,7 +434,37 @@ export async function runPipeline(
   };
 
   const execute = async (current: Plan): Promise<Execution> => {
+    const ceiling = DEEP_CUT_CEILING[current.deep_cuts];
+    const hasEra = current.era_from !== null || current.era_to !== null;
+    const price = priceLevelMax(brief);
+
     const endTags = begin("tags", STEP_LABELS.tags);
+    // Reference films use the entity signal only, so they needn't wait for the tag search.
+    emit({ type: "step", id: "references", status: "running", label: STEP_LABELS.references });
+    const pendingReferences = relax(
+      "references",
+      "reference_films",
+      "references",
+      ladder(
+        // Entity signal only: on the live host, tone tags as signal.interests.tags made this query run
+        // 22-60 s and end in a Qloo 504. The tone tags still shape the writing.
+        {
+          signal_entity_ids: subjectIds,
+          kind: "movie",
+          from_year: current.era_from ?? undefined,
+          to_year: current.era_to ?? undefined,
+          max_popularity: ceiling,
+          exclude_ids: [...subjectIds, ...directorIds].slice(0, 50),
+          take: 10,
+        },
+        [
+          ["dropped the era", { from_year: undefined, to_year: undefined }, hasEra],
+          ["lifted the deep-cut ceiling", { max_popularity: undefined }, ceiling !== undefined],
+        ],
+      ),
+    );
+    // Awaited below; this only keeps a failure while the tags are pending from going unhandled.
+    pendingReferences.catch(() => {});
     const [wardrobe, ambience] = await Promise.all([
       // Brand genre tags are hierarchical (urn:tag:genre:brand:fashion:...), so filter by what they apply to, not by type.
       findTags(current.wardrobe_words, { applies_to: "brand" }),
@@ -420,12 +479,7 @@ export async function runPipeline(
         : "None of the style words matched a Qloo tag.",
     );
 
-    const ceiling = DEEP_CUT_CEILING[current.deep_cuts];
-    const hasEra = current.era_from !== null || current.era_to !== null;
-    const price = priceLevelMax(brief);
-
     for (const [id, label] of [
-      ["references", STEP_LABELS.references],
       ["wardrobe", STEP_LABELS.wardrobe],
       ["locations", STEP_LABELS.locations],
     ] as const) {
@@ -433,28 +487,7 @@ export async function runPipeline(
     }
 
     const [references, brands, places] = await Promise.all([
-      relax(
-        "references",
-        "reference_films",
-        "references",
-        ladder(
-          // Entity signal only: on the live host, tone tags as signal.interests.tags made this query run
-          // 22-60 s and end in a Qloo 504. The tone tags still shape the writing.
-          {
-            signal_entity_ids: subjectIds,
-            kind: "movie",
-            from_year: current.era_from ?? undefined,
-            to_year: current.era_to ?? undefined,
-            max_popularity: ceiling,
-            exclude_ids: [...subjectIds, ...directorIds].slice(0, 50),
-            take: 10,
-          },
-          [
-            ["dropped the era", { from_year: undefined, to_year: undefined }, hasEra],
-            ["lifted the deep-cut ceiling", { max_popularity: undefined }, ceiling !== undefined],
-          ],
-        ),
-      ),
+      pendingReferences,
       relax(
         "wardrobe",
         "styling_brands",
@@ -519,7 +552,7 @@ export async function runPipeline(
     skipReplan("The first plan found tags for every style.");
   } else if (run.tagSearchFailed) {
     skipReplan("Qloo's tag search failed, so new words wouldn't help; continuing with what came back.");
-  } else if (runDeadline - Date.now() < REPLAN_MIN_MS) {
+  } else if (runDeadline - Date.now() < timing.planMs + writeReserveMs) {
     skipReplan("Not enough time left for another round; continuing with what came back.");
   } else {
     const missed = [...(deadWardrobe ? plan.wardrobe_words : []), ...(deadAmbience ? plan.ambience_words : [])];
@@ -569,18 +602,27 @@ export async function runPipeline(
           schema: writeSchema(writeContext),
           mock: () => mockDraft(writeContext),
           effort: "medium",
+          reasoning: REASONING[brief.thinking],
           maxOutputTokens: 8192,
+          normalize: normalizeDraft,
           signal,
           deadline: runDeadline - 1_000,
           minCallMs: 8_000,
-          timeoutMs: WRITE_TIMEOUT_MS,
+          timeoutMs: timing.writeMs,
         },
         deps.llm,
       ),
     (d) => `"${clip(d.title, 60)}": ${clip(d.logline, 160)}`,
   );
+  const scrub = refScrubber(
+    new Map([
+      ...candidates.map((c) => [c.ref, c.tag.name] as const),
+      ...[...writeContext.references, ...writeContext.brands, ...writeContext.places].map((r) => [r.ref, r.item.name] as const),
+    ]),
+  );
 
   const treatment = assemble({
+    scrub,
     id: options.id,
     brief,
     draft,
@@ -604,6 +646,8 @@ export async function runPipeline(
 }
 
 interface AssembleInput {
+  /** Swaps refs the model leaked into prose for the names they stand for. */
+  scrub: (text: string) => string;
   id: string;
   brief: Brief;
   draft: Draft;
@@ -625,6 +669,7 @@ interface AssembleInput {
 /** Map the draft's refs back to Qloo items and attach each item's evidence. */
 function assemble(input: AssembleInput): Treatment {
   const { draft, writeContext: ctx, run } = input;
+  const prose = (text: string, max: number) => clip(input.scrub(text), max);
   const evidence = (list: CompactEntity[], tool: string, entity: CompactEntity): QlooEvidence => ({
     tool,
     rank: list.indexOf(entity) + 1,
@@ -647,7 +692,7 @@ function assemble(input: AssembleInput): Treatment {
     uniqueBy(picks ?? [], (p) => p.ref).slice(0, max).flatMap((pick) => {
       const entity = refs.find((r) => r.ref === pick.ref)?.item;
       if (!entity) return [];
-      const notes = Object.fromEntries(keys.map((k) => [k, clip(pick[k], 400)])) as Record<K, string>;
+      const notes = Object.fromEntries(keys.map((k) => [k, prose(pick[k], 400)])) as Record<K, string>;
       return [{ entity, qloo: evidence(list, tool, entity), notes }];
     });
 
@@ -665,19 +710,19 @@ function assemble(input: AssembleInput): Treatment {
     id: input.id,
     createdAt: (input.deps.now?.() ?? new Date()).toISOString(),
     brief: input.brief,
-    title: clip(draft.title, 80),
-    logline: clip(draft.logline, 300),
-    concept: clip(draft.concept, 1500),
-    direction: input.plan.direction,
+    title: prose(draft.title, 80),
+    logline: prose(draft.logline, 300),
+    concept: prose(draft.concept, 1500),
+    direction: input.scrub(input.plan.direction),
     tone: uniqueBy(draft.tone ?? [], (t) => t.ref).slice(0, 5).flatMap((t) => {
       const candidate = ctx.tone.find((c) => c.ref === t.ref);
-      return candidate ? [{ tag: candidate.tag, source: candidate.source, note: clip(t.note, 300) }] : [];
+      return candidate ? [{ tag: candidate.tag, source: candidate.source, note: prose(t.note, 300) }] : [];
     }),
     beats: draft.beats.slice(0, 6).map((beat) => {
       const ref = beat.reference ? ctx.references.find((r) => r.ref === beat.reference)?.item : undefined;
       return {
-        title: clip(beat.title, 60),
-        description: clip(beat.description, 500),
+        title: prose(beat.title, 60),
+        description: prose(beat.description, 500),
         reference: ref ? { id: ref.id, name: ref.name } : null,
       };
     }),
@@ -688,8 +733,8 @@ function assemble(input: AssembleInput): Treatment {
       draft.palette.map((c) => ({ name: clip(c.name, 30), hex: c.hex.toUpperCase() })),
       (c) => c.hex,
     ).slice(0, 6),
-    lighting: draft.lighting.slice(0, 4).map((l) => clip(l, 300)),
-    shots: draft.shots.slice(0, 6).map((s) => clip(s, 300)),
+    lighting: draft.lighting.slice(0, 4).map((l) => prose(l, 300)),
+    shots: draft.shots.slice(0, 6).map((s) => prose(s, 300)),
     extras: {
       references: uncited(run.references.items),
       brands: uncited(run.brands.items),

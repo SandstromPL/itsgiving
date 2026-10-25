@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, type FormEvent } from "react";
-import { BUDGETS, FORMATS, type Budget, type Format } from "@/lib/agent/options";
+import { BUDGETS, FORMATS, THINKING, type Budget, type Format, type Thinking } from "@/lib/agent/options";
 
 export interface FormState {
   format: Format;
@@ -10,6 +10,7 @@ export interface FormState {
   city: string;
   budget: Budget;
   directorFilms: string;
+  thinking: Thinking;
 }
 
 export const EMPTY_FORM: FormState = {
@@ -19,6 +20,7 @@ export const EMPTY_FORM: FormState = {
   city: "",
   budget: "indie",
   directorFilms: "",
+  thinking: "deep",
 };
 
 /** The server's limits (src/lib/agent/brief.ts), checked here so nothing is dropped or rejected silently. */
@@ -218,6 +220,32 @@ export function BriefForm({
         </p>
         {message("directorFilms")}
       </div>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 text-xs text-dim">Thinking</legend>
+        <div className="grid grid-cols-2 gap-1 rounded-md bg-graphite p-1 ring-1 ring-edge">
+          {(Object.keys(THINKING) as Thinking[]).map((thinking) => (
+            <label
+              key={thinking}
+              className="cursor-pointer rounded px-3 py-1.5 text-center text-sm text-dim has-checked:bg-paper has-checked:text-ink has-focus-visible:outline-2 has-focus-visible:outline-tungsten"
+            >
+              <input
+                type="radio"
+                name="thinking"
+                value={thinking}
+                checked={form.thinking === thinking}
+                onChange={() => set("thinking", thinking)}
+                aria-describedby={`${ids}-thinking-hint`}
+                className="sr-only"
+              />
+              {THINKING[thinking].label}
+            </label>
+          ))}
+        </div>
+        <p id={`${ids}-thinking-hint`} className="text-xs text-faint">
+          {THINKING[form.thinking].hint}
+        </p>
+      </fieldset>
 
       <div className="flex gap-2">
         {/* aria-disabled, not disabled: the button keeps focus while the run it started is going. */}

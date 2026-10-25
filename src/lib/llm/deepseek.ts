@@ -1,15 +1,16 @@
 import type { FetchLike } from "../qloo";
 import { BASE_KEYWORDS, sanitizeSchema } from "./schema";
-import { LlmError, classifyHttpStatus, retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
+import { LlmError, classifyHttpStatus, retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider, type Reasoning } from "./types";
 
 // DeepSeek's OpenAI-compatible chat completions (paid key). Shapes checked
 // against https://api-docs.deepseek.com (models, JSON Output and Thinking
 // Mode guides) on 2026-10-25: model "deepseek-flash" (DeepSeek-V4.1-Flash),
 // response_format {type: "json_object"} only (no json_schema), and the prompt
 // must say "json" and show the expected shape, so the JSON Schema goes into
-// the prompt and zod still validates the reply. Thinking is on by default;
-// "thinking": {"type": "disabled"} keeps calls fast. JSON mode can
-// occasionally return empty content, which falls through like any failure.
+// the prompt and zod still validates the reply. Thinking is on upstream by
+// default; a step turns it on with a depth (reasoning_effort low or high) or
+// leaves it off. JSON mode can occasionally return empty content, which falls
+// through like any failure.
 
 export const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 
@@ -24,14 +25,10 @@ export function schemaInPrompt(prompt: string, schema: Record<string, unknown>):
   return `${prompt}\n\nReply with one json object that validates against this JSON Schema:\n${JSON.stringify(sanitizeSchema(schema, BASE_KEYWORDS))}`;
 }
 
-export function deepseekProvider(options: {
-  apiKey: string;
-  model: string;
-  fetch?: FetchLike;
-  baseUrl?: string;
-  /** Off by default: thinking makes every call slower. */
-  thinking?: boolean;
-}): LlmProvider {
+/** Reasoning tokens count against max_tokens, so thinking gets this much room on top of the answer's budget. */
+const REASONING_TOKENS: Record<Reasoning, number> = { low: 4_096, high: 8_192 };
+
+export function deepseekProvider(options: { apiKey: string; model: string; fetch?: FetchLike; baseUrl?: string }): LlmProvider {
   const { apiKey, model } = options;
   const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
     new LlmError({ kind, message: `DeepSeek ${model}: ${message}`, provider: "deepseek", model, status, retryAfterMs });
@@ -39,7 +36,9 @@ export function deepseekProvider(options: {
   return {
     kind: "deepseek",
     model,
+    thinks: true,
     async complete(call: LlmCall): Promise<LlmCompletion> {
+      const { reasoning } = call;
       const body = {
         model,
         messages: [
@@ -47,8 +46,9 @@ export function deepseekProvider(options: {
           { role: "user", content: schemaInPrompt(call.prompt, call.schema) },
         ],
         response_format: { type: "json_object" },
-        thinking: { type: options.thinking ? "enabled" : "disabled" },
-        max_tokens: call.maxOutputTokens,
+        thinking: { type: reasoning ? "enabled" : "disabled" },
+        ...(reasoning ? { reasoning_effort: reasoning } : {}),
+        max_tokens: call.maxOutputTokens + (reasoning ? REASONING_TOKENS[reasoning] : 0),
       };
       const response = await (options.fetch ?? fetch)(`${options.baseUrl ?? DEEPSEEK_BASE_URL}/chat/completions`, {
         method: "POST",

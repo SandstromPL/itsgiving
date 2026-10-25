@@ -32,12 +32,13 @@ free-tier limits.
    in brackets, like "Rockstar (2011)", settles it without asking, and so does one match being far better known than
    the rest (the treatment notes which one was used).
 3. **Read the audience** (`read_audience`) and, when the director lists films, **compare** their taste with the
-   audience (`taste_overlap`).
+   audience (`taste_overlap`). The two calls run at once.
 4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, an era, how deep the cuts go, and a
    few plain style words for wardrobe and ambience. Tags are shown to it as short refs (`T1`, `T2`, ...) and the output
    schema only accepts those refs, so it cannot invent a tag ID.
 5. **Execute in code.** The style words go through `find_tags` (preferring tags named like the word, never
-   adult-themed ones). Then three Qloo queries run in parallel:
+   adult-themed ones). Three Qloo queries run in parallel; reference films start straight away, since they don't
+   use the tags:
    - `reference_films`: the artist's audience, with a popularity ceiling for deep cuts and an era only when the
      director asks for "more 90s".
    - `styling_brands`: fashion brands only (`urn:tag:genre:brand:fashion`), ranked by the wardrobe style tags.
@@ -50,7 +51,8 @@ free-tier limits.
 7. **Write (last LLM call).** The model writes the treatment as JSON, citing films, brands and places only by ref
    (`R1`, `B1`, `L1`); refs not returned by a tool fail validation. Code maps refs back to Qloo items and attaches each
    item's evidence (rank within its call, affinity, popularity, the input entities that drove it) and the model that
-   wrote it.
+   wrote it. A ref that slips into the prose is swapped for its name, and lighting or shot notes sent as objects are
+   flattened, so neither costs a repair call.
 
 Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
 
@@ -71,14 +73,23 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - Every output is validated with zod. Invalid output gets one repair retry on the same model, with the validation
   problems in the prompt.
 - The chain falls through on 429, 5xx, timeouts and invalid output: **DeepSeek `deepseek-flash`** when its (paid)
-  key is set (JSON mode with the schema in the prompt, thinking off), then the free tiers: **Gemini
+  key is set (JSON mode with the schema in the prompt, thinking at the brief's depth), then the free tiers: **Gemini
   `gemini-3.5-flash-lite`** (Google AI Studio, thinking level low for planning and medium for writing), **Groq
   `openai/gpt-oss-120b`** (strict JSON schema, low reasoning effort, compact prompts for its 8K tokens/minute limit),
   and **`gemini-3.8-flash`** as a last resort.
 - The order comes from a head-to-head on live Qloo data (same briefs, same Qloo results). DeepSeek wrote clearly
   better treatments: "what to borrow" notes like "observational framing, long deadpan holds" where Flash-Lite wrote
-  "framing", outfits down to fabric and fit, budget-aware lighting, shots with lenses. It costs about $0.002 a
-  treatment and takes 17-30 s against 12-13 s. 3.8 Flash returned 503s or took over 100 s per call.
+  "framing", outfits down to fabric and fit, budget-aware lighting, shots with lenses. 3.8 Flash returned 503s or
+  took over 100 s per call. DeepSeek V4 Pro lost to Flash on quality, speed and cost.
+- **Thinking depth.** Each brief chooses how long DeepSeek thinks: **Deep** (the default, high reasoning effort) or
+  **Quick** (low). Two blind judges scored deep treatments 8.5 out of 10, quick ones 8.1 and thinking-off ones 5.8,
+  judged side by side on live Qloo. A deep treatment takes about 35-45 s, a quick one about 25-35 s, and either costs
+  under a cent. The free fallbacks ignore the setting: more thinking made them slower, not better. A quick brief is
+  answered from a cached deep treatment of the same brief when there is one.
+- **Where the time goes.** Profiled live, a deep treatment spends about 31 of its 36-42 s in DeepSeek (plan 4-5 s,
+  write 26-31 s) and about 6 s in Qloo. The time limits are Mise's own (`TIMING` in `src/lib/agent/pipeline.ts`):
+  deep allows 20 s to plan, 60 s to write and 120 s in all, quick 15, 45 and 90 s, each leaving room for one fallback.
+  While a model thinks, the timeline counts the seconds, which also keeps the stream alive.
 - Array limits ("4-6 colours") are stated to the model but applied in code, so one extra item never costs a repair.
 - A provider that times out, is overloaded or is rate limited rests for one to two minutes (longer if it sends a retry
   delay), so the next step goes straight to one that works. Every call is also bounded by the time left in the run,
@@ -139,17 +150,17 @@ All server-side only.
 | `GEMINI_API_KEY` | Google AI Studio key (free tier) |
 | `GROQ_API_KEY` | Groq key (free tier), the backup provider |
 | `LLM_MODE` | `live` or `mock`; defaults to `live` when either LLM key is set |
-| `DEEPSEEK_API_KEY` | Optional, paid: when set, DeepSeek plans and writes first (about $0.002 a treatment) and the free tiers become fallbacks |
+| `DEEPSEEK_API_KEY` | Optional, paid: when set, DeepSeek plans and writes first (under a cent a treatment) and the free tiers become fallbacks |
 | `DEEPSEEK_MODEL` / `GEMINI_MODEL` / `GROQ_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `deepseek-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `gemini-3.8-flash`); `none` drops a Gemini one |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
-| `LLM_TIMEOUT_MS` | Per-call timeout before falling through (default 20000) |
+| `LLM_TIMEOUT_MS` | Per-call timeout for calls that don't set their own (default 20000); treatment steps use `TIMING` |
 | `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
 
 ### API routes
 
 - `POST /api/treatment`: takes a brief, streams progress as server-sent events (`start`, `step`, `needs_input`,
   `treatment`, `error`, `done`). Guarded by a per-IP rate limit (6 fresh treatments a minute), a daily LLM-call cap, a
-  55-second run budget and a 24-hour cache keyed by the normalized brief.
+  run budget (120 s deep, 90 s quick, under a 150 s `maxDuration`) and a 24-hour cache keyed by the normalized brief.
 - `GET /api/health`: makes a real Qloo call and reports mode, host and provenance, plus the LLM chain (never called).
 - `GET /api/tools`: tool definitions (JSON Schema) with an example input each.
 - `POST /api/tools/{name}`: runs a tool (development only unless `MISE_TOOL_PLAYGROUND=1`).

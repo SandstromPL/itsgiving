@@ -3,6 +3,12 @@ export type LlmProviderKind = "gemini" | "groq" | "deepseek" | "mock";
 /** Maps to Gemini's thinkingLevel. Groq always reasons at low effort to fit its 8K tokens/min free tier. */
 export type Effort = "low" | "medium";
 
+/**
+ * How deeply DeepSeek thinks before answering. The free fallbacks ignore it: more thinking made them
+ * slower without making them better (benchmark, 2026-10-25).
+ */
+export type Reasoning = "low" | "high";
+
 /** One request to one model, already provider-neutral. */
 export interface LlmCall {
   system: string;
@@ -10,8 +16,11 @@ export interface LlmCall {
   /** JSON Schema of the expected output; each provider trims it to the keywords it supports. */
   schema: Record<string, unknown>;
   schemaName: string;
+  /** Tokens for the answer itself; a provider that counts thinking against its limit adds room for it. */
   maxOutputTokens: number;
   effort: Effort;
+  /** Unset means no thinking. */
+  reasoning?: Reasoning;
   signal: AbortSignal;
   /** Deterministic output for the mock provider. */
   mock: () => unknown;
@@ -31,6 +40,8 @@ export interface LlmCompletion {
 export interface LlmProvider {
   kind: LlmProviderKind;
   model: string;
+  /** Honours LlmCall.reasoning, so a result can say how deeply it was thought through. */
+  thinks?: boolean;
   /** Returns the raw text the model produced; throws LlmError on any failure. */
   complete(call: LlmCall): Promise<LlmCompletion>;
 }

@@ -23,7 +23,10 @@ interface RunInput {
   nudges: Nudge[];
 }
 
-/** The server gives up at 55 s and streams events throughout; this much silence means the connection is gone. */
+/**
+ * The server reports progress at least every few seconds, even while a model thinks (TIMING and TICK_MS
+ * in pipeline.ts), so this much silence means the connection is gone.
+ */
 const STALL_MS = 75_000;
 
 // Names that exist in Qloo and in the mock catalog, so every example works in both modes. Titles
@@ -59,6 +62,7 @@ function toBrief({ form, picks, nudges }: RunInput): BriefInput {
     director_films: splitTitles(form.directorFilms),
     picks,
     nudges,
+    thinking: form.thinking,
   };
 }
 

@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { briefSchema, normalizeBrief } from "@/lib/agent/brief";
 import { clientIp } from "@/lib/agent/guards";
-import { cacheKeyFor, getTreatmentService, sseFrame, streamTreatment } from "@/lib/agent/service";
+import { cachedTreatment, getTreatmentService, sseFrame, streamTreatment } from "@/lib/agent/service";
 
-// Plan + write LLM calls and ~15 Qloo requests; the pipeline itself gives up at 55 s.
-export const maxDuration = 60;
+// Plan + write LLM calls and ~15 Qloo requests. A deep-thinking run gives up at 120 s (TIMING in
+// pipeline.ts), so this leaves room to close the stream; Vercel allows up to 300 s with Fluid compute.
+export const maxDuration = 150;
 
 const MAX_BODY_BYTES = 8 * 1024;
 
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   const brief = normalizeBrief(parsed.data);
 
   const service = getTreatmentService();
-  if (!service.cache.get(cacheKeyFor(brief, service))) {
+  if (!cachedTreatment(brief, service)) {
     const limit = service.limiter.check(clientIp(request.headers));
     if (!limit.ok) {
       const seconds = Math.ceil(limit.retryAfterMs / 1000);

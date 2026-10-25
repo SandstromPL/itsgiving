@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { normalizeName } from "../tools/shared";
-import { BUDGETS, FORMATS, NUDGES, type Budget, type Format } from "./options";
+import { BUDGETS, FORMATS, NUDGES, THINKING, type Budget, type Format, type Thinking } from "./options";
 
-export { BUDGETS, NUDGES, type Budget, type Nudge } from "./options";
+export { BUDGETS, NUDGES, THINKING, type Budget, type Nudge, type Thinking } from "./options";
 
 // No control characters: names go into LLM prompts, and a line break could forge a prompt section.
 const noControl = (value: string) => !/\p{Cc}/u.test(value);
@@ -24,6 +24,7 @@ export const briefSchema = z
       .default({})
       .refine((picks) => Object.keys(picks).length <= 20, "Too many picks."),
     nudges: z.array(z.enum(NUDGES)).max(NUDGES.length).default([]),
+    thinking: z.enum(Object.keys(THINKING) as [Thinking, ...Thinking[]]).default("deep"),
   })
   .refine((brief) => Boolean(brief.artist?.trim()) || brief.touchstones.length > 0, {
     message: "Give an artist or at least one touchstone film.",
@@ -75,6 +76,7 @@ export function briefKey(brief: Brief, modes: { qloo: string; llm: string }): st
     director: brief.director_films.map(normalizeName).sort(),
     picks: Object.entries(brief.picks).sort(([a], [b]) => a.localeCompare(b)),
     nudges: [...brief.nudges].sort(),
+    thinking: brief.thinking,
   };
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex").slice(0, 24);
 }

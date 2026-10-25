@@ -70,7 +70,14 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
     ...(references.length > 0
       ? {
           references: z
-            .array(z.strictObject({ ref: refEnum(references), why: text, borrow: text.describe("What to borrow: palette, framing, movement or texture.") }))
+            .array(
+              z.strictObject({
+                ref: refEnum(references),
+                why: text,
+                // Not a list of options: Gemini read "palette, framing, movement or texture" as a menu and answered one word.
+                borrow: text.describe("One sentence: the specific look or technique to take from this film, and where to use it."),
+              }),
+            )
             .min(Math.min(2, references.length))
             .describe("2-6 film references."),
         }
@@ -85,9 +92,37 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
       .array(z.strictObject({ name: text, hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/).describe("#RRGGBB") }))
       .min(3)
       .describe("4-6 colours."),
-    lighting: z.array(text).min(2).describe("2-4 lighting notes."),
-    shots: z.array(text).min(3).describe("3-6 shot notes."),
+    lighting: z.array(text).min(2).describe("2-4 lighting notes, each a plain sentence."),
+    shots: z.array(text).min(3).describe("3-6 shot notes, each a plain sentence."),
   }) as unknown as z.ZodType<Draft>;
+}
+
+/** Join an object's text values: what a note sent as {"setup": ..., "purpose": ...} meant to say. */
+function flattenNote(note: unknown): unknown {
+  if (!note || typeof note !== "object" || Array.isArray(note)) return note;
+  const parts = Object.values(note).filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+  return parts.length > 0 ? parts.join(" — ") : note;
+}
+
+/**
+ * DeepSeek's JSON mode sometimes sends lighting or shot notes as objects. Flattening them before
+ * validation keeps what it wrote and saves a whole repair call (15-35 s with thinking on).
+ */
+export function normalizeDraft(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const draft = { ...(value as Record<string, unknown>) };
+  for (const key of ["lighting", "shots"]) {
+    if (Array.isArray(draft[key])) draft[key] = draft[key].map(flattenNote);
+  }
+  return draft;
+}
+
+/** Models sometimes leak refs into prose ("the T13 tag", "at L1"); this swaps each for the name it stands for. */
+export function refScrubber(names: Map<string, string>): (text: string) => string {
+  if (names.size === 0) return (text) => text;
+  // Longest first, so T13 is replaced whole rather than as T1 followed by a 3.
+  const pattern = new RegExp(`\\b(${[...names.keys()].sort((a, b) => b.length - a.length).join("|")})\\b`, "g");
+  return (text) => text.replace(pattern, (ref) => names.get(ref) ?? ref);
 }
 
 function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): string {
@@ -122,9 +157,11 @@ export function writePrompt(ctx: WriteContext): string {
   parts.push(
     "",
     "TASK",
-    "Write the treatment. Cite films, brands and places only by ref. For each reference say why it fits this audience",
-    "and what to borrow. Wardrobe looks name garments, fabrics and colours. Location scenes say what happens there.",
-    "Palette: 4-6 named colours. Lighting and shot notes must be concrete and doable on this budget.",
+    "Write the treatment. Cite films, brands and places by ref only in the ref fields; in the text, call them by name",
+    "and never write refs (T1, R2, B1, L3) or price levels. For each reference say why it fits this audience and, in one",
+    "sentence, the specific look or technique to borrow. Wardrobe looks name garments, fabrics and colours. Location",
+    "scenes say what happens there and stay true to the place's Qloo description. Palette: 4-6 named colours. Lighting",
+    "and shot notes are plain sentences, concrete and doable on this budget.",
   );
   return parts.join("\n");
 }

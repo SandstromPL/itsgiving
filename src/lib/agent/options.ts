@@ -23,6 +23,16 @@ export type Budget = keyof typeof BUDGETS;
 export const FORMATS = { music_video: "Music video", short_film: "Short film" } as const;
 export type Format = keyof typeof FORMATS;
 
+/**
+ * How long DeepSeek thinks. Deep is the default: blind judges rated its treatments clearly higher.
+ * Quick thinks less and saves about 10 s (benchmark, 2026-10-25).
+ */
+export const THINKING = {
+  deep: { label: "Deep", hint: "The strongest treatment, in about 40 s." },
+  quick: { label: "Quick", hint: "A little less considered, in about 30 s." },
+} as const;
+export type Thinking = keyof typeof THINKING;
+
 function joinNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }

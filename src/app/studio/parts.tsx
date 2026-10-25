@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from "react";
 import type { QlooEvidence, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { ProducedBy } from "@/lib/llm/generate";
+import type { Reasoning } from "@/lib/llm/types";
 import type { QlooMode } from "@/lib/qloo/client";
 
 /** Pink "camera tape" label for anything mocked. */
@@ -15,8 +16,14 @@ export function Tape({ children, title }: { children: ReactNode; title?: string 
   );
 }
 
+/** The pipeline asks DeepSeek for high reasoning on deep treatments and low on quick ones. */
+export function thinkingName(reasoning: Reasoning): string {
+  return reasoning === "high" ? "deep thinking" : "quick thinking";
+}
+
 export function modelName(by: ProducedBy): string {
-  return by.mock ? "Mock LLM" : by.model;
+  if (by.mock) return "Mock LLM";
+  return by.reasoning ? `${by.model} with ${thinkingName(by.reasoning)}` : by.model;
 }
 
 /**
@@ -42,6 +49,7 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
         ) : (
           <span className="rounded-sm px-2 py-0.5 text-dim ring-1 ring-line">
             Written by <span className="text-paper">{writer.model}</span>
+            {writer.reasoning && `, ${thinkingName(writer.reasoning)}`}
           </span>
         )
       ) : llm === "mock" ? (
