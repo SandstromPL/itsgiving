@@ -1,5 +1,6 @@
 import type { BriefInput } from "@/lib/agent/brief";
 import type { Budget, Format, Nudge, Thinking } from "@/lib/agent/options";
+import type { ImportedFilm } from "@/lib/agent/taste";
 
 // The brief form's state and the conversions between it and a brief. Kept apart from the component so
 // a featured example and the form it fills in are guaranteed to make the same brief (and cache key).
@@ -11,6 +12,10 @@ export interface FormState {
   city: string;
   budget: Budget;
   directorFilms: string;
+  /** Films imported from a TMDB list or IMDb links; the brief carries their IMDb IDs. */
+  imported: ImportedFilm[];
+  /** Where they came from, for the form: a TMDB list's name, or "IMDb links". */
+  importedFrom: string;
   thinking: Thinking;
 }
 
@@ -21,6 +26,8 @@ export const EMPTY_FORM: FormState = {
   city: "",
   budget: "indie",
   directorFilms: "",
+  imported: [],
+  importedFrom: "",
   thinking: "deep",
 };
 
@@ -71,6 +78,7 @@ export function toBrief(form: FormState, picks: Record<string, string> = {}, nud
     city: form.city.trim(),
     budget: form.budget,
     director_films: splitTitles(form.directorFilms),
+    director_imdb_ids: form.imported.map((film) => film.imdb),
     picks,
     nudges,
     thinking: form.thinking,
@@ -86,6 +94,9 @@ export function formFromBrief(brief: BriefInput): FormState {
     city: brief.city,
     budget: brief.budget ?? EMPTY_FORM.budget,
     directorFilms: (brief.director_films ?? []).join("\n"),
+    // A brief keeps only IMDb IDs, so they stand in for the titles here.
+    imported: (brief.director_imdb_ids ?? []).map((imdb) => ({ imdb, title: imdb })),
+    importedFrom: brief.director_imdb_ids?.length ? "an earlier import" : "",
     thinking: brief.thinking ?? EMPTY_FORM.thinking,
   };
 }

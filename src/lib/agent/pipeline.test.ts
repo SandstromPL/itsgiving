@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Cooldowns, DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
 import { QlooClient, createQlooClient, type FetchLike } from "../qloo";
 import { MemoryCache } from "../qloo/cache";
+import { mockEntityId } from "../qloo/mock/catalog";
 import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
@@ -574,5 +575,32 @@ describe("text helpers", () => {
     expect(scrub("The T13 tag, the T1 tag, at L1; not T130 or L10.")).toBe(
       "The Quirkily Humorous tag, the Moody tag, at Bar Orai; not T130 or L10.",
     );
+  });
+});
+
+describe("director taste import", () => {
+  it("adds imported films (by IMDb ID) to the taste comparison and notes the ones Qloo lacks", async () => {
+    const { outcome } = await run({
+      artist: "Prateek Kuhad",
+      city: "Mumbai",
+      director_films: ["In the Mood for Love"],
+      director_imdb_ids: ["tt0246578", "tt0114369", "tt7180392"],
+    });
+    const t = treatmentOf(outcome);
+    expect(t.director.map((e) => e.name)).toEqual(["In the Mood for Love", "Se7en", "Donnie Darko"]);
+    expect(t.qloo.steps.resolve?.some((p) => p.path === "/entities")).toBe(true);
+    const groupA = t.qloo.steps.overlap?.[0]?.query["a.signal.interests.entities"] ?? "";
+    for (const name of ["In the Mood for Love", "Donnie Darko", "Se7en"]) expect(groupA).toContain(mockEntityId(name));
+    expect(t.notes).toContain("1 of your imported films isn't in Qloo's catalog, so it was left out.");
+  });
+
+  it("keeps a brief's cache key when nothing is imported, and ignores import order and repeats", () => {
+    const base = { artist: "Prateek Kuhad", city: "Mumbai" };
+    const modes = { qloo: "mock", llm: "mock" };
+    expect(briefKey(brief({ ...base, director_imdb_ids: [] }), modes)).toBe(briefKey(brief(base), modes));
+    const key = briefKey(brief({ ...base, director_imdb_ids: ["tt0246578", "tt0114369"] }), modes);
+    expect(briefKey(brief({ ...base, director_imdb_ids: ["tt0114369", "tt0246578", "tt0114369"] }), modes)).toBe(key);
+    expect(key).not.toBe(briefKey(brief(base), modes));
+    expect(briefSchema.safeParse({ ...base, director_imdb_ids: ["nm0000123"] }).success).toBe(false);
   });
 });

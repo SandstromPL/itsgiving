@@ -115,7 +115,11 @@ export function describeBrief(brief: Brief, who: Who): string {
     `shoot city: ${brief.city}`,
     `budget: ${BUDGETS[brief.budget].label.toLowerCase()}${price ? ` (venues up to price level ${price} of 4)` : ""}`,
   ];
-  if (who.directorNames.length > 0) lines.push(`director's own favourite films: ${who.directorNames.join(", ")}`);
+  if (who.directorNames.length > 0) {
+    // An imported list can hold 25 films; a dozen names says enough and keeps the prompt within Groq's budget.
+    const more = who.directorNames.length - 12;
+    lines.push(`director's own favourite films: ${who.directorNames.slice(0, 12).join(", ")}${more > 0 ? ` and ${more} more` : ""}`);
+  }
   if (brief.nudges.length > 0) lines.push(`director asks to: ${brief.nudges.map((n) => NUDGE_TEXT[n]).join("; ")}`);
   return lines.join("\n");
 }

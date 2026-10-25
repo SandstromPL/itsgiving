@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { normalizeName } from "../tools/shared";
-import { BUDGETS, FORMATS, NUDGES, THINKING, type Budget, type Format, type Thinking } from "./options";
+import { BUDGETS, FORMATS, IMPORT_LIMIT, NUDGES, THINKING, type Budget, type Format, type Thinking } from "./options";
 
 export { BUDGETS, NUDGES, THINKING, type Budget, type Nudge, type Thinking } from "./options";
 
@@ -18,6 +18,11 @@ export const briefSchema = z
     city: name,
     budget: z.enum(Object.keys(BUDGETS) as [Budget, ...Budget[]]).default("indie"),
     director_films: z.array(name).max(8).default([]),
+    /** The director's taste imported from a TMDB list or IMDb links (src/lib/agent/taste.ts), looked up by IMDb ID. */
+    director_imdb_ids: z
+      .array(z.string().regex(/^tt\d{7,10}$/, "IMDb IDs look like tt0118694."))
+      .max(IMPORT_LIMIT)
+      .default([]),
     /** Ambiguity-picker answers: pickKey(type, name) -> chosen entity ID. */
     picks: z
       .record(z.string().max(120), z.string().min(1).max(120))
@@ -59,6 +64,8 @@ export function normalizeBrief(brief: Brief): Brief {
     touchstones: dedupe(brief.touchstones.map(tidy)),
     city: tidy(brief.city),
     director_films: dedupe(brief.director_films.map(tidy)),
+    // A set: the list's order doesn't change the taste, so it mustn't change the cache key or the Qloo request.
+    director_imdb_ids: [...new Set(brief.director_imdb_ids ?? [])].sort(),
     nudges: NUDGES.filter((n) => brief.nudges.includes(n)),
   };
 }
@@ -74,6 +81,8 @@ export function briefKey(brief: Brief, modes: { qloo: string; llm: string }): st
     city: normalizeName(brief.city),
     budget: brief.budget,
     director: brief.director_films.map(normalizeName).sort(),
+    // Only when present, so briefs without an import (and treatments built before it) keep their keys.
+    ...(brief.director_imdb_ids?.length ? { imported: [...brief.director_imdb_ids].sort() } : {}),
     picks: Object.entries(brief.picks).sort(([a], [b]) => a.localeCompare(b)),
     nudges: [...brief.nudges].sort(),
     thinking: brief.thinking,

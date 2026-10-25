@@ -33,6 +33,12 @@ export const THINKING = {
 } as const;
 export type Thinking = keyof typeof THINKING;
 
+/** Films a director can import as their taste: taste_overlap compares up to 25 entities a side. */
+export const IMPORT_LIMIT = 25;
+
+/** TMDB's required notice, shown wherever an imported TMDB list appears. */
+export const TMDB_NOTICE = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
+
 function joinNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }

@@ -6,7 +6,7 @@ reference films, wardrobe brands and real shoot locations, each with the evidenc
 
 > **Status:** work in progress for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). The treatment builder
 > runs end to end on live Qloo: the Qloo tools, a lean LLM agent (DeepSeek first, free models as fallbacks), the board
-> UI and four pre-built featured treatments. Director taste import comes next.
+> UI, four pre-built featured treatments, and a director's taste imported from a TMDB list or IMDb links.
 
 ## Why Qloo
 
@@ -29,7 +29,9 @@ Code runs every Qloo call; the LLM is called at most three times per treatment (
 fast and cheap, and within the free fallback models' limits.
 
 1. **Intake** is a form, so no LLM is spent parsing it.
-2. **Resolve** the artist, touchstone films and the director's own films (`resolve_entities`). Names that match more
+2. **Resolve** the artist, touchstone films and the director's own films (`resolve_entities`). A director can also import
+   their taste: a public TMDB list or pasted IMDb links become up to 25 films that Qloo looks up by IMDb ID
+   (`import_external_ids`), so nothing about them is guessed. Names that match more
    than one title go to a picker in the UI instead of being guessed; only Qloo's own candidates can be picked. A year
    in brackets, like "Rockstar (2011)", settles it without asking, and so does one match being far better known than
    the rest (the treatment notes which one was used). The shoot city is resolved too, as a Qloo locality: a state or
@@ -93,6 +95,9 @@ finished treatments and clicking one shows it at once, whatever the live rate li
   a `/search` for localities near a point (sorted by distance, no query) names an area in about 0.3 s. Live Qloo tags
   Manhattan as a "suburb" and returns Mumbai's wards with no kind, so names come from neighbourhood-sized localities
   that no other result lists as its parent.
+- `/entities` by IMDb ID first echoed the IDs as a top-level `external` list of `[{id}]` (2026-10-24), then under
+  `properties.external` as `{id, user_rating, ...}` (2026-10-25). Mise reads both, since the taste import matches each
+  film back by its echoed ID.
 - Heatmap `affinity` and `popularity` are percentiles across the city's tiles and track each other closely, but both
   are the audience's own: five very different artists' hottest tiles in New York overlapped 43% on average. Mise
   ranks tiles by affinity times popularity, which favours where the fans gather, and where there are places to shoot.
@@ -188,12 +193,15 @@ All server-side only.
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `LLM_TIMEOUT_MS` | Per-call timeout for calls that don't set their own (default 20000); treatment steps use `TIMING` |
 | `MISE_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
+| `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list. IMDb links work without it |
 
 ### API routes
 
 - `POST /api/treatment`: takes a brief, streams progress as server-sent events (`start`, `step`, `needs_input`,
   `treatment`, `error`, `done`). Guarded by a per-IP rate limit (6 fresh treatments a minute), a daily LLM-call cap, a
   run budget (120 s deep, 90 s quick, under a 150 s `maxDuration`) and a 24-hour cache keyed by the normalized brief.
+- `POST /api/taste`: takes `{ "source": "<TMDB list link or IMDb links>" }` and returns the films Qloo knows, by IMDb
+  ID, plus the ones it left out. At most 26 TMDB calls and one Qloo call; 8 imports a minute per IP.
 - `GET /api/health`: makes a real Qloo call and reports mode, host and provenance, plus the LLM chain (never called).
 - `GET /api/tools`: tool definitions (JSON Schema) with an example input each.
 - `POST /api/tools/{name}`: runs a tool (development only unless `MISE_TOOL_PLAYGROUND=1`).
@@ -218,6 +226,8 @@ All server-side only.
 - Qloo results are presented as aggregate affinities, visibly separate from the agent's own interpretation. The model
   is told never to infer health, politics, finances, identity or eligibility from taste.
 - Keys stay on the server, and Qloo responses are never committed to this repository.
+- A TMDB import reads only the list's name and its films' titles, years and IMDb IDs. Nothing about the list's owner
+  is kept, and only IMDb IDs go to Qloo.
 
 ## Limitations
 
@@ -230,6 +240,15 @@ All server-side only.
 - Location results are candidates to scout: availability and filming permission must be confirmed with each venue.
 - The shoot base is where the audience's signal is strongest, not a check on permits, crowds or access. The heatmap is
   aggregate taste by area and says nothing about the people who live there.
+- Qloo's film catalog is feature-length: short films are missing even when they have IMDb pages (Oscar winners
+  included), so a director's own shorts can't stand for their taste. Music is artist-level only, with no songs or
+  albums, so a treatment reads the artist's audience, not the particular song.
+
+## Credits
+
+- Taste data: [Qloo](https://www.qloo.com/)'s Insights API.
+- Imported film lists: [TMDB](https://www.themoviedb.org/). This product uses the TMDB API but is not endorsed or
+  certified by TMDB.
 
 ## License
 

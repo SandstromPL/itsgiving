@@ -249,11 +249,10 @@ export function compactEntity(entity: QlooEntity, options: { maxTags?: number; m
     };
   }
 
-  const external = {
-    imdb: firstExternalId(entity.external, "imdb"),
-    spotify: firstExternalId(entity.external, "spotify"),
-    letterboxd: firstExternalId(entity.external, "letterboxd"),
-  };
+  // Live responses have carried external IDs in two places: a top-level `external` of [{id}] lists (2026-10-24) and
+  // `properties.external` of {id, user_rating, ...} objects (from 2026-10-25). Read both.
+  const externalId = (key: string) => firstExternalId(entity.external, key) ?? firstExternalId(props.external, key);
+  const external = { imdb: externalId("imdb"), spotify: externalId("spotify"), letterboxd: externalId("letterboxd") };
   if (external.imdb || external.spotify || external.letterboxd) compact.external = external;
 
   return compact;

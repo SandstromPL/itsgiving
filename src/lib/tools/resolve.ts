@@ -164,7 +164,7 @@ export const importExternalIds = defineTool({
         : undefined;
     return {
       status: entities.length === 0 ? "empty" : "ok",
-      summary: `Found ${plural(entities.length, "entity")} for ${plural(requested, "ID")}.`,
+      summary: `Found ${plural(entities.length, "entity", "entities")} for ${plural(requested, "ID")}.`,
       data: { entities, unmatched },
     };
   },

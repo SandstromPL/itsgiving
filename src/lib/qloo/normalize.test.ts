@@ -30,6 +30,17 @@ describe("extractContributions", () => {
 });
 
 describe("compactEntity", () => {
+  it("reads external IDs from either place live Qloo has put them", () => {
+    const older = { name: "Se7en", entity_id: "A", external: { imdb: [{ id: "tt0114369" }] } };
+    const newer = {
+      name: "In the Mood for Love",
+      entity_id: "B",
+      properties: { external: { imdb: { id: "tt0118694", user_rating: 8 }, wikidata: { id: "Q1056853" } } },
+    };
+    expect(compactEntity(older).external?.imdb).toBe("tt0114369");
+    expect(compactEntity(newer).external?.imdb).toBe("tt0118694");
+  });
+
   it("keeps the useful fields and drops verbose ones", () => {
     const compact = compactEntity({
       name: "Balthazar",

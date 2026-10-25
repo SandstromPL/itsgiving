@@ -473,6 +473,15 @@ export function Board({
               <dd>{modelName(l.producedBy)}</dd>
             </Fragment>
           ))}
+          {t.director.length > 0 && (
+            <>
+              <dt className="text-dim">Your taste</dt>
+              <dd>
+                {names(t.director.slice(0, 8))}
+                {t.director.length > 8 ? ` and ${t.director.length - 8} more` : ""}
+              </dd>
+            </>
+          )}
           <dt className="text-dim">Creative direction</dt>
           <dd className={prose}>{t.direction}</dd>
         </dl>

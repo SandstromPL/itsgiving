@@ -247,11 +247,14 @@ export async function runPipeline(
   const directorSpecs: NameSpec[] = brief.director_films.map((input) => film(input, "director"));
   const endResolve = begin("resolve", STEP_LABELS.resolve);
   const asItems = (specs: NameSpec[]) => ({ items: specs.map(({ name, year, type }) => ({ name, type, ...(year ? { year } : {}) })) });
-  const [subjectResult, directorResult, cityResult] = await Promise.all([
+  const imported = brief.director_imdb_ids ?? [];
+  const [subjectResult, directorResult, cityResult, importedResult] = await Promise.all([
     tool<{ items: Resolution[] }>("resolve", "resolve_entities", asItems(subjectSpecs)),
     directorSpecs.length > 0 ? tool<{ items: Resolution[] }>("resolve", "resolve_entities", asItems(directorSpecs)) : null,
     // The city as a Qloo locality is more exact than its name: live "New York" by name is the state.
     tool<{ items: Resolution[] }>("resolve", "resolve_entities", { items: [{ name: brief.city, type: "locality" }] }),
+    // Imported taste is looked up by IMDb ID: exact, one request for up to 25 films, and nothing to ask about.
+    imported.length > 0 ? tool<{ entities: CompactEntity[] }>("resolve", "import_external_ids", { imdb_ids: imported }) : null,
   ]);
   if (subjectResult.status === "error" || !subjectResult.data) {
     endResolve("error", subjectResult.summary);
@@ -259,6 +262,15 @@ export async function runPipeline(
   }
   if (directorResult?.status === "error")
     notes.push(`Your taste films couldn't be looked up (${directorResult.summary}), so they were left out.`);
+  const importedFilms = importedResult?.data?.entities ?? [];
+  if (importedResult?.status === "error") {
+    notes.push(`Your imported films couldn't be looked up (${importedResult.summary}), so they were left out.`);
+  } else if (importedResult && importedFilms.length < imported.length) {
+    const left = imported.length - importedFilms.length;
+    notes.push(
+      `${left} of your imported films ${left === 1 ? "isn't" : "aren't"} in Qloo's catalog, so ${left === 1 ? "it was" : "they were"} left out.`,
+    );
+  }
 
   const ambiguities: Ambiguity[] = [];
   const missing: string[] = [];
@@ -288,9 +300,12 @@ export async function runPipeline(
     (e) => e.id,
   );
   const director = uniqueBy(
-    directorSpecs
-      .map((spec, i) => (directorResult?.data ? settle(spec, directorResult.data.items[i]) : undefined))
-      .filter((e): e is CompactEntity => Boolean(e)),
+    [
+      ...directorSpecs
+        .map((spec, i) => (directorResult?.data ? settle(spec, directorResult.data.items[i]) : undefined))
+        .filter((e): e is CompactEntity => Boolean(e)),
+      ...importedFilms,
+    ],
     (e) => e.id,
   );
 
@@ -330,7 +345,12 @@ export async function runPipeline(
       take: 15,
     }),
     endOverlap
-      ? tool<{ shared_traits: CompactTag[] }>("overlap", "taste_overlap", { group_a_ids: directorIds, group_b_ids: subjectIds, take: 10 })
+      ? tool<{ shared_traits: CompactTag[] }>("overlap", "taste_overlap", {
+          // Typed films first, then imported ones; Qloo compares up to 25 a side.
+          group_a_ids: directorIds.slice(0, 25),
+          group_b_ids: subjectIds,
+          take: 10,
+        })
       : undefined,
     tool<{ areas: HeatArea[]; map?: HeatGrid }>("heatmap", "audience_heatmap", {
       signal_entity_ids: subjectIds,

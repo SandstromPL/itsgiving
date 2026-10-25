@@ -1,12 +1,165 @@
 "use client";
 
-import { useId, type FormEvent } from "react";
-import { BUDGETS, FORMATS, THINKING, type Budget, type Format, type Thinking } from "@/lib/agent/options";
+import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { BUDGETS, FORMATS, IMPORT_LIMIT, THINKING, TMDB_NOTICE, type Budget, type Format, type Thinking } from "@/lib/agent/options";
+import type { ImportedFilm, TasteImport } from "@/lib/agent/taste";
 import { LIMITS, type FieldName, type FormProblem, type FormState } from "./form";
 
 const field =
   "w-full rounded-md border border-edge bg-raised px-3 py-2.5 text-[15px] text-paper placeholder:text-faint hover:border-dim focus:border-tungsten aria-invalid:border-safelight";
 const label = "text-[13px] font-medium text-dim";
+
+const filmName = (film: { title: string; year?: number }) => `${film.title}${film.year ? ` (${film.year})` : ""}`;
+
+/** One line on what an import brought in and what it left out. */
+function importSummary(result: TasteImport): string {
+  const read = result.found.length + result.missing.length;
+  const from = result.source.kind === "tmdb" ? `“${result.source.name}”` : "your links";
+  const parts = [`${result.found.length} of ${read} from ${from} ${result.found.length === 1 ? "is" : "are"} in Qloo.`];
+  if (result.source.kind === "tmdb" && result.source.total > read) parts.push(`Mise read the first ${read} of ${result.source.total}.`);
+  if (result.missing.length > 0) {
+    const names = result.missing.slice(0, 3).map(filmName).join(", ");
+    const more = result.missing.length > 3 ? ` and ${result.missing.length - 3} more` : "";
+    parts.push(`Left out: ${names}${more}. Qloo lists feature films and series, not short films.`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Imports the director's taste from a public TMDB list or IMDb links. The films found in Qloo show as chips; the
+ * brief carries their IMDb IDs, so the pipeline looks them up exactly.
+ */
+function TasteImportField({
+  imported,
+  from,
+  onChange,
+}: {
+  imported: ImportedFilm[];
+  from: string;
+  onChange: (imported: ImportedFilm[], from: string) => void;
+}) {
+  const ids = useId();
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+
+  const run = async () => {
+    if (busy || !text.trim()) return;
+    setBusy(true);
+    setError("");
+    setStatus("");
+    try {
+      const response = await fetch("/api/taste", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ source: text }),
+      });
+      const body = (await response.json().catch(() => ({}))) as Partial<TasteImport> & { error?: string };
+      if (!response.ok || !body.found || !body.source) {
+        setError(body.error ?? "The import failed. Try again.");
+        return;
+      }
+      const result = body as TasteImport;
+      onChange(result.found, result.source.kind === "tmdb" ? `the TMDB list “${result.source.name}”` : "IMDb links");
+      setStatus(importSummary(result));
+      setText("");
+    } catch {
+      setError("Couldn't reach Mise. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={`${ids}-import`} className={label}>
+        Import your taste (optional)
+      </label>
+      <div className="flex gap-2">
+        <input
+          id={`${ids}-import`}
+          className={`${field} min-w-0 flex-1`}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter imports; it must not submit the brief around it.
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void run();
+            }
+          }}
+          placeholder="TMDB list link, or IMDb links"
+          autoComplete="off"
+          spellCheck={false}
+          aria-describedby={`${ids}-import-hint`}
+        />
+        <button
+          type="button"
+          onClick={() => void run()}
+          aria-disabled={busy || !text.trim()}
+          className="shrink-0 rounded-md px-3.5 text-sm text-paper ring-1 ring-edge hover:ring-dim aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+        >
+          {busy ? "Importing…" : "Import"}
+        </button>
+      </div>
+      <p id={`${ids}-import-hint`} className="text-xs leading-5 text-faint">
+        A public TMDB list, or IMDb title links, up to {IMPORT_LIMIT} films. Mise looks each one up in Qloo by its IMDb ID, so nothing is
+        guessed. {TMDB_NOTICE}
+      </p>
+      <p role="status" className="text-xs leading-5 text-dim empty:hidden">
+        {status}
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-safelight">
+          {error}
+        </p>
+      )}
+      {imported.length > 0 && (
+        <div className="rounded-md bg-frame p-3 ring-1 ring-line">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-xs text-dim">
+              {imported.length} film{imported.length === 1 ? "" : "s"} from {from}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onChange([], "");
+                setStatus("Import cleared.");
+              }}
+              className="text-xs text-dim underline decoration-edge underline-offset-4 hover:text-paper"
+            >
+              Clear
+            </button>
+          </div>
+          <ul aria-label="Imported films" className="mt-2 flex flex-wrap gap-1.5">
+            {imported.map((film) => (
+              <li
+                key={film.imdb}
+                className="flex items-center gap-0.5 rounded-full bg-graphite py-0.5 pr-0.5 pl-2.5 text-xs text-paper ring-1 ring-line"
+              >
+                {filmName(film)}
+                <button
+                  type="button"
+                  aria-label={`Remove ${filmName(film)}`}
+                  onClick={() =>
+                    onChange(
+                      imported.filter((f) => f.imdb !== film.imdb),
+                      from,
+                    )
+                  }
+                  className="grid size-6 place-items-center rounded-full text-dim hover:bg-raised hover:text-paper"
+                >
+                  <span aria-hidden>×</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function BriefForm({
   form,
@@ -17,7 +170,7 @@ export function BriefForm({
   problem,
 }: {
   form: FormState;
-  onChange: (form: FormState) => void;
+  onChange: Dispatch<SetStateAction<FormState>>;
   onSubmit: () => void;
   onStop: () => void;
   running: boolean;
@@ -159,6 +312,13 @@ export function BriefForm({
         </p>
         {message("directorFilms")}
       </div>
+
+      <TasteImportField
+        imported={form.imported}
+        from={form.importedFrom}
+        // An update, not a snapshot: the import lands seconds later, after any edits made meanwhile.
+        onChange={(imported, importedFrom) => onChange((current) => ({ ...current, imported, importedFrom }))}
+      />
 
       <fieldset className="flex flex-col gap-2">
         <legend className={`mb-2 ${label}`}>Thinking</legend>
