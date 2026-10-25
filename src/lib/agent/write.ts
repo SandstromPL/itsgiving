@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { CompactEntity } from "../qloo";
 import type { Brief } from "./brief";
 import { subjectPhrase } from "./options";
-import { describeBrief, vibeOf, type ToneCandidate, type Vibe } from "./plan";
+import { areaLabel, describeBrief, vibeOf, type ToneCandidate, type Vibe } from "./plan";
+import type { BaseArea } from "./types";
 
 // The writing LLM call. Every Qloo item is listed under a short ref (R1, B1,
 // L1, T1) and the schema's enums accept only those refs, so a citation can
@@ -24,6 +25,8 @@ export interface WriteContext {
   brands: Ref<CompactEntity>[];
   places: Ref<CompactEntity>[];
   leans: string[];
+  /** The area the locations were scouted in; unset when there was none or it was widened to the whole city. */
+  base?: BaseArea;
   /** Entity ID -> name, to show which input drove a pick. */
   names: Map<string, string>;
 }
@@ -153,6 +156,11 @@ export function writePrompt(ctx: WriteContext): string {
   if (ctx.leans.length > 0) parts.push(`Audience skew: ${ctx.leans.join("; ")}`);
   if (ctx.references.length > 0) parts.push("Film references:", ...ctx.references.map((r) => entityLine(r, ctx)));
   if (ctx.brands.length > 0) parts.push("Wardrobe brands:", ...ctx.brands.map((r) => entityLine(r, ctx)));
+  if (ctx.base) {
+    parts.push(
+      `Shoot base: ${areaLabel(ctx.base, false)}, where this audience over-indexes (Qloo heatmap). Every location below is within ${ctx.base.radius_m / 1000} km of it.`,
+    );
+  }
   if (ctx.places.length > 0) parts.push(`Locations in ${ctx.brief.city}:`, ...ctx.places.map((r) => entityLine(r, ctx)));
   parts.push(
     "",

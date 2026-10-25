@@ -6,6 +6,7 @@ import type { Example } from "@/lib/agent/examples";
 import type { FeaturedCover } from "@/lib/agent/featured";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
+import { ShootBaseBlock } from "./base-map";
 import { EdgeCode, QlooTags, Still, Tape, Why, modelName } from "./parts";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
@@ -319,11 +320,12 @@ export function Board({
         title="Locations"
         note={`Real places in ${t.brief.city} whose regulars share this audience's taste, found by ${source}. Confirm availability and filming permission with each venue.`}
       >
+        <ShootBaseBlock t={t} mock={mock} />
         {t.locations.length === 0 ? (
           <p className="text-sm text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
         ) : (
           <ul className="grid gap-x-8 gap-y-12 sm:grid-cols-2 2xl:grid-cols-3">
-            {t.locations.map((l) => {
+            {t.locations.map((l, i) => {
               const place = l.entity.place;
               const where = [place?.kind, place?.neighborhood, place?.price_level ? `price level ${place.price_level} of 4` : undefined]
                 .filter(Boolean)
@@ -335,7 +337,17 @@ export function Board({
               return (
                 <li key={l.entity.id} className="flex flex-col">
                   <Still src={l.entity.image} alt={`Photo of ${l.entity.name}`} className="aspect-[3/2] w-full rounded-[3px]" />
-                  <h4 className="type-head mt-4 text-xl leading-tight">{l.entity.name}</h4>
+                  <h4 className="type-head mt-4 text-xl leading-tight">
+                    {t.base?.map && map && (
+                      <>
+                        <span className="type-evidence mr-1 align-[0.1em] text-sm text-dim">
+                          <span className="sr-only">Location </span>
+                          {i + 1}
+                        </span>{" "}
+                      </>
+                    )}
+                    {l.entity.name}
+                  </h4>
                   {where && <p className="mt-0.5 text-xs text-dim">{where}</p>}
                   <div className="mt-1">
                     <EdgeCode qloo={l.qloo} mock={mock} />

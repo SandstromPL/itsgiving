@@ -61,6 +61,11 @@ interface GetOptions {
 }
 
 const MAX_BODY_CHARS = 5 * 1024 * 1024;
+/**
+ * Larger responses skip the cache. A city heatmap runs to 0.3-1 MB of text (thousands of cells), several
+ * MB once parsed, and the in-memory cache holds 500 entries; the heatmap call itself takes under a second.
+ */
+const MAX_CACHED_CHARS = 256 * 1024;
 const MAX_DELAY_MS = 30_000;
 
 /** Waits `ms`, or rejects as soon as `signal` aborts so a cancelled run doesn't sit out a Retry-After. */
@@ -133,8 +138,8 @@ export class QlooClient {
       });
     }
 
-    const { data, status, requestId } = await this.fetchWithRetry(path, query, options);
-    if (cache) {
+    const { data, status, requestId, chars } = await this.fetchWithRetry(path, query, options);
+    if (cache && chars <= MAX_CACHED_CHARS) {
       // Best effort: a read-only disk (QLOO_CACHE_DIR on a serverless host) must not fail a good response.
       await cache.set(key, data).catch((err: unknown) => console.warn(`Qloo cache write failed for ${path}:`, err));
     }
@@ -210,7 +215,7 @@ export class QlooClient {
     path: string,
     query: Record<string, string>,
     options: GetOptions,
-  ): Promise<{ data: unknown; status: number; requestId?: string }> {
+  ): Promise<{ data: unknown; status: number; requestId?: string; chars: number }> {
     if (this.mode === "live" && !this.options.apiKey) {
       throw new QlooError({ kind: "config", message: "QLOO_API_KEY is not set.", path });
     }
@@ -260,14 +265,14 @@ export class QlooClient {
           throw new QlooError({ kind: "parse", message: `Qloo ${path} response exceeded 5 MiB.`, path, requestId });
         }
         try {
-          return { data: body ? JSON.parse(body) : {}, status: response.status, requestId };
+          return { data: body ? JSON.parse(body) : {}, status: response.status, requestId, chars: body.length };
         } catch {
           throw new QlooError({ kind: "parse", message: `Qloo ${path} returned invalid JSON.`, path, requestId });
         }
       }
 
       if (response.status === 404 && options.emptyOn404) {
-        return { data: { results: [] }, status: 404, requestId };
+        return { data: { results: [] }, status: 404, requestId, chars: 0 };
       }
 
       const { kind, retryable } = classifyStatus(response.status);

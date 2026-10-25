@@ -39,6 +39,19 @@ export interface MockCity {
   center: { lat: number; lon: number };
 }
 
+export interface MockLocality {
+  id: string;
+  name: string;
+  /** Qloo's locality genre (urn:tag:genre:locality:<kind>): city, state, suburb, neighbourhood... */
+  kind: string;
+  /** The mock city whose places it covers; the state covers its main city, as it does on live Qloo. */
+  city: string;
+  lat: number;
+  lon: number;
+  popularity: number;
+  disambiguation: string;
+}
+
 /** Stable fake UUIDs: an all-zero prefix makes them easy to spot as mock IDs. */
 export function mockId(seed: string): string {
   let hash = 0x811c9dc5;
@@ -144,6 +157,8 @@ export const TAGS: MockTag[] = [
   tag(G_PLACE, "restaurant", "Restaurant", [PLACE], ["warm"], 0.95),
   tag(G_PLACE, "restaurant:bar", "Bar", [PLACE], ["nocturnal", "urban"], 0.85),
   tag(G_PLACE, "live_music_venue", "Live Music Venue", [PLACE], ["rebellious", "nocturnal"], 0.6),
+  tag(G_PLACE, "book_store", "Book Store", [PLACE], ["intimate", "nostalgic", "tender"], 0.5),
+  tag(G_PLACE, "park", "Park", [PLACE], ["warm", "dreamy", "tender"], 0.7),
 ];
 
 export const CITIES: MockCity[] = [
@@ -154,6 +169,38 @@ export const CITIES: MockCity[] = [
     aliases: ["new york", "new york city", "nyc", "new york, ny", "the big apple", "manhattan", "brooklyn"],
     center: { lat: 40.7128, lon: -74.006 },
   },
+];
+
+function locality(name: string, kind: string, city: string, coords: [number, number], disambiguation: string, popularity = 0.95): MockLocality {
+  return { id: mockId(`urn:entity:locality:${disambiguation}`), name, kind, city, lat: coords[0], lon: coords[1], popularity, disambiguation };
+}
+
+const NYC = "New York, New York, United States of America";
+
+/**
+ * The two cities and the neighbourhoods around the mock places. Like live Qloo, a search for "New York"
+ * lists the state (centred upstate, far from every mock place) before the city.
+ */
+export const LOCALITIES: MockLocality[] = [
+  locality("Mumbai", "city", "Mumbai", [19.076, 72.8777], "Mumbai, Maharashtra, India", 1),
+  locality("New York", "state", "New York", [42.9226, -75.5978], "New York, United States of America", 1),
+  locality("New York", "city", "New York", [40.7128, -74.006], NYC, 1),
+  locality("Juhu", "suburb", "Mumbai", [19.1075, 72.8263], "Juhu, K/W Ward, Mumbai, Maharashtra, India"),
+  locality("Bandra West", "suburb", "Mumbai", [19.0596, 72.8295], "Bandra West, H/W Ward, Mumbai, Maharashtra, India"),
+  locality("Worli", "suburb", "Mumbai", [19.0166, 72.8172], "Worli, G/S Ward, Mumbai, Maharashtra, India"),
+  locality("Lower Parel", "suburb", "Mumbai", [18.9953, 72.8302], "Lower Parel, G/S Ward, Mumbai, Maharashtra, India"),
+  locality("Colaba", "suburb", "Mumbai", [18.9067, 72.8147], "Colaba, A Ward, Mumbai, Maharashtra, India"),
+  locality("Fort", "neighbourhood", "Mumbai", [18.9322, 72.8351], "Fort, A Ward, Mumbai, Maharashtra, India"),
+  locality("Ballard Estate", "neighbourhood", "Mumbai", [18.9396, 72.8406], "Ballard Estate, A Ward, Mumbai, Maharashtra, India"),
+  locality("Dhobi Talao", "neighbourhood", "Mumbai", [18.9446, 72.8298], "Dhobi Talao, C Ward, Mumbai, Maharashtra, India"),
+  locality("SoHo", "neighbourhood", "New York", [40.7233, -74.003], `SoHo, Manhattan, ${NYC}`),
+  locality("East Village", "neighbourhood", "New York", [40.7265, -73.9815], `East Village, Manhattan, ${NYC}`),
+  locality("West Village", "neighbourhood", "New York", [40.7358, -74.0036], `West Village, Manhattan, ${NYC}`),
+  locality("Greenwich Village", "neighbourhood", "New York", [40.7336, -74.0027], `Greenwich Village, Manhattan, ${NYC}`),
+  locality("Tribeca", "neighbourhood", "New York", [40.7163, -74.0086], `Tribeca, Manhattan, ${NYC}`),
+  locality("Lower East Side", "neighbourhood", "New York", [40.715, -73.9843], `Lower East Side, Manhattan, ${NYC}`),
+  locality("Upper East Side", "neighbourhood", "New York", [40.7736, -73.9566], `Upper East Side, Manhattan, ${NYC}`),
+  locality("Bushwick", "neighbourhood", "New York", [40.6944, -73.9213], `Bushwick, Brooklyn, ${NYC}`),
 ];
 
 function film(
@@ -307,6 +354,10 @@ export const ENTITIES: MockEntity[] = [
   place("Bonobo", "Mumbai", "Bandra", 2, [19.0645, 72.8352], 0.62, ["nocturnal", "rebellious", "urban", "playful"], [p("restaurant:bar"), a("lively"), a("trendy")], false),
   place("The Bombay Canteen", "Mumbai", "Lower Parel", 3, [18.9965, 72.8251], 0.75, ["playful", "warm", "retro"], [p("restaurant"), a("lively")]),
   place("The Clearing House", "Mumbai", "Ballard Estate", 3, [18.9375, 72.8401], 0.55, ["romantic", "intimate", "retro", "tender"], [p("restaurant"), a("romantic"), a("intimate"), d("vintage")]),
+  // A few more around the heatmap's hot spots, so a 2 km shoot base can hold in mock mode too.
+  place("Kitab Khana", "Mumbai", "Fort", 2, [18.9327, 72.8335], 0.55, ["nostalgic", "intimate", "tender", "warm"], [p("book_store"), a("cozy"), d("vintage")]),
+  place("Horniman Circle Garden", "Mumbai", "Fort", 1, [18.9331, 72.8347], 0.6, ["nostalgic", "tender", "dreamy", "retro"], [p("park")]),
+  place("Cafe Mondegar", "Mumbai", "Colaba", 2, [18.9236, 72.8317], 0.7, ["retro", "playful", "nostalgic", "urban"], [p("restaurant:cafe"), p("restaurant:bar"), a("lively"), d("vintage")]),
   place("Balthazar", "New York", "SoHo", 3, [40.7226, -73.9981], 0.95, ["romantic", "retro", "maximalist", "urban"], [p("restaurant"), a("lively"), d("art_deco")]),
   place("Veselka", "New York", "East Village", 1, [40.729, -73.9871], 0.78, ["nostalgic", "warm", "urban"], [p("restaurant"), a("cozy")]),
   place("Bemelmans Bar", "New York", "Upper East Side", 4, [40.7744, -73.9632], 0.8, ["nocturnal", "retro", "intimate", "romantic"], [p("restaurant:bar"), a("intimate"), a("upscale"), d("art_deco")]),
@@ -314,6 +365,10 @@ export const ENTITIES: MockEntity[] = [
   place("Elsewhere", "New York", "Bushwick", 2, [40.7062, -73.9235], 0.7, ["neon", "nocturnal", "rebellious", "urban"], [p("live_music_venue"), st("rooftop"), a("lively"), s("edgy")]),
   place("The Odeon", "New York", "Tribeca", 3, [40.7169, -74.0077], 0.76, ["nocturnal", "retro", "urban", "neon"], [p("restaurant"), d("neon_signage"), d("art_deco"), a("moody")]),
   place("Russ & Daughters Cafe", "New York", "Lower East Side", 2, [40.7202, -73.9895], 0.72, ["nostalgic", "warm"], [p("restaurant:cafe"), d("vintage"), a("cozy")], false),
+  place("McNally Jackson", "New York", "SoHo", 2, [40.7238, -73.9961], 0.62, ["intimate", "minimalist", "tender", "urban"], [p("book_store"), a("cozy")]),
+  place("Washington Square Park", "New York", "Greenwich Village", 1, [40.7308, -73.9973], 0.9, ["dreamy", "urban", "playful", "warm"], [p("park"), a("lively")]),
+  place("Caffe Reggio", "New York", "Greenwich Village", 2, [40.7302, -74.0001], 0.66, ["nostalgic", "retro", "romantic", "warm"], [p("restaurant:cafe"), d("vintage"), a("cozy")]),
+  place("Mercury Lounge", "New York", "Lower East Side", 2, [40.7222, -73.9867], 0.64, ["rebellious", "nocturnal", "gritty", "urban"], [p("live_music_venue"), a("moody")]),
 ];
 
 /** ID of a mock entity by name, for examples and tests. Throws if it isn't in the catalog. */

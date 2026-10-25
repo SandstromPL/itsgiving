@@ -117,10 +117,23 @@ export const scoutLocations = defineTool({
     "Shortlist real places in the shoot city whose kind and ambience fit the treatment and whose regulars share the " +
     "audience's taste, with photos where available. Call this when planning locations. venue_kinds filters to filmable " +
     "kinds of place (cafe, bar, bookstore, park...); ambience_tag_ids from find_tags (applies_to: place) rank places by " +
-    "mood; price_level_max keeps to the budget. Results are candidates to scout: availability and filming permission " +
-    "must be confirmed with each venue.",
+    "mood; price_level_max keeps to the budget; near keeps to one area, e.g. a shoot base from audience_heatmap. " +
+    "Results are candidates to scout: availability and filming permission must be confirmed with each venue.",
   inputSchema: z.strictObject({
     city: z.string().min(1).describe("City or neighbourhood name, e.g. \"Mumbai\", \"Bandra\" or \"New York City\"."),
+    locality_id: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("The city's Qloo ID from resolve_entities (type locality); more exact than the name."),
+    near: z
+      .strictObject({
+        lat: z.number().min(-90).max(90),
+        lon: z.number().min(-180).max(180),
+        radius_m: z.number().int().min(200).max(20_000),
+      })
+      .optional()
+      .describe("Only places within radius_m metres of this point, e.g. an area from audience_heatmap."),
     signal_entity_ids: z
       .array(z.string().min(1))
       .max(10)
@@ -147,7 +160,12 @@ export const scoutLocations = defineTool({
   async run(input, { qloo }) {
     const response = await qloo.insights({
       "filter.type": entityUrn("place"),
-      "filter.location.query": input.city,
+      // WKT puts longitude first. A locality ID or a name covers the whole city.
+      ...(input.near
+        ? { "filter.location": `POINT(${input.near.lon} ${input.near.lat})`, "filter.location.radius": input.near.radius_m }
+        : input.locality_id
+          ? { "filter.location": input.locality_id }
+          : { "filter.location.query": input.city }),
       "signal.interests.entities": input.signal_entity_ids,
       // Venue kind filters and mood ranks: one filter.tags operator can't mean "any of these kinds AND this mood".
       ...(input.venue_kinds ? { "filter.tags": venueTagIds(input.venue_kinds), "operator.filter.tags": "union" } : {}),
@@ -160,7 +178,9 @@ export const scoutLocations = defineTool({
       take: Math.min(input.take + 4, 24),
     });
     const locations = oneBranchEach(entityList(response.data).map((e) => compactEntity(e, { maxTags: 6 }))).slice(0, input.take);
+    const where = input.near ? `within ${input.near.radius_m / 1000} km of the given point in ${input.city}` : `in ${input.city}`;
     const relax = [
+      input.near ? "a wider radius_m or no near" : undefined,
       input.venue_kinds && input.venue_kinds.length < VENUE_KIND_VALUES.length ? "more venue_kinds" : undefined,
       input.require_photo ? "require_photo=false" : undefined,
       input.price_level_max ? "a higher price_level_max" : undefined,
@@ -169,8 +189,8 @@ export const scoutLocations = defineTool({
       status: locations.length > 0 ? "ok" : "empty",
       summary:
         locations.length > 0
-          ? `${plural(locations.length, "location")} in ${input.city}: ${locations.slice(0, 5).map((l) => l.name).join(", ")}. Confirm availability and filming permission with each venue.`
-          : `No locations matched in ${input.city}.${relax.length > 0 ? ` Try ${relax.join(", ")}.` : ""}`,
+          ? `${plural(locations.length, "location")} ${where}: ${locations.slice(0, 5).map((l) => l.name).join(", ")}. Confirm availability and filming permission with each venue.`
+          : `No locations matched ${where}.${relax.length > 0 ? ` Try ${relax.join(", ")}.` : ""}`,
       data: { locations },
       warnings: response.warnings,
     };

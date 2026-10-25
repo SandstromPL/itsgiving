@@ -17,6 +17,7 @@ export const SEARCHABLE_KINDS = [
   "book",
   "podcast",
   "videogame",
+  "locality",
 ] as const satisfies readonly EntityKind[];
 
 export const TAG_KIND_VALUES = [

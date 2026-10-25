@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { QlooError, type Provenance } from "../qloo";
+import { audienceHeatmap } from "./heatmap";
 import { importExternalIds, resolveEntities } from "./resolve";
 import { findTags, readAudience, tasteOverlap } from "./taste";
 import { referenceFilms, scoutLocations, stylingBrands } from "./treatment";
@@ -11,6 +12,7 @@ export const TOOLS: readonly MiseTool[] = [
   findTags,
   readAudience,
   tasteOverlap,
+  audienceHeatmap,
   referenceFilms,
   stylingBrands,
   scoutLocations,

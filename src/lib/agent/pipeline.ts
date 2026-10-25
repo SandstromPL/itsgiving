@@ -1,5 +1,6 @@
 import { describeKind, generateJson, type LlmDeps, type LlmResult, type Reasoning } from "../llm";
 import type { CompactEntity, CompactTag, Provenance, QlooClient } from "../qloo";
+import type { HeatArea, HeatGrid } from "../tools/heatmap";
 import { runTool } from "../tools/registry";
 import { VENUE_KIND_VALUES, normalizeName } from "../tools/shared";
 import type { ToolResult } from "../tools/types";
@@ -17,13 +18,14 @@ import {
   type PlanDraft,
   type ToneCandidate,
 } from "./plan";
-import type { AgentEvent, Ambiguity, LlmStep, LlmTrace, Pick, QlooEvidence, Role, StepId, StepStatus, Treatment } from "./types";
+import type { AgentEvent, Ambiguity, BaseArea, LlmStep, LlmTrace, Pick, QlooEvidence, Role, StepId, StepStatus, Treatment } from "./types";
 import { mockDraft, normalizeDraft, refScrubber, writePrompt, writeSchema, type Draft, type Ref, type WriteContext } from "./write";
 
 // The lean agent: code runs every Qloo tool deterministically and the LLM is
 // called at most three times (plan, an optional re-plan, write). Resolve ->
-// read audience (+ overlap with the director's films) -> plan -> find_tags,
-// references, wardrobe, locations (relaxing empty results) -> write.
+// read audience (+ overlap with the director's films, + the heatmap of where
+// the fans are) -> plan (which picks the shoot base) -> find_tags, references,
+// wardrobe, locations near the base (relaxing short results) -> write.
 
 export interface PipelineDeps {
   qloo: QlooClient;
@@ -37,7 +39,7 @@ export type PipelineOutcome =
   | { kind: "failed"; message: string };
 
 type Resolution =
-  | { input: string; status: "resolved"; match: CompactEntity; among?: number }
+  | { input: string; status: "resolved"; match: CompactEntity; among?: number; note?: string }
   | { input: string; status: "ambiguous"; candidates: CompactEntity[] }
   | { input: string; status: "not_found" };
 
@@ -62,6 +64,8 @@ export function parseTitle(input: string): { name: string; year?: number } {
 interface Relaxed {
   items: CompactEntity[];
   relaxations: string[];
+  /** How many the first search found when that was too few to keep (it is then relaxed). */
+  firstCount?: number;
   error?: string;
 }
 
@@ -74,9 +78,15 @@ interface Execution {
   references: Relaxed;
   brands: Relaxed;
   places: Relaxed;
+  /** The area the plan based the shoot in; held is false when locations had to come from the whole city. */
+  base?: { area: BaseArea; held: boolean };
 }
 
 const MAX_TONE_CANDIDATES = 16;
+/** How far a shoot base reaches: places within it are a short unit move apart. */
+const BASE_RADIUS_M = 2_000;
+/** Fewer places than this near the base, and locations are scouted across the city instead. */
+const MIN_BASE_PLACES = 3;
 
 /**
  * Time limits per thinking depth, sized from live DeepSeek runs (2026-10-25): deep plans took 4-6 s and
@@ -230,9 +240,11 @@ export async function runPipeline(
   const directorSpecs: NameSpec[] = brief.director_films.map((input) => film(input, "director"));
   const endResolve = begin("resolve", STEP_LABELS.resolve);
   const asItems = (specs: NameSpec[]) => ({ items: specs.map(({ name, year, type }) => ({ name, type, ...(year ? { year } : {}) })) });
-  const [subjectResult, directorResult] = await Promise.all([
+  const [subjectResult, directorResult, cityResult] = await Promise.all([
     tool<{ items: Resolution[] }>("resolve", "resolve_entities", asItems(subjectSpecs)),
     directorSpecs.length > 0 ? tool<{ items: Resolution[] }>("resolve", "resolve_entities", asItems(directorSpecs)) : null,
+    // The city as a Qloo locality is more exact than its name: live "New York" by name is the state.
+    tool<{ items: Resolution[] }>("resolve", "resolve_entities", { items: [{ name: brief.city, type: "locality" }] }),
   ]);
   if (subjectResult.status === "error" || !subjectResult.data) {
     endResolve("error", subjectResult.summary);
@@ -294,11 +306,15 @@ export async function runPipeline(
   const subjectIds = subjects.map((e) => e.id);
   const directorIds = director.map((e) => e.id);
   const entityNames = new Map([...subjects, ...director].map((e) => [e.id, e.name]));
+  const city = cityResult.data?.items[0];
+  const cityId = city?.status === "resolved" ? city.match.id : undefined;
+  if (city?.status === "resolved" && city.note) notes.push(city.note);
 
-  // 2. Read the audience, and where it meets the director's own taste. The two don't depend on each other.
+  // 2. Read the audience, where it meets the director's own taste, and where in the city it is. None depends on another.
   const endAudience = begin("audience", STEP_LABELS.audience);
   const endOverlap = director.length > 0 ? begin("overlap", STEP_LABELS.overlap) : undefined;
-  const [audience, shared] = await Promise.all([
+  const endHeatmap = begin("heatmap", STEP_LABELS.heatmap);
+  const [audience, shared, heat] = await Promise.all([
     tool<{ taste_tags: CompactTag[]; demographics: { entity_id: string; leans: string }[] }>("audience", "read_audience", {
       entity_ids: subjectIds,
       take: 15,
@@ -306,7 +322,18 @@ export async function runPipeline(
     endOverlap
       ? tool<{ shared_traits: CompactTag[] }>("overlap", "taste_overlap", { group_a_ids: directorIds, group_b_ids: subjectIds, take: 10 })
       : undefined,
+    tool<{ areas: HeatArea[]; map?: HeatGrid }>("heatmap", "audience_heatmap", {
+      signal_entity_ids: subjectIds,
+      city: brief.city,
+      ...(cityId ? { locality_id: cityId } : {}),
+      areas: 3,
+      radius_m: BASE_RADIUS_M,
+    }),
   ]);
+  const areas: BaseArea[] = (heat.data?.areas ?? []).map((area) => ({ ...area, ref: `A${area.rank}` }));
+  const heatMap = heat.data?.map;
+  if (heat.status === "error") notes.push(`The heatmap failed (${heat.summary}), so locations were scouted across the city.`);
+  endHeatmap(heat.status === "ok" ? "done" : heat.status === "error" ? "error" : "warning", heat.summary);
   const tasteTags = audience.data?.taste_tags ?? [];
   const leans = (audience.data?.demographics ?? []).map((d) =>
     subjects.length > 1 ? `${entityNames.get(d.entity_id) ?? "audience"}: ${d.leans}` : d.leans,
@@ -345,6 +372,7 @@ export async function runPipeline(
     ...who,
     candidates,
     leans,
+    areas,
   };
   const askPlan = (ctx: PlanContext, step: LlmStep) =>
     llm(
@@ -356,7 +384,7 @@ export async function runPipeline(
             name: step,
             system: SYSTEM_PROMPT,
             prompt: planPrompt(ctx),
-            schema: planSchema(toneRefs),
+            schema: planSchema(toneRefs, areas.map((a) => a.ref)),
             mock: () => mockPlan(ctx),
             effort: "low",
             // A re-plan only swaps style words that found no tags, so it needn't think hard.
@@ -369,7 +397,10 @@ export async function runPipeline(
           },
           deps.llm,
         ),
-      (plan) => clip(plan.direction, 200),
+      (plan) => {
+        const base = areas.find((a) => a.ref === plan.base);
+        return `${clip(plan.direction, 200)}${base ? ` Base: ${base.name}.` : ""}`;
+      },
     ).then((plan) => normalizePlan(plan, brief));
   let plan = await askPlan(planContext, "plan");
 
@@ -387,23 +418,33 @@ export async function runPipeline(
     return { tags: uniqueBy(picked.flat(), (t) => t.id).slice(0, 4), missed, errored: results.some((r) => r.status === "error") };
   };
 
+  /** Run the ladder until a rung finds enough: `firstMin` for the first rung (a shoot base needs a few places), one after. */
   const relax = async (
     step: StepId,
     toolName: string,
     key: string,
     ladder: [string, Record<string, unknown>][],
+    firstMin = 1,
   ): Promise<Relaxed> => {
     const relaxations: string[] = [];
     let lastError: string | undefined;
+    let firstCount: number | undefined;
+    // A first rung that found some but too few: still better than nothing if every wider rung fails.
+    let short: Relaxed | undefined;
     for (let i = 0; i < ladder.length; i++) {
       const result = await tool<Record<string, CompactEntity[]>>(step, toolName, ladder[i][1]);
       const items = result.data?.[key] ?? [];
-      if (result.status !== "error" && items.length > 0) return { items, relaxations };
+      if (result.status !== "error" && items.length >= (i === 0 ? firstMin : 1)) return { items, relaxations, firstCount };
+      if (result.status !== "error" && items.length > 0) {
+        firstCount = items.length;
+        short = { items, relaxations: [] };
+      }
       // A failed call is treated like an empty one: the next rung is usually lighter (no tag signals), which is
       // exactly what helps when Qloo is slow on a heavy query.
       if (result.status === "error") lastError = result.error?.message ?? result.summary;
       if (i + 1 < ladder.length) relaxations.push(ladder[i + 1][0]);
     }
+    if (short) return short;
     return lastError ? { items: [], relaxations, error: lastError } : { items: [], relaxations };
   };
 
@@ -423,7 +464,8 @@ export async function runPipeline(
       return;
     }
     if (relaxed.relaxations.length > 0) {
-      notes.push(`${what}: nothing matched at first, so Mise ${relaxed.relaxations.join(", then ")}.`);
+      const first = relaxed.firstCount ? `only ${relaxed.firstCount} matched at first` : "nothing matched at first";
+      notes.push(`${what}: ${first}, so Mise ${relaxed.relaxations.join(", then ")}.`);
     }
     const status: StepStatus = relaxed.items.length === 0 || relaxed.relaxations.length > 0 ? "warning" : "done";
     const summary =
@@ -437,6 +479,7 @@ export async function runPipeline(
     const ceiling = DEEP_CUT_CEILING[current.deep_cuts];
     const hasEra = current.era_from !== null || current.era_to !== null;
     const price = priceLevelMax(brief);
+    const base = areas.find((a) => a.ref === current.base) ?? areas[0];
 
     const endTags = begin("tags", STEP_LABELS.tags);
     // Reference films use the entity signal only, so they needn't wait for the tag search.
@@ -508,6 +551,8 @@ export async function runPipeline(
         ladder(
           {
             city: brief.city,
+            ...(cityId ? { locality_id: cityId } : {}),
+            near: base ? { lat: base.lat, lon: base.lon, radius_m: base.radius_m } : undefined,
             signal_entity_ids: subjectIds,
             venue_kinds: current.venue_kinds,
             ambience_tag_ids: ambience.tags.length > 0 ? ambience.tags.map((t) => t.id) : undefined,
@@ -515,19 +560,29 @@ export async function runPipeline(
             price_level_max: price,
             take: 8,
           },
-          // Creative choices give way before the director's constraints: venue kinds, then photos, then budget.
+          // Creative choices give way before the director's constraints: the base, venue kinds, then photos, then budget.
           [
+            [`widened the search from ${base?.name} to all of ${brief.city}`, { near: undefined }, base !== undefined],
             ["widened to every kind of venue", { venue_kinds: VENUE_KIND_VALUES }, current.venue_kinds.length < VENUE_KIND_VALUES.length],
             ["allowed places without photos", { require_photo: false }, true],
             ["lifted the price ceiling", { price_level_max: undefined }, price !== undefined],
           ],
         ),
+        base ? MIN_BASE_PLACES : 1,
       ),
     ]);
+    // The base held when the first rung (near it) was enough, or was all there was.
+    const held = base !== undefined && places.items.length > 0 && places.relaxations.length === 0;
 
     report("references", STEP_LABELS.references, "Reference films", references, (items) => names(items).slice(0, 4).join(", "));
     report("wardrobe", STEP_LABELS.wardrobe, "Wardrobe brands", brands, (items) => names(items).slice(0, 5).join(", "));
-    report("locations", STEP_LABELS.locations, "Locations", places, (items) => `${items.slice(0, 4).map((p) => p.name).join(", ")} in ${brief.city}`);
+    report(
+      "locations",
+      STEP_LABELS.locations,
+      "Locations",
+      places,
+      (items) => `${items.slice(0, 4).map((p) => p.name).join(", ")} ${held ? `near ${base?.name}, ${brief.city}` : `in ${brief.city}`}`,
+    );
 
     return {
       wardrobeTags: wardrobe.tags,
@@ -537,6 +592,7 @@ export async function runPipeline(
       references,
       brands,
       places,
+      base: base ? { area: base, held } : undefined,
     };
   };
 
@@ -588,6 +644,7 @@ export async function runPipeline(
     brands: toRefs(run.brands.items, "B", 6),
     places: toRefs(run.places.items, "L", 6),
     leans,
+    base: run.base?.held ? run.base.area : undefined,
     names: entityNames,
   };
   const draft = await llm(
@@ -634,6 +691,8 @@ export async function runPipeline(
     tasteTags,
     overlap,
     leans,
+    areas,
+    heatMap,
     notes,
     traces,
     trail,
@@ -659,6 +718,8 @@ interface AssembleInput {
   tasteTags: CompactTag[];
   overlap: CompactTag[];
   leans: string[];
+  areas: BaseArea[];
+  heatMap?: HeatGrid;
   notes: string[];
   traces: LlmTrace[];
   trail: Partial<Record<StepId, Provenance[]>>;
@@ -729,6 +790,7 @@ function assemble(input: AssembleInput): Treatment {
     references,
     wardrobe,
     locations,
+    base: run.base ? { chosen: run.base.area.ref, held: run.base.held, areas: input.areas, map: input.heatMap } : undefined,
     palette: uniqueBy(
       draft.palette.map((c) => ({ name: clip(c.name, 30), hex: c.hex.toUpperCase() })),
       (c) => c.hex,

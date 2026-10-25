@@ -53,6 +53,42 @@ export function tagId(tag: QlooTag): string {
   return tag.tag_id ?? tag.id ?? "";
 }
 
+/**
+ * One heatmap tile: a geohash cell (150 m to 5 km; Qloo sizes them by density) with Qloo's scores for the
+ * signal there. Both scores are percentiles across the area's tiles and track each other closely
+ * (correlation 0.9+ on live New York and Mumbai, 2026-10-25), yet differ by audience.
+ */
+export interface HeatCell {
+  lat: number;
+  lon: number;
+  /** Geohash length, the tile's size: 7 is about 150 m, 6 about 1.2 x 0.6 km, 5 about 5 km. */
+  precision: number;
+  /** How strongly the audience over-indexes in the tile. */
+  affinity: number;
+  /** How much of the audience's signal falls in the tile. */
+  popularity: number;
+}
+
+export function heatmapCells(data: unknown): HeatCell[] {
+  const results = isRecord(data) ? data.results : undefined;
+  const cells = isRecord(results) && Array.isArray(results.heatmap) ? results.heatmap : [];
+  return cells.flatMap((cell): HeatCell[] => {
+    if (!isRecord(cell) || !isRecord(cell.location)) return [];
+    const lat = num(cell.location.latitude);
+    const lon = num(cell.location.longitude);
+    if (lat === undefined || lon === undefined) return [];
+    const query: Loose = isRecord(cell.query) ? cell.query : {};
+    return [{ lat, lon, precision: str(cell.location.geohash)?.length ?? 0, affinity: num(query.affinity) ?? 0, popularity: num(query.popularity) ?? 0 }];
+  });
+}
+
+const LOCALITY_GENRE = "urn:tag:genre:locality:";
+
+/** A locality's kind from its genre tag: "city", "state", "county", "suburb", "neighbourhood"... */
+export function localityKind(entity: QlooEntity): string | undefined {
+  return (entity.tags ?? []).map(tagId).find((id) => id.startsWith(LOCALITY_GENRE))?.slice(LOCALITY_GENRE.length);
+}
+
 export interface Contribution {
   entity_id: string;
   score: number;

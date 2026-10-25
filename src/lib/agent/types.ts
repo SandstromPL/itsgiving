@@ -1,11 +1,13 @@
 import type { LlmAttempt, LlmMode, ProducedBy } from "../llm";
 import type { CompactEntity, CompactTag, Provenance, QlooMode } from "../qloo";
+import type { HeatArea, HeatGrid } from "../tools/heatmap";
 import type { Brief } from "./brief";
 
 export type StepId =
   | "resolve"
   | "audience"
   | "overlap"
+  | "heatmap"
   | "plan"
   | "tags"
   | "references"
@@ -89,6 +91,22 @@ export interface Beat {
   reference: { id: string; name: string } | null;
 }
 
+/** An area from Qloo's heatmap, with the ref (A1, A2...) the planner chose it by. */
+export interface BaseArea extends HeatArea {
+  ref: string;
+}
+
+/** Where the shoot is based: the areas where the audience over-indexes, and the one the planner picked. */
+export interface ShootBase {
+  /** Ref of the area the planner chose. */
+  chosen: string;
+  /** False when too few places matched inside it, so locations were scouted across the city. */
+  held: boolean;
+  areas: BaseArea[];
+  /** The heatmap the board draws. */
+  map?: HeatGrid;
+}
+
 export interface Treatment {
   id: string;
   createdAt: string;
@@ -103,6 +121,8 @@ export interface Treatment {
   references: Pick<"why" | "borrow">[];
   wardrobe: Pick<"look">[];
   locations: Pick<"scene">[];
+  /** Missing on treatments built before the heatmap step, and when Qloo had no heatmap for the city. */
+  base?: ShootBase;
   palette: { name: string; hex: string }[];
   lighting: string[];
   shots: string[];

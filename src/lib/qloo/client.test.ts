@@ -128,6 +128,17 @@ describe("QlooClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
+  it("doesn't cache a response as large as a city heatmap", async () => {
+    const heatmap = Array.from({ length: 4_000 }, (_, i) => ({ location: { latitude: i, longitude: i, geohash: "te7u102" }, query: { affinity: 0.5 } }));
+    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse({ results: { heatmap } }));
+    const client = liveClient(fetchImpl, { cache: new MemoryCache() });
+    const params = { "filter.type": "urn:heatmap", "filter.location.query": "Mumbai", "signal.interests.entities": "A" };
+    await client.insights(params);
+    const second = await client.insights(params);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(second.provenance.cached).toBe(false);
+  });
+
   it("retries a body that fails mid-stream, and stops retrying once the run is aborted", async () => {
     const broken = () => new Response(new ReadableStream({ start: (c) => c.error(new TypeError("terminated")) }), { status: 200 });
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValueOnce(broken()).mockResolvedValueOnce(jsonResponse({ results: [] }));

@@ -1,10 +1,13 @@
 import { z } from "zod";
-import { compactEntity, entityList, entityUrn, type CompactEntity } from "../qloo";
+import { compactEntity, entityList, entityUrn, localityKind, type CompactEntity, type QlooEntity } from "../qloo";
 import { SEARCHABLE_KINDS, defineTool, normalizeName, plural } from "./shared";
 
 type Resolution =
-  /** `among` is set when several titles matched exactly and this one was far better known. */
-  | { input: string; status: "resolved"; match: CompactEntity; among?: number }
+  /**
+   * `among` is set when several titles matched exactly and this one was far better known; `note` says when a
+   * place name was read as something other than Qloo's first match.
+   */
+  | { input: string; status: "resolved"; match: CompactEntity; among?: number; note?: string }
   | { input: string; status: "ambiguous"; candidates: CompactEntity[] }
   | { input: string; status: "not_found" };
 
@@ -51,13 +54,33 @@ function pick(item: z.output<typeof itemSchema>, candidates: CompactEntity[]): R
 /** How much more popular (0-1 percentile) one same-name title must be to be taken without asking. */
 export const DOMINANT_GAP = 0.5;
 
+/** Qloo names some states and counties after their main city; a shoot city of that name means the city. */
+const WIDER_THAN_A_CITY = new Set(["state", "county", "region", "province", "country"]);
+
+/**
+ * A city is never worth a question: take Qloo's first exact match, except that a state or county sharing
+ * its name with a city means the city. Live Qloo lists New York State before New York City, and Los Angeles
+ * County before the city; Delhi's first match is the state, with no same-name city, so it stays.
+ */
+function pickLocality(item: z.output<typeof itemSchema>, entities: QlooEntity[]): Resolution {
+  if (entities.length === 0) return { input: item.name, status: "not_found" };
+  const wanted = normalizeName(item.name);
+  const exact = entities.filter((e) => normalizeName(e.name) === wanted);
+  const first = exact[0] ?? entities[0];
+  const kind = localityKind(first);
+  const city = kind && WIDER_THAN_A_CITY.has(kind) ? exact.find((e) => localityKind(e) === "city") : undefined;
+  const match = compactEntity(city ?? first, { maxTags: 3 });
+  if (!city) return { input: item.name, status: "resolved", match };
+  return { input: item.name, status: "resolved", match, note: `Qloo's first match for "${item.name}" is the ${kind}, so Mise used the city.` };
+}
+
 export const resolveEntities = defineTool({
   name: "resolve_entities",
   description:
-    "Turn names the user mentions (artists, films, TV shows, brands, places, people) into Qloo entity IDs. " +
+    "Turn names the user mentions (artists, films, TV shows, brands, places, people, cities) into Qloo entity IDs. " +
     "Call this before any other Qloo tool whenever you only have a name, and again whenever the user adds new references. " +
     "Each item comes back resolved, ambiguous (with up to 5 candidates) or not found. For ambiguous or missing items, " +
-    "ask the user which one they mean instead of guessing.",
+    "ask the user which one they mean instead of guessing. Cities (type locality) always resolve to the best match.",
   inputSchema: z.strictObject({
     items: z.array(itemSchema).min(1).max(10).describe("Names to resolve, up to 10 per call."),
   }),
@@ -72,7 +95,9 @@ export const resolveEntities = defineTool({
     const items = await Promise.all(
       input.items.map(async (item) => {
         const response = await qloo.search({ query: item.name, types: entityUrn(item.type), take: 5 });
-        return pick(item, entityList(response.data).map((e) => compactEntity(e, { maxTags: 5 })));
+        const entities = entityList(response.data);
+        if (item.type === "locality") return pickLocality(item, entities);
+        return pick(item, entities.map((e) => compactEntity(e, { maxTags: 5 })));
       }),
     );
     const resolved = items.filter((i) => i.status === "resolved").length;

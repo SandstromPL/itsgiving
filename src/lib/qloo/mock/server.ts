@@ -1,5 +1,5 @@
 import type { FetchLike } from "../client";
-import { AUDIENCES, CITIES, ENTITIES, TAGS, type MockCity, type MockEntity, type MockTag } from "./catalog";
+import { AUDIENCES, CITIES, ENTITIES, LOCALITIES, TAGS, type MockCity, type MockEntity, type MockLocality, type MockTag } from "./catalog";
 
 // A small fake of the Qloo API for building without a key. It mirrors the
 // documented request/response shapes and the known gotchas (403 for
@@ -29,6 +29,7 @@ type Vector = Map<string, number>;
 const entityById = new Map(ENTITIES.map((e) => [e.id, e]));
 const tagById = new Map(TAGS.map((t) => [t.id, t]));
 const audienceById = new Map(AUDIENCES.map((au) => [au.id, au]));
+const localityById = new Map(LOCALITIES.map((l) => [l.id, l]));
 
 function hash(text: string): number {
   let h = 0x811c9dc5;
@@ -114,6 +115,143 @@ function findCity(query: string): { city: MockCity; neighborhood?: string } | un
     }
   }
   return undefined;
+}
+
+interface LatLon {
+  lat: number;
+  lon: number;
+}
+
+function distanceM(a: LatLon, b: LatLon): number {
+  const rad = Math.PI / 180;
+  const h =
+    Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 +
+    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lon - a.lon) * rad) / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
+}
+
+/** "POINT(lon lat)" (WKT, longitude first) or "lat,lon", the two point forms Qloo accepts. */
+function parsePoint(text: string): LatLon | undefined {
+  const wkt = /^POINT\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)$/i.exec(text.trim());
+  if (wkt) return { lon: Number(wkt[1]), lat: Number(wkt[2]) };
+  const pair = /^(-?[\d.]+)\s*,\s*(-?[\d.]+)$/.exec(text.trim());
+  return pair ? { lat: Number(pair[1]), lon: Number(pair[2]) } : undefined;
+}
+
+function placeCoords(entity: MockEntity): LatLon | undefined {
+  const { lat, lon } = entity.properties;
+  return typeof lat === "number" && typeof lon === "number" ? { lat, lon } : undefined;
+}
+
+/** Where a request points: within `radiusM` of `center`, or a mock city (and neighbourhood). */
+interface Area {
+  name: string;
+  center: LatLon;
+  radiusM?: number;
+  city?: MockCity;
+  neighborhood?: string;
+}
+
+/**
+ * filter.location (a point, "lat,lon" or a locality ID) or filter.location.query (a name). Undefined when
+ * the location can't be found; null when the request gives none.
+ */
+function locate(params: URLSearchParams): Area | undefined | null {
+  const raw = params.get("filter.location");
+  if (raw !== null) {
+    const point = parsePoint(raw);
+    if (point) return { name: raw, center: point, radiusM: numberParam(params, "filter.location.radius") ?? 15_000 };
+    const locality = localityById.get(raw);
+    if (!locality) return undefined;
+    const center = { lat: locality.lat, lon: locality.lon };
+    if (locality.kind !== "city" && locality.kind !== "state") return { name: locality.name, center, radiusM: 1_500 };
+    return { name: locality.name, center, city: CITIES.find((c) => c.name === locality.city) };
+  }
+  const query = params.get("filter.location.query");
+  if (query === null) return null;
+  const located = findCity(query);
+  return located ? { name: located.city.name, center: located.city.center, city: located.city, neighborhood: located.neighborhood } : undefined;
+}
+
+function inArea(entity: MockEntity, area: Area): boolean {
+  if (area.radiusM !== undefined) {
+    const at = placeCoords(entity);
+    return at !== undefined && distanceM(area.center, at) <= area.radiusM;
+  }
+  const city = (entity.properties.geocode as { city?: string } | undefined)?.city;
+  return city === area.city?.name && (!area.neighborhood || entity.properties.neighborhood === area.neighborhood);
+}
+
+/** A 6-character geohash tile, about 1.2 x 0.6 km. */
+const TILE = { lat: 180 / 2 ** 15, lon: 360 / 2 ** 15 };
+
+/**
+ * Geohash-6-sized tiles over the area's places. A tile's affinity is high near places whose vibes match the
+ * signal, and its popularity (activity) is high near any place, so the strongest area is somewhere a fitting
+ * shoot could happen. An area with no places (the state, centred upstate) comes back cold.
+ */
+function mockHeatmap(area: Area, profile: Profile) {
+  const spots = ENTITIES.filter((e) => e.subtype === "urn:entity:place" && inArea(e, area)).flatMap((e) => {
+    const at = placeCoords(e);
+    return at ? [{ ...at, match: profile.vector.size > 0 ? cosine(profile.vector, toVector(e.vibes)) : 0.5 }] : [];
+  });
+  const lats = spots.length > 0 ? spots.map((s) => s.lat) : [area.center.lat];
+  const lons = spots.length > 0 ? spots.map((s) => s.lon) : [area.center.lon];
+  const margin = 0.03;
+  const cells: { location: { latitude: number; longitude: number; geohash: string }; query: Record<string, number> }[] = [];
+  for (let lat = Math.min(...lats) - margin; lat <= Math.max(...lats) + margin; lat += TILE.lat) {
+    for (let lon = Math.min(...lons) - margin; lon <= Math.max(...lons) + margin; lon += TILE.lon) {
+      const weights = spots.map((s) => ({ match: s.match, w: Math.exp(-((distanceM({ lat, lon }, s) / 1_200) ** 2)) }));
+      const affinity = 0.2 + 0.8 * Math.max(0, ...weights.map(({ match, w }) => match * w));
+      const popularity = Math.min(1, 0.05 + 0.6 * weights.reduce((sum, { w }) => sum + w, 0));
+      const geohash = `mk${cells.length.toString(36).padStart(4, "0")}`;
+      cells.push({
+        location: { latitude: Math.round(lat * 1e5) / 1e5, longitude: Math.round(lon * 1e5) / 1e5, geohash },
+        query: { affinity: round(affinity), affinity_rank: round(affinity), popularity: round(popularity) },
+      });
+    }
+  }
+  return cells;
+}
+
+function serializeLocality(locality: MockLocality) {
+  return {
+    name: locality.name,
+    entity_id: locality.id,
+    type: "urn:entity",
+    subtype: "urn:entity:locality",
+    popularity: locality.popularity,
+    disambiguation: locality.disambiguation,
+    location: { lat: locality.lat, lon: locality.lon },
+    tags: [{ id: `urn:tag:genre:locality:${locality.kind}`, name: locality.kind, type: "urn:tag:genre:locality" }],
+  };
+}
+
+/** Localities by name (exact names first, in catalog order) or, with no query, nearest first around filter.location. */
+function searchLocalities(params: URLSearchParams): Response {
+  const query = normalize(params.get("query") ?? "");
+  let found: MockLocality[];
+  if (query) {
+    const alias = findCity(query)?.city.name;
+    found = LOCALITIES.map((l) => ({
+      l,
+      score: normalize(l.name) === query ? 3 : l.kind === "city" && l.city === alias ? 2 : normalize(l.name).startsWith(query) ? 1 : 0,
+    }))
+      .filter((m) => m.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((m) => m.l);
+  } else {
+    const point = parsePoint(params.get("filter.location") ?? "");
+    if (!point) return fail(400, "query is required");
+    // /search takes its radius in miles.
+    const reach = (numberParam(params, "filter.radius") ?? 10) * 1_609.34;
+    found = LOCALITIES.map((l) => ({ l, d: distanceM(point, l) }))
+      .filter((m) => m.d <= reach)
+      .sort((a, b) => a.d - b.d)
+      .map((m) => m.l);
+  }
+  if (found.length === 0) return fail(404, "No results");
+  return respond({ success: true, results: page(found.map(serializeLocality), params, 20, 100), _mock: true });
 }
 
 function serializeEntity(entity: MockEntity) {
@@ -260,22 +398,10 @@ function insights(params: URLSearchParams): Response {
   }
 
   if (type === "urn:heatmap") {
-    const where = params.get("filter.location.query");
-    const located = where ? findCity(where) : undefined;
-    if (!located) return fail(400, "A location is required for heatmaps (filter.location.query)");
+    const area = locate(params);
+    if (!area) return fail(400, "A location is required for heatmaps (filter.location or filter.location.query)");
     if (!profile.hasSignal) return fail(400, "at least one valid signal or filter is required");
-    const heatmap = Array.from({ length: 6 }, (_, i) => {
-      const seed = `${params.toString()}:${i}`;
-      return {
-        location: {
-          latitude: round(located.city.center.lat + (unit(`${seed}:lat`) - 0.5) * 0.08),
-          longitude: round(located.city.center.lon + (unit(`${seed}:lon`) - 0.5) * 0.08),
-          geohash: `mock${i}`,
-        },
-        query: { affinity: round(unit(`${seed}:a`)), affinity_rank: round(unit(`${seed}:r`)), popularity: round(unit(`${seed}:p`)) },
-      };
-    });
-    return respond({ success: true, results: { heatmap }, query: { localities: { filter: located.city.name } }, _mock: true });
+    return respond({ success: true, results: { heatmap: mockHeatmap(area, profile) }, query: { localities: { filter: [{ name: area.name }] } }, _mock: true });
   }
 
   let candidates = ENTITIES.filter((entity) => entity.subtype === type && !profile.entityIds.includes(entity.id));
@@ -319,16 +445,11 @@ function insights(params: URLSearchParams): Response {
     candidates = candidates.filter((entity) => Boolean(entity.properties.image));
   }
 
-  const where = params.get("filter.location.query");
-  if (where !== null) {
-    const located = findCity(where);
-    if (!located) return fail(400, `Could not find a locality matching "${where}"`);
+  const area = locate(params);
+  if (area !== null) {
+    if (!area) return fail(400, `Could not find a locality matching "${params.get("filter.location") ?? params.get("filter.location.query")}"`);
     hasFilter = true;
-    candidates = candidates.filter((entity) => {
-      const city = (entity.properties.geocode as { city?: string } | undefined)?.city;
-      if (city !== located.city.name) return false;
-      return !located.neighborhood || entity.properties.neighborhood === located.neighborhood;
-    });
+    candidates = candidates.filter((entity) => inArea(entity, area));
   }
 
   if (!profile.hasSignal && !hasFilter) return fail(400, "at least one valid signal or filter is required");
@@ -338,9 +459,10 @@ function insights(params: URLSearchParams): Response {
 }
 
 function search(params: URLSearchParams): Response {
+  const types = list(params, "types");
+  if (types.includes("urn:entity:locality")) return searchLocalities(params);
   const query = normalize(params.get("query") ?? "");
   if (!query) return fail(400, "query is required");
-  const types = list(params, "types");
   const matches = ENTITIES.filter((entity) => types.length === 0 || types.includes(entity.subtype))
     .map((entity) => {
       const name = normalize(entity.name);

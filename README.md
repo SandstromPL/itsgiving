@@ -19,7 +19,9 @@ Mise uses Qloo's taste graph as the source of truth:
 - **Cross-domain affinity:** what an artist's audience over-indexes on in film, fashion and places.
 - **Taste profiles and demographics:** the audience's vocabulary (themes, styles, ambiences) and who they are.
 - **Audience comparison:** where the director's own film taste meets the artist's audience.
-- **Real places:** venues in the shoot city whose ambience fits and whose regulars share the taste.
+- **Locality intelligence:** Qloo's heatmap of the shoot city shows where the audience over-indexes; the shoot is
+  based in one of those areas.
+- **Real places:** venues near that base whose ambience fits and whose regulars share the taste.
 
 ## How a treatment is built
 
@@ -30,23 +32,28 @@ free-tier limits.
 2. **Resolve** the artist, touchstone films and the director's own films (`resolve_entities`). Names that match more
    than one title go to a picker in the UI instead of being guessed; only Qloo's own candidates can be picked. A year
    in brackets, like "Rockstar (2011)", settles it without asking, and so does one match being far better known than
-   the rest (the treatment notes which one was used).
-3. **Read the audience** (`read_audience`) and, when the director lists films, **compare** their taste with the
-   audience (`taste_overlap`). The two calls run at once.
-4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, an era, how deep the cuts go, and a
-   few plain style words for wardrobe and ambience. Tags are shown to it as short refs (`T1`, `T2`, ...) and the output
-   schema only accepts those refs, so it cannot invent a tag ID.
+   the rest (the treatment notes which one was used). The shoot city is resolved too, as a Qloo locality: a state or
+   county that shares its name with a city ("New York") is read as the city.
+3. **Read the audience** (`read_audience`), **map where the fans are** (`audience_heatmap`) and, when the director
+   lists films, **compare** their taste with the audience (`taste_overlap`). The calls run at once. The heatmap scores
+   every tile of the city for the audience; Mise groups the hottest tenth into the three strongest areas, 2 km in
+   radius, and names each after the neighbourhoods Qloo lists around its centre.
+4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, how deep the cuts go, a few plain
+   style words for wardrobe and ambience, and which of the strongest areas to base the shoot in. Tags and areas are
+   shown to it as short refs (`T1`, `A1`, ...) and the output schema only accepts those refs, so it cannot invent a
+   tag ID or a neighbourhood.
 5. **Execute in code.** The style words go through `find_tags` (preferring tags named like the word, never
    adult-themed ones). Three Qloo queries run in parallel; reference films start straight away, since they don't
    use the tags:
    - `reference_films`: the artist's audience, with a popularity ceiling for deep cuts and an era only when the
      director asks for "more 90s".
    - `styling_brands`: fashion brands only (`urn:tag:genre:brand:fashion`), ranked by the wardrobe style tags.
-   - `scout_locations`: the venue kinds the plan chose (cafe, bar, bookstore, park and so on, mapped to Qloo place
-     genres), ranked by the ambience tags, within the budget's price level, with photos.
+   - `scout_locations`: within 2 km of the chosen base, the venue kinds the plan chose (cafe, bar, bookstore, park
+     and so on, mapped to Qloo place genres), ranked by the ambience tags, within the budget's price level, with photos.
 
-   Empty or failed results are relaxed deterministically (widen the venue kinds, allow places without photos, lift
-   the price ceiling, drop style tags, lift the deep-cut ceiling), and the treatment says what was relaxed.
+   Empty or failed results are relaxed deterministically (widen from the base to the whole city when fewer than three
+   places match near it, widen the venue kinds, allow places without photos, lift the price ceiling, drop style tags,
+   lift the deep-cut ceiling), and the treatment says what was relaxed.
 6. **Re-plan (optional LLM call 2)** only when a whole set of style words matched no Qloo tag.
 7. **Write (last LLM call).** The model writes the treatment as JSON, citing films, brands and places only by ref
    (`R1`, `B1`, `L1`); refs not returned by a tool fail validation. Code maps refs back to Qloo items and attaches each
@@ -79,6 +86,16 @@ finished treatments and clicking one shows it at once, whatever the live rate li
 - `tourist_attraction` is on hotels and golf clubs, so it is not a venue kind. Places carry Qloo's own
   `ambience_description`, shown as evidence on each location. Chain branches ("Starbucks - Juhu") are collapsed to
   the best-ranked one.
+- A city name alone is ambiguous: `filter.location.query=New York` matches New York State, and one treatment got two
+  venues in Hudson, NY, 200 km upstate. Mise now resolves the city to a locality ID first.
+- The heatmap's own neighbourhood output (`output.heatmap.boundary=urn:entity:locality`) ships every locality's
+  polygon: 5 MB for Mumbai, over 5 MiB for New York, and `take` doesn't trim it. The tile heatmap takes 0.5-1.1 s, and
+  a `/search` for localities near a point (sorted by distance, no query) names an area in about 0.3 s. Live Qloo tags
+  Manhattan as a "suburb" and returns Mumbai's wards with no kind, so names come from neighbourhood-sized localities
+  that no other result lists as its parent.
+- Heatmap `affinity` and `popularity` are percentiles across the city's tiles and track each other closely, but both
+  are the audience's own: five very different artists' hottest tiles in New York overlapped 43% on average. Mise
+  ranks tiles by affinity times popularity, which favours where the fans gather, and where there are places to shoot.
 
 ### LLM layer (`src/lib/llm`)
 
@@ -121,14 +138,15 @@ status, a one-line summary, compact data, warnings and the provenance of every Q
 
 | Tool | What it does | Qloo endpoint(s) |
 | --- | --- | --- |
-| `resolve_entities` | Names to Qloo IDs; asks the user about ambiguous names | `GET /search` |
+| `resolve_entities` | Names and cities to Qloo IDs; asks the user about ambiguous names | `GET /search` |
 | `import_external_ids` | IMDb / Spotify IDs to Qloo entities (e.g. a director's watch history) | `GET /entities` |
 | `find_tags` | Mood or style words to tag IDs | `GET /v2/tags` (semantic search) |
 | `read_audience` | Taste vocabulary plus age/gender skew of an audience | `GET /v2/insights` (`urn:tag`, `urn:demographics`) |
 | `taste_overlap` | Shared traits between the director's taste and the artist | `GET /v2/analysis/compare` |
+| `audience_heatmap` | Where in a city an audience over-indexes, as named areas to base a shoot in | `GET /v2/insights` (`urn:heatmap`), `GET /search` (localities near a point) |
 | `reference_films` | Films/shows the audience loves, with era and deep-cut controls and explanations | `GET /v2/insights` (movie, tv_show) |
 | `styling_brands` | Fashion and lifestyle brands for wardrobe | `GET /v2/insights` (brand) |
-| `scout_locations` | Real places in the shoot city by ambience, budget and photo | `GET /v2/insights` (place) |
+| `scout_locations` | Real places in the shoot city, or near a point, by ambience, budget and photo | `GET /v2/insights` (place) |
 
 ## Getting started
 
@@ -210,6 +228,8 @@ All server-side only.
 - A treatment that hit a failed Qloo call or a template-written step is shown (and says so) but never cached.
 - The free Gemini tier may use prompts to improve Google's products; Mise only sends public names and Qloo tags.
 - Location results are candidates to scout: availability and filming permission must be confirmed with each venue.
+- The shoot base is where the audience's signal is strongest, not a check on permits, crowds or access. The heatmap is
+  aggregate taste by area and says nothing about the people who live there.
 
 ## License
 

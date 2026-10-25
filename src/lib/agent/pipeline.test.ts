@@ -5,6 +5,7 @@ import { MemoryCache } from "../qloo/cache";
 import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
+import { distanceM } from "../tools/heatmap";
 import { clipSentences, closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { planSchema } from "./plan";
 import { cachedTreatment, streamTreatment, type TreatmentService } from "./service";
@@ -128,7 +129,33 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     const t = treatmentOf(outcome);
     expect(t.priceLevelMax).toBe(1);
     expect(t.locations.length).toBeGreaterThan(0);
-    expect(t.notes.join(" ")).toMatch(/Locations: nothing matched at first/);
+    expect(t.notes.join(" ")).toMatch(/Locations: (nothing|only \d+) matched at first/);
+  });
+
+  it("bases the shoot where the audience over-indexes and scouts locations around it", async () => {
+    const { outcome, steps } = await run({ artist: "Prateek Kuhad", city: "Mumbai" });
+    const t = treatmentOf(outcome);
+    const base = t.base!;
+    expect(base.chosen).toBe("A1");
+    expect(base.held).toBe(true);
+    expect(base.areas.map((a) => a.ref)).toEqual(["A1", "A2", "A3"].slice(0, base.areas.length));
+    expect(base.map?.tiles.length).toBeGreaterThan(20);
+    const chosen = base.areas[0];
+    expect(t.locations.length).toBeGreaterThanOrEqual(1);
+    for (const l of [...t.locations.map((p) => p.entity), ...t.extras.locations]) {
+      expect(distanceM(chosen, { lat: l.place!.lat!, lon: l.place!.lon! })).toBeLessThanOrEqual(chosen.radius_m);
+    }
+    expect(steps.find((s) => s.id === "heatmap" && s.status === "done")?.summary).toContain(chosen.name);
+    expect(steps.find((s) => s.id === "locations" && s.status === "done")?.summary).toContain(`near ${chosen.name}`);
+    // The city went to Qloo as its locality ID, not as a name to guess at.
+    expect(t.qloo.steps.locations?.[0].query["filter.location"]).toMatch(/^POINT\(/);
+    expect(t.qloo.steps.heatmap?.[0].query["filter.location"]).toMatch(/^00000000-/);
+  });
+
+  it("reads New York as the city, not the state Qloo lists first, and says so", async () => {
+    const t = treatmentOf((await run({ artist: "Phoebe Bridgers", city: "New York" })).outcome);
+    expect(t.notes.join(" ")).toContain(`first match for "New York" is the state`);
+    expect(t.base?.areas.length).toBeGreaterThan(0);
   });
 
   it("applies nudges the code can guarantee", async () => {
@@ -211,6 +238,22 @@ describe("runPipeline with a live provider", () => {
     expect(tries).toBe(2);
     expect(t.llm.find((l) => l.step === "write")?.attempts[0].outcome).toBe("repaired");
     expect(t.references.length).toBeGreaterThan(0);
+  });
+
+  it("lets the planner pick the shoot base, and widens to the city when too few places are near it", async () => {
+    const prompts: string[] = [];
+    const { provider } = scriptedProvider({ plan: (mock) => ({ ...mock, base: "A2" }) });
+    const recording: LlmProvider = { ...provider, complete: (call) => (prompts.push(call.prompt), provider.complete(call)) };
+    const t = treatmentOf((await run({ artist: "Prateek Kuhad", city: "Mumbai" }, liveWith(recording))).outcome);
+    expect(prompts[0]).toContain("WHERE THE AUDIENCE IS (Qloo heatmap of Mumbai, strongest first)");
+    expect(prompts[0]).toMatch(/A2 \S/);
+    const base = t.base!;
+    const juhu = base.areas.find((a) => a.ref === "A2")!;
+    // Juhu has one mock cafe: too few to base a shoot on, so the search widens and the writer isn't told of a base.
+    expect(base).toMatchObject({ chosen: "A2", held: false });
+    expect(t.notes.join(" ")).toContain(`only 1 matched at first, so Mise widened the search from ${juhu.name} to all of Mumbai`);
+    expect(prompts.at(-1)).not.toContain("Shoot base:");
+    expect(t.locations.length).toBeGreaterThan(1);
   });
 
   it("thinks deeply by default and briefly for a quick treatment", async () => {
@@ -436,7 +479,18 @@ describe("LLM schemas", () => {
     } as unknown as WriteContext;
     expect(strictModeViolations(toJsonSchema(planSchema(["T1", "T2"])))).toEqual([]);
     expect(strictModeViolations(toJsonSchema(planSchema([])))).toEqual([]);
+    expect(strictModeViolations(toJsonSchema(planSchema(["T1"], ["A1", "A2"])))).toEqual([]);
     expect(strictModeViolations(toJsonSchema(writeSchema(ctx)))).toEqual([]);
+  });
+
+  it("only let the planner base the shoot in an area the heatmap returned", () => {
+    const plan = { direction: "A quiet film about leaving.", tone: ["T1"], deep_cuts: "balanced", wardrobe_words: ["vintage"], ambience_words: ["cozy"], venue_kinds: ["cafe"] };
+    const schema = planSchema(["T1"], ["A1", "A2"]);
+    expect(schema.safeParse({ ...plan, base: "A2" }).success).toBe(true);
+    expect(schema.safeParse({ ...plan, base: "A3" }).success).toBe(false);
+    expect(schema.safeParse(plan).success).toBe(false);
+    // No heatmap, no base field at all.
+    expect(planSchema(["T1"]).safeParse(plan).success).toBe(true);
   });
 });
 

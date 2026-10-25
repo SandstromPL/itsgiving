@@ -3,6 +3,7 @@ import type { CompactTag } from "../qloo";
 import { VENUE_KIND_VALUES, type VenueKind } from "../tools/shared";
 import { BUDGETS, priceLevelMax, type Brief, type Nudge } from "./brief";
 import { subjectPhrase } from "./options";
+import type { BaseArea } from "./types";
 
 // The planning LLM call: pick the creative direction and the parameters the
 // code then feeds to Qloo. Tags are shown to the model as short refs (T1, T2...)
@@ -43,6 +44,8 @@ export interface PlanContext {
   directorNames: string[];
   candidates: ToneCandidate[];
   leans: string[];
+  /** Areas of the shoot city where the audience over-indexes, strongest first (Qloo heatmap). */
+  areas?: BaseArea[];
   /** Set on the one re-plan: why the first plan's words found nothing. */
   feedback?: string;
 }
@@ -55,6 +58,8 @@ export interface PlanDraft {
   wardrobe_words: string[];
   ambience_words: string[];
   venue_kinds: VenueKind[];
+  /** Ref of the area to base the shoot in, when the heatmap found any. */
+  base?: string;
 }
 
 /**
@@ -68,7 +73,7 @@ export interface Plan extends PlanDraft {
 
 // Arrays only carry minimums: a model that returns one item too many is
 // trimmed in code (normalizePlan) instead of costing a repair call.
-export function planSchema(toneRefs: string[]): z.ZodType<PlanDraft> {
+export function planSchema(toneRefs: string[], areaRefs: string[] = []): z.ZodType<PlanDraft> {
   const words = (examples: string) =>
     z.array(z.string().min(2)).min(1).describe(`1-3 plain words for Qloo tag search, e.g. ${examples}.`);
   return z.strictObject({
@@ -80,7 +85,16 @@ export function planSchema(toneRefs: string[]): z.ZodType<PlanDraft> {
     wardrobe_words: words("vintage, streetwear, tailored, minimalist"),
     ambience_words: words("cozy, moody, neon, rooftop, industrial"),
     venue_kinds: z.array(z.enum(VENUE_KIND_VALUES)).min(1).describe("2-4 kinds of place to scout for locations."),
+    ...(areaRefs.length > 0
+      ? { base: z.enum(areaRefs as [string, ...string[]]).describe("The area ref to base the shoot in.") }
+      : {}),
   }) as unknown as z.ZodType<PlanDraft>;
+}
+
+/** "Bandra West, H/W Ward (near Pali Hill, Malla)": an area as the planner and the writer read it. */
+export function areaLabel(area: BaseArea, withNear = true): string {
+  const name = `${area.name}${area.district ? `, ${area.district}` : ""}`;
+  return withNear && area.near.length > 0 ? `${name} (near ${area.near.join(", ")})` : name;
 }
 
 export interface Who {
@@ -117,6 +131,14 @@ export function planPrompt(ctx: PlanContext): string {
   if (audience.length > 0) parts.push("The audience over-indexes on:", ...audience.map(tagLine));
   if (ctx.candidates.length === 0) parts.push("No taste tags came back for this audience.");
   if (ctx.leans.length > 0) parts.push(`Audience skew: ${ctx.leans.join("; ")}`);
+  const areas = ctx.areas ?? [];
+  if (areas.length > 0) {
+    parts.push(
+      "",
+      `WHERE THE AUDIENCE IS (Qloo heatmap of ${ctx.brief.city}, strongest first)`,
+      ...areas.map((a) => `${a.ref} ${areaLabel(a)}: ${Math.round(a.share * 100)}% of the strongest tiles`),
+    );
+  }
   parts.push(
     "",
     "TASK",
@@ -125,6 +147,11 @@ export function planPrompt(ctx: PlanContext): string {
     "Give 1-3 common style words each for wardrobe and for location ambience; Qloo's tag search reads them literally.",
     "Pick 2-4 venue_kinds that suit the story and can be filmed.",
   );
+  if (areas.length > 0) {
+    parts.push(
+      `Pick the base (by ref): the area the shoot is based in. The audience over-indexes in all of them; choose the one whose streets suit the story. Locations are scouted within ${areas[0].radius_m / 1000} km of it.`,
+    );
+  }
   if (ctx.feedback) parts.push("", "RE-PLAN", ctx.feedback);
   return parts.join("\n");
 }
@@ -168,6 +195,8 @@ export function mockPlan(ctx: PlanContext): PlanDraft {
     wardrobe_words: words.wardrobe,
     ambience_words: words.ambience,
     venue_kinds: WORDS[vibe].venues,
+    // The strongest area: the template has no story reason to prefer another.
+    ...(ctx.areas?.[0] ? { base: ctx.areas[0].ref } : {}),
   };
 }
 
