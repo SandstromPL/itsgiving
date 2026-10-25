@@ -58,7 +58,12 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
     logline: text.describe("One sentence."),
     concept: text.describe("80-140 words, present tense."),
     ...(tone.length > 0
-      ? { tone: z.array(z.strictObject({ ref: refEnum(tone), note: text })).min(1).describe("2-5 items: how each tone tag shows up on screen.") }
+      ? {
+          tone: z
+            .array(z.strictObject({ ref: refEnum(tone), note: text }))
+            .min(1)
+            .describe("2-5 items: how each tone tag shows up on screen."),
+        }
       : {}),
     beats: z
       .array(
@@ -86,13 +91,31 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
         }
       : {}),
     ...(brands.length > 0
-      ? { wardrobe: z.array(z.strictObject({ ref: refEnum(brands), look: text.describe("Garments, fabrics, colours.") })).min(1).describe("1-4 looks.") }
+      ? {
+          wardrobe: z
+            .array(z.strictObject({ ref: refEnum(brands), look: text.describe("Garments, fabrics, colours.") }))
+            .min(1)
+            .describe("1-4 looks."),
+        }
       : {}),
     ...(places.length > 0
-      ? { locations: z.array(z.strictObject({ ref: refEnum(places), scene: text.describe("What happens there.") })).min(1).describe("1-4 locations.") }
+      ? {
+          locations: z
+            .array(z.strictObject({ ref: refEnum(places), scene: text.describe("What happens there.") }))
+            .min(1)
+            .describe("1-4 locations."),
+        }
       : {}),
     palette: z
-      .array(z.strictObject({ name: text, hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/).describe("#RRGGBB") }))
+      .array(
+        z.strictObject({
+          name: text,
+          hex: z
+            .string()
+            .regex(/^#[0-9A-Fa-f]{6}$/)
+            .describe("#RRGGBB"),
+        }),
+      )
       .min(3)
       .describe("4-6 colours."),
     lighting: z.array(text).min(2).describe("2-4 lighting notes, each a plain sentence."),
@@ -138,20 +161,16 @@ function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): strin
   // Qloo's own read of the room, clipped so six places stay within Groq's tokens-per-minute budget.
   if (item.place?.ambience) bits.push(`"${item.place.ambience.slice(0, 140)}"`);
   // With one subject every pick is "via" it; only spend tokens on this when it discriminates.
-  const via = ctx.artistNames.length + ctx.touchstoneNames.length > 1 ? (item.because ?? []).map((b) => ctx.names.get(b.entity_id)).filter(Boolean) : [];
+  const via =
+    ctx.artistNames.length + ctx.touchstoneNames.length > 1
+      ? (item.because ?? []).map((b) => ctx.names.get(b.entity_id)).filter(Boolean)
+      : [];
   if (via.length > 0) bits.push(`via ${via.slice(0, 2).join(", ")}`);
   return bits.join(" · ");
 }
 
 export function writePrompt(ctx: WriteContext): string {
-  const parts = [
-    describeBrief(ctx.brief, ctx),
-    "",
-    "DIRECTION",
-    ctx.direction,
-    "",
-    "QLOO EVIDENCE (aggregate taste; ranked best first)",
-  ];
+  const parts = [describeBrief(ctx.brief, ctx), "", "DIRECTION", ctx.direction, "", "QLOO EVIDENCE (aggregate taste; ranked best first)"];
   if (ctx.tone.length > 0) parts.push(`Tone tags: ${ctx.tone.map((t) => `${t.ref} ${t.tag.name}`).join("; ")}`);
   if (ctx.leans.length > 0) parts.push(`Audience skew: ${ctx.leans.join("; ")}`);
   if (ctx.references.length > 0) parts.push("Film references:", ...ctx.references.map((r) => entityLine(r, ctx)));
@@ -248,7 +267,10 @@ function hashOf(textValue: string): number {
 
 /** Deterministic writer for mock mode and for when every LLM fails; output is labelled "Mock LLM". */
 export function mockDraft(ctx: WriteContext): Draft {
-  const vibe = vibeOf(ctx.tone.map((t) => t.tag.name), ctx.brief.nudges.includes("darker"));
+  const vibe = vibeOf(
+    ctx.tone.map((t) => t.tag.name),
+    ctx.brief.nudges.includes("darker"),
+  );
   const subject = subjectPhrase(ctx.artistNames, ctx.touchstoneNames);
   const toneNames = ctx.tone.map((t) => t.tag.name.toLowerCase());
   const refs = ctx.references.slice(0, 4);
@@ -266,7 +288,12 @@ export function mockDraft(ctx: WriteContext): Draft {
       `${ctx.direction} The film stays close to the performer and lets the city do the talking: ` +
       `${places.map((p) => p.item.name).join(", ") || ctx.brief.city} stand in for the song's emotional rooms. ` +
       (refs.length > 0 ? `Visually it borrows from ${refs.map((r) => r.item.name).join(", ")}. ` : "") +
-      (brands.length > 0 ? `Wardrobe pulls from ${brands.map((b) => b.item.name).join(", ")}, kept within a ${palette.slice(0, 3).map((c) => c.name.toLowerCase()).join(", ")} palette.` : ""),
+      (brands.length > 0
+        ? `Wardrobe pulls from ${brands.map((b) => b.item.name).join(", ")}, kept within a ${palette
+            .slice(0, 3)
+            .map((c) => c.name.toLowerCase())
+            .join(", ")} palette.`
+        : ""),
     ...(ctx.tone.length > 0
       ? { tone: ctx.tone.slice(0, 5).map((t) => ({ ref: t.ref, note: `Let ${t.tag.name.toLowerCase()} set the pace and the framing.` })) }
       : {}),
@@ -293,7 +320,12 @@ export function mockDraft(ctx: WriteContext): Draft {
         }
       : {}),
     ...(places.length > 0
-      ? { locations: places.map((p, i) => ({ ref: p.ref, scene: `The ${beatNames[i].toLowerCase()} beat: ${i === 0 ? "establish the artist in their element" : i === 1 ? "the middle section's movement" : "the final turn"}.` })) }
+      ? {
+          locations: places.map((p, i) => ({
+            ref: p.ref,
+            scene: `The ${beatNames[i].toLowerCase()} beat: ${i === 0 ? "establish the artist in their element" : i === 1 ? "the middle section's movement" : "the final turn"}.`,
+          })),
+        }
       : {}),
     palette: palette.slice(0, 5),
     lighting: LIGHTING[vibe],

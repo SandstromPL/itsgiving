@@ -55,7 +55,10 @@ describe("generateJson", () => {
       const value = v as { notes: unknown[] };
       return { notes: value.notes.map((n) => (typeof n === "object" && n ? Object.values(n).join(", ") : n)) };
     };
-    const result = await generateJson({ name: "notes", system: "s", prompt: "p", schema: notes, mock: () => ({ notes: ["x"] }), normalize: flatten }, deps([reply.provider]));
+    const result = await generateJson(
+      { name: "notes", system: "s", prompt: "p", schema: notes, mock: () => ({ notes: ["x"] }), normalize: flatten },
+      deps([reply.provider]),
+    );
     expect(result.data).toEqual({ notes: ["One tungsten fresnel, warm skin"] });
     expect(result.calls).toBe(1);
     expect(result.attempts[0].outcome).toBe("ok");
@@ -64,7 +67,8 @@ describe("generateJson", () => {
   it("credits the thinking depth only to a provider that honours it", async () => {
     const thinker = { ...scripted("gemini", "thinker", ['{"title":"A","tone":"T1"}']).provider, thinks: true };
     const plain = scripted("gemini", "plain", ['{"title":"A","tone":"T1"}']).provider;
-    const ask = (p: LlmProvider) => generateJson({ name: "t", system: "s", prompt: "p", schema, mock: () => MOCK, reasoning: "high" }, deps([p]));
+    const ask = (p: LlmProvider) =>
+      generateJson({ name: "t", system: "s", prompt: "p", schema, mock: () => MOCK, reasoning: "high" }, deps([p]));
     expect((await ask(thinker)).producedBy).toEqual({ provider: "gemini", model: "thinker", mock: false, reasoning: "high" });
     expect((await ask(plain)).producedBy).toEqual({ provider: "gemini", model: "plain", mock: false });
   });
@@ -136,8 +140,7 @@ describe("generateJson", () => {
     const slow: LlmProvider = {
       kind: "gemini",
       model: "slow",
-      complete: (call) =>
-        new Promise((_, reject) => call.signal.addEventListener("abort", () => reject(call.signal.reason))),
+      complete: (call) => new Promise((_, reject) => call.signal.addEventListener("abort", () => reject(call.signal.reason))),
     };
     const result = await ask(deps([slow], { timeoutMs: 20 }));
     expect(result.attempts[0]).toMatchObject({ model: "slow", outcome: "error", kind: "timeout" });
@@ -215,7 +218,10 @@ describe("generateJson", () => {
           });
         }),
     };
-    const result = await generateJson({ name: "test", system: "", prompt: "", schema, mock: () => MOCK, timeoutMs: 50 }, deps([slow], { timeoutMs: 60_000 }));
+    const result = await generateJson(
+      { name: "test", system: "", prompt: "", schema, mock: () => MOCK, timeoutMs: 50 },
+      deps([slow], { timeoutMs: 60_000 }),
+    );
     expect(result.attempts[0]).toMatchObject({ outcome: "error", kind: "timeout" });
     expect(seen).toBeLessThan(1_000);
   });
@@ -236,7 +242,10 @@ describe("generateJson", () => {
 
   it("rejects a mock that breaks its own schema (a programming error)", async () => {
     await expect(
-      generateJson({ name: "bad", system: "", prompt: "", schema, mock: () => ({ title: "", tone: "T3" }) as never }, deps([], { mode: "mock" })),
+      generateJson(
+        { name: "bad", system: "", prompt: "", schema, mock: () => ({ title: "", tone: "T3" }) as never },
+        deps([], { mode: "mock" }),
+      ),
     ).rejects.toThrow(/does not match its schema/);
   });
 });
@@ -269,7 +278,12 @@ describe("llmConfigFromEnv", () => {
   });
 
   it("honours model overrides, drops 'none', and skips providers without a key", () => {
-    const overridden = llmConfigFromEnv({ GEMINI_API_KEY: "k", GROQ_API_KEY: "g", GEMINI_MODEL: "gemini-x", GEMINI_FALLBACK_MODEL: "none" });
+    const overridden = llmConfigFromEnv({
+      GEMINI_API_KEY: "k",
+      GROQ_API_KEY: "g",
+      GEMINI_MODEL: "gemini-x",
+      GEMINI_FALLBACK_MODEL: "none",
+    });
     expect(createProviders(overridden).map((p) => `${p.kind}:${p.model}`)).toEqual(["gemini:gemini-x", "groq:openai/gpt-oss-120b"]);
     expect(createProviders(llmConfigFromEnv({ GROQ_API_KEY: "g" })).map((p) => p.kind)).toEqual(["groq"]);
     const same = llmConfigFromEnv({ GEMINI_API_KEY: "k", GEMINI_FALLBACK_MODEL: "gemini-3.5-flash-lite" });
@@ -300,7 +314,15 @@ function recordingFetch(status: number, body: unknown) {
 const call = (overrides: Partial<LlmCall> = {}): LlmCall => ({
   system: "You plan.",
   prompt: "Brief here.",
-  schema: toJsonSchema(z.strictObject({ tone: z.array(z.enum(["T1"])).min(1).max(3), hex: z.string().regex(/^#/) })),
+  schema: toJsonSchema(
+    z.strictObject({
+      tone: z
+        .array(z.enum(["T1"]))
+        .min(1)
+        .max(3),
+      hex: z.string().regex(/^#/),
+    }),
+  ),
   schemaName: "plan",
   maxOutputTokens: 2048,
   effort: "low",
@@ -358,7 +380,10 @@ describe("geminiProvider", () => {
   });
 
   it("treats MAX_TOKENS and safety stops as failures", async () => {
-    for (const [finishReason, kind] of [["MAX_TOKENS", "truncated"], ["SAFETY", "blocked"]]) {
+    for (const [finishReason, kind] of [
+      ["MAX_TOKENS", "truncated"],
+      ["SAFETY", "blocked"],
+    ]) {
       const { fetchImpl } = recordingFetch(200, { candidates: [{ content: { parts: [{ text: "{" }] }, finishReason }] });
       const provider = geminiProvider({ apiKey: "k", model: "m", fetch: fetchImpl });
       await expect(provider.complete(call())).rejects.toMatchObject({ kind });
@@ -403,9 +428,13 @@ describe("groqProvider", () => {
 
   it("maps 413 (tokens-per-minute) to rate_limit and a schema miss to invalid_output", async () => {
     const tpm = recordingFetch(413, { error: { message: "Request too large" } });
-    await expect(groqProvider({ apiKey: "k", model: "m", fetch: tpm.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "rate_limit" });
+    await expect(groqProvider({ apiKey: "k", model: "m", fetch: tpm.fetchImpl }).complete(call())).rejects.toMatchObject({
+      kind: "rate_limit",
+    });
     const miss = recordingFetch(400, { error: { message: "Generated JSON does not match the expected schema." } });
-    await expect(groqProvider({ apiKey: "k", model: "m", fetch: miss.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "invalid_output" });
+    await expect(groqProvider({ apiKey: "k", model: "m", fetch: miss.fetchImpl }).complete(call())).rejects.toMatchObject({
+      kind: "invalid_output",
+    });
   });
 
   it("stays at low effort whatever depth the call asks for", async () => {
@@ -452,7 +481,9 @@ describe("deepseekProvider", () => {
       status: 402,
     });
     const empty = recordingFetch(200, { choices: [{ message: { content: "" }, finish_reason: "stop" }] });
-    await expect(deepseekProvider({ apiKey: "k", model: "m", fetch: empty.fetchImpl }).complete(call())).rejects.toMatchObject({ kind: "empty" });
+    await expect(deepseekProvider({ apiKey: "k", model: "m", fetch: empty.fetchImpl }).complete(call())).rejects.toMatchObject({
+      kind: "empty",
+    });
   });
 
   it("thinks at the call's depth, with room for the reasoning on top of the answer's tokens", async () => {

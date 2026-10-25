@@ -73,7 +73,12 @@ describe("compactEntity", () => {
         ambience_description: "Gilded Age glamour with velvet furnishings.",
       },
     });
-    expect(compact.place).toMatchObject({ kind: "Lounge bar", ambience: "Gilded Age glamour with velvet furnishings.", lat: 40.76, lon: -73.97 });
+    expect(compact.place).toMatchObject({
+      kind: "Lounge bar",
+      ambience: "Gilded Age glamour with velvet furnishings.",
+      lat: 40.76,
+      lon: -73.97,
+    });
   });
 
   it("puts a film's style tags first and drops noise and generic labels", () => {

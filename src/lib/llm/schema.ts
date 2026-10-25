@@ -7,16 +7,7 @@ import { z } from "zod";
 type JsonSchema = Record<string, unknown>;
 
 /** Keywords both Gemini (responseJsonSchema) and Groq (strict json_schema) accept. */
-export const BASE_KEYWORDS = [
-  "type",
-  "properties",
-  "required",
-  "additionalProperties",
-  "items",
-  "enum",
-  "description",
-  "anyOf",
-] as const;
+export const BASE_KEYWORDS = ["type", "properties", "required", "additionalProperties", "items", "enum", "description", "anyOf"] as const;
 
 /** Gemini also enforces array and number bounds. */
 export const GEMINI_KEYWORDS = [...BASE_KEYWORDS, "minItems", "maxItems", "minimum", "maximum"] as const;
@@ -35,9 +26,7 @@ export function sanitizeSchema(node: unknown, keep: readonly string[]): unknown 
     if (!keep.includes(key)) continue;
     if (key === "properties" && value && typeof value === "object") {
       // Property names are data, not keywords: keep every one.
-      out.properties = Object.fromEntries(
-        Object.entries(value as JsonSchema).map(([name, child]) => [name, sanitizeSchema(child, keep)]),
-      );
+      out.properties = Object.fromEntries(Object.entries(value as JsonSchema).map(([name, child]) => [name, sanitizeSchema(child, keep)]));
     } else {
       out[key] = sanitizeSchema(value, keep);
     }

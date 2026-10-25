@@ -198,7 +198,9 @@ export function Board({
       className={`flex flex-col gap-12 transition-opacity duration-300 ${state === "current" ? "" : "opacity-50"}`}
     >
       {state === "previous" && (
-        <p className="-mb-6 text-sm text-dim">This is the previous version. The latest change didn&apos;t finish, so nothing below reflects it.</p>
+        <p className="-mb-6 text-sm text-dim">
+          This is the previous version. The latest change didn&apos;t finish, so nothing below reflects it.
+        </p>
       )}
       <div className="flex flex-col gap-5">
         <Cover t={t} />
@@ -370,7 +372,12 @@ export function Board({
                       mock={mock}
                     />
                     {map && (
-                      <a href={map} target="_blank" rel="noreferrer" className="text-xs text-dim underline decoration-edge underline-offset-4 hover:text-paper">
+                      <a
+                        href={map}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-dim underline decoration-edge underline-offset-4 hover:text-paper"
+                      >
                         Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
                       </a>
                     )}
@@ -436,7 +443,13 @@ export function Board({
             </>
           )}
           <dt className="text-sm text-paper">The audience over-indexes on</dt>
-          <dd>{t.audience.taste_tags.length > 0 ? <TagList tags={t.audience.taste_tags} mock={mock} /> : <p className="text-sm text-dim">No taste tags came back.</p>}</dd>
+          <dd>
+            {t.audience.taste_tags.length > 0 ? (
+              <TagList tags={t.audience.taste_tags} mock={mock} />
+            ) : (
+              <p className="text-sm text-dim">No taste tags came back.</p>
+            )}
+          </dd>
           {t.audience.leans.length > 0 && (
             <>
               <dt className="text-sm text-paper">Who over-indexes</dt>
@@ -471,11 +484,14 @@ export function Board({
           </ul>
         )}
         {t.mock.qloo && (
-          <p className="mt-4 text-sm text-tape">Mock data: the names are real, but every score, tag, photo and ranking here is synthetic, not Qloo&apos;s.</p>
+          <p className="mt-4 text-sm text-tape">
+            Mock data: the names are real, but every score, tag, photo and ranking here is synthetic, not Qloo&apos;s.
+          </p>
         )}
         {templated.length > 0 && (
           <p className="mt-2 text-sm text-tape">
-            Mock LLM: a deterministic template did the {templated.join(" and ")} {templated.length === 1 ? "step" : "steps"}, not a language model.
+            Mock LLM: a deterministic template did the {templated.join(" and ")} {templated.length === 1 ? "step" : "steps"}, not a language
+            model.
           </p>
         )}
       </Section>
@@ -513,7 +529,15 @@ function CoverCard({ cover, onOpen }: { cover: FeaturedCover; onOpen: () => void
   );
 }
 
-export function EmptyBoard({ examples, covers, onTry }: { examples: Example[]; covers: FeaturedCover[]; onTry: (example: Example) => void }) {
+export function EmptyBoard({
+  examples,
+  covers,
+  onTry,
+}: {
+  examples: Example[];
+  covers: FeaturedCover[];
+  onTry: (example: Example) => void;
+}) {
   const coverOf = (example: Example) => covers.find((c) => c.slug === example.slug);
   const featured = examples.filter(coverOf);
   const plain = examples.filter((e) => !coverOf(e));
@@ -523,8 +547,8 @@ export function EmptyBoard({ examples, covers, onTry }: { examples: Example[]; c
       <div className="flex min-h-[24rem] flex-col justify-end rounded-[3px] bg-frame p-6 sm:aspect-[2.39/1] sm:min-h-auto sm:p-10">
         <h2 className="type-poster max-w-[13ch] text-[clamp(3rem,7vw,7rem)] text-balance text-paper">Your voice, their taste.</h2>
         <p className="mt-5 max-w-[54ch] text-base leading-7 text-pretty text-dim sm:text-lg sm:leading-8">
-          Give Mise an artist, a shoot city and a budget. It reads what that audience loves on Qloo, then writes a treatment you can
-          pitch: reference films, wardrobe, real locations, and the evidence behind every pick.
+          Give Mise an artist, a shoot city and a budget. It reads what that audience loves on Qloo, then writes a treatment you can pitch:
+          reference films, wardrobe, real locations, and the evidence behind every pick.
         </p>
       </div>
 
@@ -533,7 +557,9 @@ export function EmptyBoard({ examples, covers, onTry }: { examples: Example[]; c
           <h3 id="featured-heading" className="text-[13px] font-medium text-dim">
             Featured treatments
           </h3>
-          <p className="mt-1 text-sm leading-6 text-faint">Built ahead of time from live Qloo data, so they open at once. Rework any of them, or write your own brief.</p>
+          <p className="mt-1 text-sm leading-6 text-faint">
+            Built ahead of time from live Qloo data, so they open at once. Rework any of them, or write your own brief.
+          </p>
           <ul className="mt-4 grid gap-4 lg:grid-cols-2">
             {featured.map((example) => (
               <li key={example.slug}>

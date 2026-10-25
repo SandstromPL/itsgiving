@@ -104,7 +104,11 @@ function placeLabels(rings: { name: string; x: number; y: number; r: number }[],
       left: { left: ring.x - ring.r - 4 - w, right: ring.x - ring.r - 4, top: ring.y - h / 2, bottom: ring.y + h / 2 },
     };
     const fits = (b: Box) =>
-      b.left >= 0 && b.right <= width && b.top >= 0 && b.bottom <= height && !taken.some((t) => b.left < t.right && b.right > t.left && b.top < t.bottom && b.bottom > t.top);
+      b.left >= 0 &&
+      b.right <= width &&
+      b.top >= 0 &&
+      b.bottom <= height &&
+      !taken.some((t) => b.left < t.right && b.right > t.left && b.top < t.bottom && b.bottom > t.top);
     const side = (["above", "below", "right", "left"] as const).find((s) => fits(boxes[s])) ?? "above";
     taken.push(boxes[side]);
     return side;
@@ -172,7 +176,15 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
           {spots.map((spot, i) => (
             <g key={i}>
               {(placed[i].x !== spot.x || placed[i].y !== spot.y) && (
-                <line x1={spot.x} y1={spot.y} x2={placed[i].x} y2={placed[i].y} stroke="var(--foreground)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+                <line
+                  x1={spot.x}
+                  y1={spot.y}
+                  x2={placed[i].x}
+                  y2={placed[i].y}
+                  stroke="var(--foreground)"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
               )}
               <circle cx={spot.x} cy={spot.y} r={2.5} fill="var(--foreground)" />
             </g>

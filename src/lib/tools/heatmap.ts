@@ -51,8 +51,7 @@ export const heatOf = (cell: HeatCell) => cell.affinity * cell.popularity;
 export function distanceM(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
   const rad = Math.PI / 180;
   const h =
-    Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 +
-    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lon - a.lon) * rad) / 2) ** 2;
+    Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lon - a.lon) * rad) / 2) ** 2;
   return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
 }
 
@@ -109,9 +108,14 @@ function tileSize(precision: number, kx: number): number {
  * clearly (the whole city when there are none). Qloo's tiles (150 m to 5 km, thousands per city) are binned
  * into squares about 1/`across` of the frame, never finer than Qloo's own tiles, each keeping its hottest tile.
  */
-export function heatGrid(cells: HeatCell[], areas: { lat: number; lon: number; radius_m: number }[] = [], across = 40): HeatGrid | undefined {
+export function heatGrid(
+  cells: HeatCell[],
+  areas: { lat: number; lon: number; radius_m: number }[] = [],
+  across = 40,
+): HeatGrid | undefined {
   if (cells.length === 0) return undefined;
-  const spots = areas.length > 0 ? areas.map((a) => ({ ...a, reach: a.radius_m + FRAME_MARGIN_M })) : cells.map((c) => ({ ...c, reach: 0 }));
+  const spots =
+    areas.length > 0 ? areas.map((a) => ({ ...a, reach: a.radius_m + FRAME_MARGIN_M })) : cells.map((c) => ({ ...c, reach: 0 }));
   const kx = Math.cos(((spots.reduce((sum, s) => sum + s.lat, 0) / spots.length) * Math.PI) / 180);
   let south = Math.min(...spots.map((s) => s.lat - s.reach / METRES_PER_DEGREE));
   let north = Math.max(...spots.map((s) => s.lat + s.reach / METRES_PER_DEGREE));
@@ -193,7 +197,7 @@ export const audienceHeatmap = defineTool({
     "area. These are aggregate affinities by area, never facts about the people who live there.",
   inputSchema: z.strictObject({
     signal_entity_ids: entityIds(10).describe("The artist and/or touchstones whose audience to map."),
-    city: z.string().min(1).describe("The shoot city as the user wrote it, e.g. \"Mumbai\"."),
+    city: z.string().min(1).describe('The shoot city as the user wrote it, e.g. "Mumbai".'),
     locality_id: z
       .string()
       .min(1)

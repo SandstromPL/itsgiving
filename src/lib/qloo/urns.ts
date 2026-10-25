@@ -42,24 +42,9 @@ export const TAG_TYPES = {
 
 export type TagKind = keyof typeof TAG_TYPES;
 
-export const AGE_BUCKETS = [
-  "24_and_younger",
-  "25_to_29",
-  "30_to_34",
-  "35_to_44",
-  "45_to_54",
-  "55_and_older",
-] as const;
+export const AGE_BUCKETS = ["24_and_younger", "25_to_29", "30_to_34", "35_to_44", "45_to_54", "55_and_older"] as const;
 
-export const WEEKDAYS = [
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-] as const;
+export const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;
 
 export function entityUrn(kind: EntityKind): EntityUrn {
   return ENTITY_TYPES[kind];
@@ -67,8 +52,6 @@ export function entityUrn(kind: EntityKind): EntityUrn {
 
 export function kindFromUrn(urn: string | undefined): EntityKind | undefined {
   if (!urn) return undefined;
-  const match = (Object.entries(ENTITY_TYPES) as [EntityKind, string][]).find(
-    ([, value]) => value === urn,
-  );
+  const match = (Object.entries(ENTITY_TYPES) as [EntityKind, string][]).find(([, value]) => value === urn);
   return match?.[0];
 }

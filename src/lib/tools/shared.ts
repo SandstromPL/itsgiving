@@ -58,11 +58,7 @@ export function venueTagIds(kinds: readonly VenueKind[]): string[] {
 }
 
 export const entityIds = (max: number) =>
-  z
-    .array(z.string().min(1))
-    .min(1)
-    .max(max)
-    .describe("Qloo entity IDs exactly as returned by resolve_entities or import_external_ids.");
+  z.array(z.string().min(1)).min(1).max(max).describe("Qloo entity IDs exactly as returned by resolve_entities or import_external_ids.");
 
 export const tagIds = (max: number) =>
   z

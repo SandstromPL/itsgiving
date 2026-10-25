@@ -51,7 +51,10 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
       <ul className="mt-1.5 flex flex-col gap-1">
         {calls.map((call, i) => (
           // The request itself is code, so it keeps a code face.
-          <li key={i} className="overflow-x-auto whitespace-nowrap rounded-sm bg-frame px-2 py-1 font-mono text-[10.5px] leading-4 text-dim">
+          <li
+            key={i}
+            className="overflow-x-auto whitespace-nowrap rounded-sm bg-frame px-2 py-1 font-mono text-[10.5px] leading-4 text-dim"
+          >
             <span className="text-paper">GET {call.path}</span> {new URLSearchParams(call.query).toString()}{" "}
             <span className="text-faint">
               {call.status} {call.cached ? "cached" : `${call.durationMs} ms`}
@@ -91,13 +94,19 @@ export function Timeline({ steps, size = "rail" }: { steps: StepEvent[]; size?: 
   const stage = size === "stage";
   // No aria-busy here: screen readers may hold back the live region below until it clears.
   return (
-    <section aria-labelledby={stage ? undefined : "agent-heading"} aria-label={stage ? "Run log" : undefined} className="flex flex-col gap-3">
+    <section
+      aria-labelledby={stage ? undefined : "agent-heading"}
+      aria-label={stage ? "Run log" : undefined}
+      className="flex flex-col gap-3"
+    >
       {!stage && (
         <div>
           <h2 id="agent-heading" className="type-head text-lg text-paper">
             Run log
           </h2>
-          <p className="mt-1 text-xs leading-5 text-dim">Code makes every Qloo call. The model only plans and writes, citing what Qloo returned.</p>
+          <p className="mt-1 text-xs leading-5 text-dim">
+            Code makes every Qloo call. The model only plans and writes, citing what Qloo returned.
+          </p>
         </div>
       )}
       <p className="sr-only" aria-live="polite">

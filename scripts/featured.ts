@@ -50,7 +50,13 @@ async function build(example: Example, llmConfig: LlmConfig, qloo: ReturnType<ty
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     const started = Date.now();
     // Fresh cooldowns per attempt: one slow call shouldn't bench DeepSeek for the retry.
-    const llm = { mode: llmConfig.mode, providers: createProviders(llmConfig), budget: new DailyBudget(20), timeoutMs: llmConfig.timeoutMs, cooldowns: new Cooldowns() };
+    const llm = {
+      mode: llmConfig.mode,
+      providers: createProviders(llmConfig),
+      budget: new DailyBudget(20),
+      timeoutMs: llmConfig.timeoutMs,
+      cooldowns: new Cooldowns(),
+    };
     try {
       const outcome = await runPipeline(brief, { qloo, llm }, () => {}, {
         id: `featured-${example.slug}`,
@@ -123,7 +129,9 @@ async function main() {
     else missing += 1;
     if (fresh) {
       const kept = !fresh.item && previous ? "; kept the previous one" : "";
-      console.log(`  ${fresh.item ? "built" : "FAILED"}  ${example.slug}  ${fresh.item ? `"${fresh.item.treatment.title}", ` : ""}${fresh.note}${kept}`);
+      console.log(
+        `  ${fresh.item ? "built" : "FAILED"}  ${example.slug}  ${fresh.item ? `"${fresh.item.treatment.title}", ` : ""}${fresh.note}${kept}`,
+      );
     }
   }
 

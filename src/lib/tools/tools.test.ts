@@ -37,7 +37,12 @@ describe("resolve_entities", () => {
   it("resolves exact names and asks about ambiguous ones", async () => {
     const result = await runTool(
       "resolve_entities",
-      { items: [{ name: "prateek kuhad", type: "artist" }, { name: "Forgotten", type: "movie" }] },
+      {
+        items: [
+          { name: "prateek kuhad", type: "artist" },
+          { name: "Forgotten", type: "movie" },
+        ],
+      },
       ctx,
     );
     expect(result.status).toBe("needs_input");
@@ -58,7 +63,13 @@ describe("resolve_entities", () => {
       baseUrl: "https://mock.qloo.invalid",
       fetch: async (url, init) => {
         if (!url.includes("/search")) return mock(url, init);
-        const film = (id: string, popularity: number) => ({ entity_id: id, name: "Aftersun", subtype: "urn:entity:movie", popularity, properties: { release_year: 2022 } });
+        const film = (id: string, popularity: number) => ({
+          entity_id: id,
+          name: "Aftersun",
+          subtype: "urn:entity:movie",
+          popularity,
+          properties: { release_year: 2022 },
+        });
         return new Response(JSON.stringify({ results: [film("A", 0.999), film("B", 0.086)] }), { status: 200 });
       },
     });
@@ -75,7 +86,12 @@ describe("resolve_entities", () => {
   it("never asks about a city, and reads a state that shares a city's name as the city", async () => {
     const result = await runTool(
       "resolve_entities",
-      { items: [{ name: "New York", type: "locality" }, { name: "Bombay", type: "locality" }] },
+      {
+        items: [
+          { name: "New York", type: "locality" },
+          { name: "Bombay", type: "locality" },
+        ],
+      },
       ctx,
     );
     expect(result.status).toBe("ok");
@@ -120,7 +136,10 @@ describe("audience_heatmap", () => {
 
   it("frames the map on the strongest areas, never thinner than 4:5 and never finer than Qloo's tiles", () => {
     // A long, thin city: 0.4 degrees of latitude, 0.05 of longitude, in New York-sized tiles (geohash 6).
-    const tiles = Array.from({ length: 800 }, (_, i) => ({ ...cell(18.9 + (i % 80) * 0.005, 72.8 + Math.floor(i / 80) * 0.005, 0.5), precision: 6 }));
+    const tiles = Array.from({ length: 800 }, (_, i) => ({
+      ...cell(18.9 + (i % 80) * 0.005, 72.8 + Math.floor(i / 80) * 0.005, 0.5),
+      precision: 6,
+    }));
     const grid = heatGrid(tiles, [{ lat: 19.0, lon: 72.82, radius_m: 2_000 }]) as HeatGrid;
     const { south, north, west, east } = grid.bounds!;
     const kx = Math.cos((19 * Math.PI) / 180);
@@ -157,11 +176,7 @@ describe("reference_films", () => {
   });
 
   it("applies the popularity ceiling and explains each pick", async () => {
-    const result = await runTool(
-      "reference_films",
-      { signal_entity_ids: [mockEntityId("Frank Ocean")], max_popularity: 0.85 },
-      ctx,
-    );
+    const result = await runTool("reference_films", { signal_entity_ids: [mockEntityId("Frank Ocean")], max_popularity: 0.85 }, ctx);
     const references = (result.data as Data<"references">).references;
     expect(references.length).toBeGreaterThan(0);
     expect(references.every((r) => (r.popularity ?? 1) <= 0.85)).toBe(true);
@@ -178,14 +193,23 @@ describe("styling_brands", () => {
       { signal_entity_ids: [mockEntityId("Charli xcx")], style_tag_ids: ["urn:tag:genre:brand:fashion:streetwear"] },
       ctx,
     );
-    expect(steered.provenance[0].query).toMatchObject({ "feature.explainability": "false", "signal.interests.tags": "urn:tag:genre:brand:fashion:streetwear" });
+    expect(steered.provenance[0].query).toMatchObject({
+      "feature.explainability": "false",
+      "signal.interests.tags": "urn:tag:genre:brand:fashion:streetwear",
+    });
     expect((steered.data as Data<"brands">).brands[0].name).toMatch(/Stüssy|Carhartt WIP/);
   });
 });
 
 describe("oneBranchEach", () => {
   it("keeps the best-ranked branch of each chain, in Qloo's order", () => {
-    const places = ["Starbucks - Juhu Tara Road", "Cafe Mondegar", "Starbucks - Vile Parle West", "The Coffee Bean & Tea Leaf (Malad)", "The Coffee Bean & Tea Leaf - Bandra"];
+    const places = [
+      "Starbucks - Juhu Tara Road",
+      "Cafe Mondegar",
+      "Starbucks - Vile Parle West",
+      "The Coffee Bean & Tea Leaf (Malad)",
+      "The Coffee Bean & Tea Leaf - Bandra",
+    ];
     expect(oneBranchEach(places.map((name) => ({ name }))).map((p) => p.name)).toEqual([
       "Starbucks - Juhu Tara Road",
       "Cafe Mondegar",
@@ -222,11 +246,7 @@ describe("scout_locations", () => {
   });
 
   it("suggests how to relax the search when nothing matches", async () => {
-    const result = await runTool(
-      "scout_locations",
-      { city: "Mumbai", venue_kinds: ["music_venue"], price_level_max: 1 },
-      ctx,
-    );
+    const result = await runTool("scout_locations", { city: "Mumbai", venue_kinds: ["music_venue"], price_level_max: 1 }, ctx);
     expect(result.status).toBe("empty");
     expect(result.summary).toContain("more venue_kinds");
   });

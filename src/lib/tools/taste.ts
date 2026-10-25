@@ -16,7 +16,7 @@ import { SEARCHABLE_KINDS, TAG_KIND_VALUES, defineTool, entityIds, plural, take 
 export const findTags = defineTool({
   name: "find_tags",
   description:
-    "Translate a mood, style or concept (e.g. \"neon\", \"melancholic\", \"art deco\", \"rooftop\", \"streetwear\") into Qloo " +
+    'Translate a mood, style or concept (e.g. "neon", "melancholic", "art deco", "rooftop", "streetwear") into Qloo ' +
     "tag IDs. Call this before using any concept as a signal or filter: Qloo rejects free-text tags. Results are ranked " +
     "candidates, not proof; prefer tags whose applies_to includes the entity type you will query next.",
   inputSchema: z.strictObject({
@@ -49,7 +49,10 @@ export const findTags = defineTool({
       status: tags.length > 0 ? "ok" : "empty",
       summary:
         tags.length > 0
-          ? `${plural(tags.length, "tag candidate")} for "${input.query}": ${tags.slice(0, 5).map((t) => t.name).join(", ")}.`
+          ? `${plural(tags.length, "tag candidate")} for "${input.query}": ${tags
+              .slice(0, 5)
+              .map((t) => t.name)
+              .join(", ")}.`
           : `No tags matched "${input.query}"; try a simpler or different word.`,
       data: { tags },
     };
@@ -116,8 +119,12 @@ export const readAudience = defineTool({
     return {
       status: tasteTags.length + audience.length > 0 ? "ok" : "empty",
       summary:
-        `Audience over-indexes on ${tasteTags.slice(0, 6).map((t) => t.name).join(", ") || "no clear tags"}.` +
-        (audience[0] ? ` ${audience[0].leans}.` : ""),
+        `Audience over-indexes on ${
+          tasteTags
+            .slice(0, 6)
+            .map((t) => t.name)
+            .join(", ") || "no clear tags"
+        }.` + (audience[0] ? ` ${audience[0].leans}.` : ""),
       data: { taste_tags: tasteTags, demographics: audience },
       warnings,
     };
@@ -150,7 +157,10 @@ export const tasteOverlap = defineTool({
       status: traits.length > 0 ? "ok" : "empty",
       summary:
         traits.length > 0
-          ? `Shared traits: ${traits.slice(0, 6).map((t) => t.name).join(", ")}.`
+          ? `Shared traits: ${traits
+              .slice(0, 6)
+              .map((t) => t.name)
+              .join(", ")}.`
           : "No shared traits found between the two groups.",
       data: { shared_traits: traits },
     };

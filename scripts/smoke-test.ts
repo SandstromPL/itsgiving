@@ -103,7 +103,12 @@ async function check(id: string, title: string, body: () => Promise<[Verdict, st
 }
 
 function names(entities: CompactEntity[], max = 6): string {
-  return entities.slice(0, max).map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`).join(", ") || "none";
+  return (
+    entities
+      .slice(0, max)
+      .map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`)
+      .join(", ") || "none"
+  );
 }
 
 function jaccard(a: string[], b: string[]): number {
@@ -181,7 +186,10 @@ async function main() {
     const viaSpotify = entityList(spotify.data)[0]?.name ?? "nothing";
     const missing = ARTISTS.filter((a) => !artistIds.has(a));
     const verdict = missing.length === 0 ? "PASS" : missing.length < ARTISTS.length ? "WARN" : "FAIL";
-    return [verdict, `Found ${artistIds.size}/${ARTISTS.length}${missing.length ? ` (missing: ${missing.join(", ")})` : ""}. Spotify ${DOCS_SPOTIFY_ID} -> ${viaSpotify}.`];
+    return [
+      verdict,
+      `Found ${artistIds.size}/${ARTISTS.length}${missing.length ? ` (missing: ${missing.join(", ")})` : ""}. Spotify ${DOCS_SPOTIFY_ID} -> ${viaSpotify}.`,
+    ];
   });
 
   const [artistA, artistB] = [...artistIds.entries()];
@@ -202,16 +210,20 @@ async function main() {
     });
     baseline = a.entities;
     const raw = (a.result.data as InsightsResponse).results?.entities?.[0]?.query?.explainability;
-    const explain = raw === undefined
-      ? "no explainability returned"
-      : `explainability keys: ${Object.keys(raw as object).join(", ") || "(empty)"}; parsed ${extractContributions(raw).length} contributions`;
+    const explain =
+      raw === undefined
+        ? "no explainability returned"
+        : `explainability keys: ${Object.keys(raw as object).join(", ") || "(empty)"}; parsed ${extractContributions(raw).length} contributions`;
     if (!artistB) return ["WARN", `${nameA}: ${names(a.entities)}. Only one artist resolved, so no comparison. ${explain}.`];
     const b = await insightsEntities(`movies-${artistB[0]}`, {
       "filter.type": ENTITY_TYPES.movie,
       "signal.interests.entities": artistB[1],
       take: 15,
     });
-    const overlap = jaccard(a.entities.map((e) => e.id), b.entities.map((e) => e.id));
+    const overlap = jaccard(
+      a.entities.map((e) => e.id),
+      b.entities.map((e) => e.id),
+    );
     const verdict = a.entities.length === 0 ? "FAIL" : overlap < 0.5 ? "PASS" : "WARN";
     return [verdict, `overlap ${overlap.toFixed(2)}. ${nameA}: ${names(a.entities)} | ${artistB[0]}: ${names(b.entities)}. ${explain}.`];
   });
@@ -225,9 +237,15 @@ async function main() {
       take: 15,
     });
     const overThreshold = entities.filter((e) => (e.popularity ?? 0) > 0.7).length;
-    const overlap = jaccard(entities.map((e) => e.id), baseline.map((e) => e.id));
+    const overlap = jaccard(
+      entities.map((e) => e.id),
+      baseline.map((e) => e.id),
+    );
     const verdict = entities.length === 0 ? "FAIL" : overThreshold === 0 && overlap < 0.8 ? "PASS" : "WARN";
-    return [verdict, `${entities.length} results, ${overThreshold} above 0.7, overlap with default ${overlap.toFixed(2)}: ${names(entities)}`];
+    return [
+      verdict,
+      `${entities.length} results, ${overThreshold} above 0.7, overlap with default ${overlap.toFixed(2)}: ${names(entities)}`,
+    ];
   });
 
   await check("era_filter", "filter.release_year pins an era", async () => {
@@ -239,7 +257,10 @@ async function main() {
       take: 10,
     });
     const outside = entities.filter((e) => e.year !== undefined && (e.year < 1990 || e.year > 1999)).length;
-    return [entities.length > 0 && outside === 0 ? "PASS" : "WARN", `${entities.length} results, ${outside} outside the 90s: ${names(entities)}`];
+    return [
+      entities.length > 0 && outside === 0 ? "PASS" : "WARN",
+      `${entities.length} results, ${outside} outside the 90s: ${names(entities)}`,
+    ];
   });
 
   // 7. Wardrobe brands.
@@ -250,7 +271,10 @@ async function main() {
       take: 15,
     });
     const fashion = entities.filter((e) => e.tags.some((t) => /fashion|apparel|cloth|wear|footwear|luxury/i.test(t))).length;
-    return [entities.length >= 5 ? "PASS" : entities.length > 0 ? "WARN" : "FAIL", `${entities.length} brands (${fashion} with fashion-like tags): ${names(entities, 8)}`];
+    return [
+      entities.length >= 5 ? "PASS" : entities.length > 0 ? "WARN" : "FAIL",
+      `${entities.length} brands (${fashion} with fashion-like tags): ${names(entities, 8)}`,
+    ];
   });
 
   // 8. Audience taste vocabulary; 9. demographics.
@@ -263,7 +287,13 @@ async function main() {
     });
     await save(`tags-${nameA}`, result);
     const tags = tagList(result.data).map(compactTag);
-    return [tags.length >= 5 ? "PASS" : tags.length > 0 ? "WARN" : "FAIL", `${tags.length} tags: ${tags.slice(0, 10).map((t) => t.name).join(", ")}`];
+    return [
+      tags.length >= 5 ? "PASS" : tags.length > 0 ? "WARN" : "FAIL",
+      `${tags.length} tags: ${tags
+        .slice(0, 10)
+        .map((t) => t.name)
+        .join(", ")}`,
+    ];
   });
 
   await check("demographics", "urn:demographics returns age/gender skew", async () => {
@@ -283,7 +313,13 @@ async function main() {
     });
     await save(`compare-archive-${nameA}`, result);
     const tags = tagList(result.data).map(compactTag);
-    return [tags.length >= 3 ? "PASS" : tags.length > 0 ? "WARN" : "FAIL", `${tags.length} shared traits: ${tags.slice(0, 10).map((t) => t.name).join(", ")}`];
+    return [
+      tags.length >= 3 ? "PASS" : tags.length > 0 ? "WARN" : "FAIL",
+      `${tags.length} shared traits: ${tags
+        .slice(0, 10)
+        .map((t) => t.name)
+        .join(", ")}`,
+    ];
   });
 
   // 11. Ambience tags for locations. /v2/tags needs a query: type filters alone return nothing (2026-10-25).
@@ -307,9 +343,27 @@ async function main() {
     });
     await save("tags-semantic-intimate", semantic);
     const candidates = tagList(semantic.data).map(compactTag);
-    ambienceIds.push(...candidates.slice(0, 3).map((t) => t.id).filter(Boolean));
+    ambienceIds.push(
+      ...candidates
+        .slice(0, 3)
+        .map((t) => t.id)
+        .filter(Boolean),
+    );
     const verdict = ambience.length > 0 && candidates.length > 0 ? "PASS" : ambience.length + candidates.length > 0 ? "WARN" : "FAIL";
-    return [verdict, `"cozy" -> ${ambience.slice(0, 5).map((t) => t.id).join(", ") || "none"}; "intimate" -> ${candidates.slice(0, 5).map((t) => t.id).join(", ") || "none"}`];
+    return [
+      verdict,
+      `"cozy" -> ${
+        ambience
+          .slice(0, 5)
+          .map((t) => t.id)
+          .join(", ") || "none"
+      }; "intimate" -> ${
+        candidates
+          .slice(0, 5)
+          .map((t) => t.id)
+          .join(", ") || "none"
+      }`,
+    ];
   });
 
   // 12. Locations with photos in demo cities: as-is, then the way scout_locations asks
@@ -339,8 +393,18 @@ async function main() {
           })
         ).entities;
       }
-      const verdict = base.entities.length >= 5 ? (tagged.length >= 3 || ambienceIds.length === 0 ? "PASS" : "WARN") : base.entities.length > 0 ? "WARN" : "FAIL";
-      return [verdict, `${base.entities.length} with photos (${names(base.entities, 5)}); ${tagged.length} filmable and ranked by ambience (${names(tagged, 5)})`];
+      const verdict =
+        base.entities.length >= 5
+          ? tagged.length >= 3 || ambienceIds.length === 0
+            ? "PASS"
+            : "WARN"
+          : base.entities.length > 0
+            ? "WARN"
+            : "FAIL";
+      return [
+        verdict,
+        `${base.entities.length} with photos (${names(base.entities, 5)}); ${tagged.length} filmable and ranked by ambience (${names(tagged, 5)})`,
+      ];
     });
   }
 
@@ -392,7 +456,7 @@ async function main() {
 }
 
 main()
-  .catch((err) => record("crash", "Smoke test crashed", "FAIL", err instanceof Error ? err.stack ?? err.message : String(err)))
+  .catch((err) => record("crash", "Smoke test crashed", "FAIL", err instanceof Error ? (err.stack ?? err.message) : String(err)))
   .finally(async () => {
     const count = (v: Verdict) => checks.filter((c) => c.verdict === v).length;
     await mkdir(outDir, { recursive: true });

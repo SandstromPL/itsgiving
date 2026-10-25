@@ -37,7 +37,9 @@ function replaySteps(t: Treatment): StepEvent[] {
     const qloo = t.qloo.steps[id];
     const llm = t.llm.find((trace) => trace.step === id);
     if (!qloo?.length && !llm) return [];
-    return [{ type: "step", id, status: "done", label: STEP_LABELS[id], summary: "Replayed from cache: no new calls this time.", qloo, llm }];
+    return [
+      { type: "step", id, status: "done", label: STEP_LABELS[id], summary: "Replayed from cache: no new calls this time.", qloo, llm },
+    ];
   });
 }
 
@@ -256,7 +258,13 @@ export function Studio({ initialBadges, featured }: { initialBadges: ReactNode; 
             </p>
           )}
           {question && phase === "needs_input" && (
-            <Picker key={question.items.map((i) => i.key).join("|")} message={question.message} items={question.items} onPick={pick} running={running} />
+            <Picker
+              key={question.items.map((i) => i.key).join("|")}
+              message={question.message}
+              items={question.items}
+              onPick={pick}
+              running={running}
+            />
           )}
           {logOnStage ? (
             <RunStage steps={steps} startedAt={startedAt} thinking={pending?.form.thinking ?? "deep"} />

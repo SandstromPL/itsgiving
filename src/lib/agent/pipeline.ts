@@ -204,7 +204,14 @@ export async function runPipeline(
     llmCalls += 1;
     const started = Date.now();
     const tick = setInterval(
-      () => emit({ type: "step", id: step, status: "running", label, summary: `Thinking: ${Math.round((Date.now() - started) / 1000)} s so far.` }),
+      () =>
+        emit({
+          type: "step",
+          id: step,
+          status: "running",
+          label,
+          summary: `Thinking: ${Math.round((Date.now() - started) / 1000)} s so far.`,
+        }),
       TICK_MS,
     );
     let result: LlmResult<T>;
@@ -250,7 +257,8 @@ export async function runPipeline(
     endResolve("error", subjectResult.summary);
     return { kind: "failed", message: `Couldn't look up the brief in Qloo: ${subjectResult.error?.message ?? subjectResult.summary}` };
   }
-  if (directorResult?.status === "error") notes.push(`Your taste films couldn't be looked up (${directorResult.summary}), so they were left out.`);
+  if (directorResult?.status === "error")
+    notes.push(`Your taste films couldn't be looked up (${directorResult.summary}), so they were left out.`);
 
   const ambiguities: Ambiguity[] = [];
   const missing: string[] = [];
@@ -259,7 +267,9 @@ export async function runPipeline(
     if (resolution?.status === "resolved") {
       if (resolution.among) {
         const m = resolution.match;
-        notes.push(`"${spec.input}" matched ${resolution.among} titles in Qloo; Mise used the far better-known ${m.name}${m.year ? ` (${m.year})` : ""}.`);
+        notes.push(
+          `"${spec.input}" matched ${resolution.among} titles in Qloo; Mise used the far better-known ${m.name}${m.year ? ` (${m.year})` : ""}.`,
+        );
       }
       return resolution.match;
     }
@@ -347,7 +357,13 @@ export async function runPipeline(
     overlap = shared.data?.shared_traits ?? [];
     endOverlap(shared.status === "ok" ? "done" : "warning", shared.summary);
   } else {
-    emit({ type: "step", id: "overlap", status: "skipped", label: STEP_LABELS.overlap, summary: "Add your own favourite films to find the overlap." });
+    emit({
+      type: "step",
+      id: "overlap",
+      status: "skipped",
+      label: STEP_LABELS.overlap,
+      summary: "Add your own favourite films to find the overlap.",
+    });
   }
 
   const candidates: ToneCandidate[] = uniqueBy(
@@ -384,7 +400,10 @@ export async function runPipeline(
             name: step,
             system: SYSTEM_PROMPT,
             prompt: planPrompt(ctx),
-            schema: planSchema(toneRefs, areas.map((a) => a.ref)),
+            schema: planSchema(
+              toneRefs,
+              areas.map((a) => a.ref),
+            ),
             mock: () => mockPlan(ctx),
             effort: "low",
             // A re-plan only swaps style words that found no tags, so it needn't think hard.
@@ -405,10 +424,7 @@ export async function runPipeline(
   let plan = await askPlan(planContext, "plan");
 
   // 4. Execute the plan in code.
-  const findTags = async (
-    words: string[],
-    filter: object,
-  ): Promise<{ tags: CompactTag[]; missed: string[]; errored: boolean }> => {
+  const findTags = async (words: string[], filter: object): Promise<{ tags: CompactTag[]; missed: string[]; errored: boolean }> => {
     const results = await Promise.all(
       words.map((query) => tool<{ tags: CompactTag[] }>("tags", "find_tags", { query, ...filter, take: 5 })),
     );
@@ -581,7 +597,11 @@ export async function runPipeline(
       STEP_LABELS.locations,
       "Locations",
       places,
-      (items) => `${items.slice(0, 4).map((p) => p.name).join(", ")} ${held ? `near ${base?.name}, ${brief.city}` : `in ${brief.city}`}`,
+      (items) =>
+        `${items
+          .slice(0, 4)
+          .map((p) => p.name)
+          .join(", ")} ${held ? `near ${base?.name}, ${brief.city}` : `in ${brief.city}`}`,
     );
 
     return {
@@ -738,9 +758,7 @@ function assemble(input: AssembleInput): Treatment {
     affinity: entity.affinity,
     popularity: entity.popularity,
     tags: entity.tags,
-    because: (entity.because ?? [])
-      .map((b) => ({ name: ctx.names.get(b.entity_id) ?? "", score: b.score }))
-      .filter((b) => b.name),
+    because: (entity.because ?? []).map((b) => ({ name: ctx.names.get(b.entity_id) ?? "", score: b.score })).filter((b) => b.name),
   });
   const cite = <K extends string>(
     refs: Ref<CompactEntity>[],
@@ -750,12 +768,14 @@ function assemble(input: AssembleInput): Treatment {
     keys: K[],
     max: number,
   ): Pick<K>[] =>
-    uniqueBy(picks ?? [], (p) => p.ref).slice(0, max).flatMap((pick) => {
-      const entity = refs.find((r) => r.ref === pick.ref)?.item;
-      if (!entity) return [];
-      const notes = Object.fromEntries(keys.map((k) => [k, prose(pick[k], 400)])) as Record<K, string>;
-      return [{ entity, qloo: evidence(list, tool, entity), notes }];
-    });
+    uniqueBy(picks ?? [], (p) => p.ref)
+      .slice(0, max)
+      .flatMap((pick) => {
+        const entity = refs.find((r) => r.ref === pick.ref)?.item;
+        if (!entity) return [];
+        const notes = Object.fromEntries(keys.map((k) => [k, prose(pick[k], 400)])) as Record<K, string>;
+        return [{ entity, qloo: evidence(list, tool, entity), notes }];
+      });
 
   // The schema only enforces minimums; the maximums the prompt asked for are applied here.
   const references = cite(ctx.references, run.references.items, "reference_films", draft.references, ["why", "borrow"], 6);
@@ -775,10 +795,12 @@ function assemble(input: AssembleInput): Treatment {
     logline: prose(draft.logline, 300),
     concept: prose(draft.concept, 1500),
     direction: input.scrub(input.plan.direction),
-    tone: uniqueBy(draft.tone ?? [], (t) => t.ref).slice(0, 5).flatMap((t) => {
-      const candidate = ctx.tone.find((c) => c.ref === t.ref);
-      return candidate ? [{ tag: candidate.tag, source: candidate.source, note: prose(t.note, 300) }] : [];
-    }),
+    tone: uniqueBy(draft.tone ?? [], (t) => t.ref)
+      .slice(0, 5)
+      .flatMap((t) => {
+        const candidate = ctx.tone.find((c) => c.ref === t.ref);
+        return candidate ? [{ tag: candidate.tag, source: candidate.source, note: prose(t.note, 300) }] : [];
+      }),
     beats: draft.beats.slice(0, 6).map((beat) => {
       const ref = beat.reference ? ctx.references.find((r) => r.ref === beat.reference)?.item : undefined;
       return {

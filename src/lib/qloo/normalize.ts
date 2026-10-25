@@ -1,10 +1,4 @@
-import type {
-  AudiencesResponse,
-  QlooAudience,
-  QlooEntity,
-  QlooTag,
-  TagsResponse,
-} from "./types";
+import type { AudiencesResponse, QlooAudience, QlooEntity, QlooTag, TagsResponse } from "./types";
 import { kindFromUrn, type EntityKind } from "./urns";
 
 // Readers that tolerate the response-shape conflicts across Qloo's docs, and
@@ -78,7 +72,15 @@ export function heatmapCells(data: unknown): HeatCell[] {
     const lon = num(cell.location.longitude);
     if (lat === undefined || lon === undefined) return [];
     const query: Loose = isRecord(cell.query) ? cell.query : {};
-    return [{ lat, lon, precision: str(cell.location.geohash)?.length ?? 0, affinity: num(query.affinity) ?? 0, popularity: num(query.popularity) ?? 0 }];
+    return [
+      {
+        lat,
+        lon,
+        precision: str(cell.location.geohash)?.length ?? 0,
+        affinity: num(query.affinity) ?? 0,
+        popularity: num(query.popularity) ?? 0,
+      },
+    ];
   });
 }
 
@@ -86,7 +88,10 @@ const LOCALITY_GENRE = "urn:tag:genre:locality:";
 
 /** A locality's kind from its genre tag: "city", "state", "county", "suburb", "neighbourhood"... */
 export function localityKind(entity: QlooEntity): string | undefined {
-  return (entity.tags ?? []).map(tagId).find((id) => id.startsWith(LOCALITY_GENRE))?.slice(LOCALITY_GENRE.length);
+  return (entity.tags ?? [])
+    .map(tagId)
+    .find((id) => id.startsWith(LOCALITY_GENRE))
+    ?.slice(LOCALITY_GENRE.length);
 }
 
 export interface Contribution {
@@ -204,10 +209,7 @@ export function pickTags(tags: QlooTag[], kind: EntityKind | undefined, max: num
   return names;
 }
 
-export function compactEntity(
-  entity: QlooEntity,
-  options: { maxTags?: number; maxDescription?: number } = {},
-): CompactEntity {
+export function compactEntity(entity: QlooEntity, options: { maxTags?: number; maxDescription?: number } = {}): CompactEntity {
   const props: Loose = isRecord(entity.properties) ? entity.properties : {};
   const geocode: Loose = isRecord(props.geocode) ? props.geocode : {};
   const location: Loose = isRecord(props.location) ? props.location : {};

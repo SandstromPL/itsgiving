@@ -18,11 +18,7 @@ export class StreamError extends Error {
  * Resolves when the stream closes; the caller checks that a terminal event
  * (treatment, needs_input or error) arrived before it did.
  */
-export async function streamTreatment(
-  brief: BriefInput,
-  onEvent: (event: AgentEvent) => void,
-  signal: AbortSignal,
-): Promise<void> {
+export async function streamTreatment(brief: BriefInput, onEvent: (event: AgentEvent) => void, signal: AbortSignal): Promise<void> {
   let response: Response;
   try {
     response = await fetch("/api/treatment", {

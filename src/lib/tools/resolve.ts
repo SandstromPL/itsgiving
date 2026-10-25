@@ -12,7 +12,7 @@ type Resolution =
   | { input: string; status: "not_found" };
 
 const itemSchema = z.strictObject({
-  name: z.string().min(1).describe("The name as the user wrote it, e.g. \"Prateek Kuhad\" or \"In the Mood for Love\"."),
+  name: z.string().min(1).describe('The name as the user wrote it, e.g. "Prateek Kuhad" or "In the Mood for Love".'),
   type: z.enum(SEARCHABLE_KINDS).describe("What kind of thing it is."),
   year: z
     .number()
@@ -34,9 +34,7 @@ function pick(item: z.output<typeof itemSchema>, candidates: CompactEntity[]): R
   }
   if (item.city) {
     const city = normalizeName(item.city);
-    const sameCity = exact.filter((c) =>
-      normalizeName(`${c.place?.city ?? ""} ${c.disambiguation ?? ""}`).includes(city),
-    );
+    const sameCity = exact.filter((c) => normalizeName(`${c.place?.city ?? ""} ${c.disambiguation ?? ""}`).includes(city));
     if (sameCity.length > 0) exact = sameCity;
   }
   // Like Qloo's own harness: only auto-accept a single exact match; anything
@@ -71,7 +69,12 @@ function pickLocality(item: z.output<typeof itemSchema>, entities: QlooEntity[])
   const city = kind && WIDER_THAN_A_CITY.has(kind) ? exact.find((e) => localityKind(e) === "city") : undefined;
   const match = compactEntity(city ?? first, { maxTags: 3 });
   if (!city) return { input: item.name, status: "resolved", match };
-  return { input: item.name, status: "resolved", match, note: `Qloo's first match for "${item.name}" is the ${kind}, so Mise used the city.` };
+  return {
+    input: item.name,
+    status: "resolved",
+    match,
+    note: `Qloo's first match for "${item.name}" is the ${kind}, so Mise used the city.`,
+  };
 }
 
 export const resolveEntities = defineTool({
@@ -97,16 +100,17 @@ export const resolveEntities = defineTool({
         const response = await qloo.search({ query: item.name, types: entityUrn(item.type), take: 5 });
         const entities = entityList(response.data);
         if (item.type === "locality") return pickLocality(item, entities);
-        return pick(item, entities.map((e) => compactEntity(e, { maxTags: 5 })));
+        return pick(
+          item,
+          entities.map((e) => compactEntity(e, { maxTags: 5 })),
+        );
       }),
     );
     const resolved = items.filter((i) => i.status === "resolved").length;
     const unclear = items.filter((i) => i.status !== "resolved").map((i) => `"${i.input}" (${i.status.replace("_", " ")})`);
     return {
       status: resolved === items.length ? "ok" : resolved === 0 && items.every((i) => i.status === "not_found") ? "empty" : "needs_input",
-      summary:
-        `Resolved ${resolved}/${items.length}.` +
-        (unclear.length > 0 ? ` Ask the user about ${unclear.join(", ")}.` : ""),
+      summary: `Resolved ${resolved}/${items.length}.` + (unclear.length > 0 ? ` Ask the user about ${unclear.join(", ")}.` : ""),
       data: { items },
     };
   },

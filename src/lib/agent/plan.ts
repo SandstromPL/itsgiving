@@ -74,20 +74,22 @@ export interface Plan extends PlanDraft {
 // Arrays only carry minimums: a model that returns one item too many is
 // trimmed in code (normalizePlan) instead of costing a repair call.
 export function planSchema(toneRefs: string[], areaRefs: string[] = []): z.ZodType<PlanDraft> {
-  const words = (examples: string) =>
-    z.array(z.string().min(2)).min(1).describe(`1-3 plain words for Qloo tag search, e.g. ${examples}.`);
+  const words = (examples: string) => z.array(z.string().min(2)).min(1).describe(`1-3 plain words for Qloo tag search, e.g. ${examples}.`);
   return z.strictObject({
     direction: z.string().min(10).describe("One or two sentences of creative direction."),
     ...(toneRefs.length > 0
-      ? { tone: z.array(z.enum(toneRefs as [string, ...string[]])).min(1).describe("2-5 tone tag refs, strongest first.") }
+      ? {
+          tone: z
+            .array(z.enum(toneRefs as [string, ...string[]]))
+            .min(1)
+            .describe("2-5 tone tag refs, strongest first."),
+        }
       : {}),
     deep_cuts: z.enum(["canon", "balanced", "deep"]).describe("How obscure the film references should be."),
     wardrobe_words: words("vintage, streetwear, tailored, minimalist"),
     ambience_words: words("cozy, moody, neon, rooftop, industrial"),
     venue_kinds: z.array(z.enum(VENUE_KIND_VALUES)).min(1).describe("2-4 kinds of place to scout for locations."),
-    ...(areaRefs.length > 0
-      ? { base: z.enum(areaRefs as [string, ...string[]]).describe("The area ref to base the shoot in.") }
-      : {}),
+    ...(areaRefs.length > 0 ? { base: z.enum(areaRefs as [string, ...string[]]).describe("The area ref to base the shoot in.") } : {}),
   }) as unknown as z.ZodType<PlanDraft>;
 }
 
@@ -119,7 +121,11 @@ export function describeBrief(brief: Brief, who: Who): string {
 }
 
 function tagLine(c: ToneCandidate): string {
-  const family = c.tag.type?.replace(/^urn:tag:/, "").split(":").slice(0, 2).join("/");
+  const family = c.tag.type
+    ?.replace(/^urn:tag:/, "")
+    .split(":")
+    .slice(0, 2)
+    .join("/");
   return `${c.ref} ${c.tag.name}${family ? ` [${family}]` : ""}`;
 }
 
@@ -181,7 +187,10 @@ export function mockPlan(ctx: PlanContext): PlanDraft {
     ? [...ctx.candidates].sort((a, b) => Number(DARK.test(b.tag.name)) - Number(DARK.test(a.tag.name)))
     : ctx.candidates;
   const tone = ranked.slice(0, 4);
-  const vibe = vibeOf(tone.map((c) => c.tag.name), darker);
+  const vibe = vibeOf(
+    tone.map((c) => c.tag.name),
+    darker,
+  );
   const words = ctx.feedback ? FALLBACK_WORDS : WORDS[vibe];
   const toneNames = tone.map((c) => c.tag.name.toLowerCase());
   const shared = tone.find((c) => c.source === "overlap");
@@ -203,7 +212,14 @@ export function mockPlan(ctx: PlanContext): PlanDraft {
 /** Clean free-text words before they reach find_tags. */
 export function cleanWords(words: string[]): string[] {
   const out = words
-    .map((w) => w.toLowerCase().replace(/[^a-z0-9 &'-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 40))
+    .map((w) =>
+      w
+        .toLowerCase()
+        .replace(/[^a-z0-9 &'-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 40),
+    )
     .filter((w) => w.length >= 2);
   return [...new Set(out)].slice(0, 3);
 }

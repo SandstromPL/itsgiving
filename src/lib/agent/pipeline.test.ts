@@ -267,7 +267,10 @@ describe("runPipeline with a live provider", () => {
 
   it("flattens lighting notes sent as objects instead of spending a repair call", async () => {
     const { provider, seen } = scriptedProvider({
-      treatment: (mock) => ({ ...mock, lighting: [{ setup: "One tungsten fresnel through muslin", purpose: "warm skin" }, "Practicals on dimmers."] }),
+      treatment: (mock) => ({
+        ...mock,
+        lighting: [{ setup: "One tungsten fresnel through muslin", purpose: "warm skin" }, "Practicals on dimmers."],
+      }),
     });
     const t = treatmentOf((await run({ artist: "Charli xcx", city: "New York" }, liveWith(provider))).outcome);
     expect(seen).toEqual(["plan", "treatment"]);
@@ -277,7 +280,11 @@ describe("runPipeline with a live provider", () => {
 
   it("swaps refs the writer leaked into the prose for the names they stand for", async () => {
     const { provider } = scriptedProvider({
-      treatment: (mock) => ({ ...mock, concept: "Borrow the stillness of R1, then end at L1.", lighting: ["Hide one lamp at L1.", "Keep R02 gels off."] }),
+      treatment: (mock) => ({
+        ...mock,
+        concept: "Borrow the stillness of R1, then end at L1.",
+        lighting: ["Hide one lamp at L1.", "Keep R02 gels off."],
+      }),
     });
     const t = treatmentOf((await run({ artist: "Charli xcx", city: "New York" }, liveWith(provider))).outcome);
     const first = (picks: { entity: { name: string }; qloo: { rank: number } }[], extras: { name: string }[]) =>
@@ -369,7 +376,12 @@ describe("streamTreatment", () => {
     const logs: string[] = [];
     const spy = vi.spyOn(console, "log").mockImplementation((line: string) => void logs.push(line));
     try {
-      await streamTreatment(brief({ artist: "Charli xcx", city: "New York" }), service(liveWith(provider)), () => {}, new AbortController().signal);
+      await streamTreatment(
+        brief({ artist: "Charli xcx", city: "New York" }),
+        service(liveWith(provider)),
+        () => {},
+        new AbortController().signal,
+      );
     } finally {
       spy.mockRestore();
     }
@@ -421,7 +433,12 @@ describe("streamTreatment", () => {
 
   it("turns a needs-input outcome into an event", async () => {
     const events: AgentEvent[] = [];
-    await streamTreatment(brief({ touchstones: ["Forgotten"], city: "Mumbai" }), service(), (e) => events.push(e), new AbortController().signal);
+    await streamTreatment(
+      brief({ touchstones: ["Forgotten"], city: "Mumbai" }),
+      service(),
+      (e) => events.push(e),
+      new AbortController().signal,
+    );
     expect(events.map((e) => e.type)).toContain("needs_input");
     expect(events.at(-1)).toEqual({ type: "done" });
   });
@@ -484,7 +501,14 @@ describe("LLM schemas", () => {
   });
 
   it("only let the planner base the shoot in an area the heatmap returned", () => {
-    const plan = { direction: "A quiet film about leaving.", tone: ["T1"], deep_cuts: "balanced", wardrobe_words: ["vintage"], ambience_words: ["cozy"], venue_kinds: ["cafe"] };
+    const plan = {
+      direction: "A quiet film about leaving.",
+      tone: ["T1"],
+      deep_cuts: "balanced",
+      wardrobe_words: ["vintage"],
+      ambience_words: ["cozy"],
+      venue_kinds: ["cafe"],
+    };
     const schema = planSchema(["T1"], ["A1", "A2"]);
     expect(schema.safeParse({ ...plan, base: "A2" }).success).toBe(true);
     expect(schema.safeParse({ ...plan, base: "A3" }).success).toBe(false);
@@ -540,7 +564,15 @@ describe("text helpers", () => {
   });
 
   it("swaps whole refs only, longest first", () => {
-    const scrub = refScrubber(new Map([["T1", "Moody"], ["T13", "Quirkily Humorous"], ["L1", "Bar Orai"]]));
-    expect(scrub("The T13 tag, the T1 tag, at L1; not T130 or L10.")).toBe("The Quirkily Humorous tag, the Moody tag, at Bar Orai; not T130 or L10.");
+    const scrub = refScrubber(
+      new Map([
+        ["T1", "Moody"],
+        ["T13", "Quirkily Humorous"],
+        ["L1", "Bar Orai"],
+      ]),
+    );
+    expect(scrub("The T13 tag, the T1 tag, at L1; not T130 or L10.")).toBe(
+      "The Quirkily Humorous tag, the Moody tag, at Bar Orai; not T130 or L10.",
+    );
   });
 });

@@ -10,7 +10,10 @@ import type { QlooMode } from "@/lib/qloo/client";
 /** Pink "camera tape" label for anything mocked. */
 export function Tape({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <span title={title} className="inline-flex items-center rounded-sm bg-tape/15 px-2 py-0.5 text-xs font-medium text-tape ring-1 ring-tape/30">
+    <span
+      title={title}
+      className="inline-flex items-center rounded-sm bg-tape/15 px-2 py-0.5 text-xs font-medium text-tape ring-1 ring-tape/30"
+    >
       {children}
     </span>
   );

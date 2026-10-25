@@ -30,13 +30,7 @@ export function cacheKey(path: string, query: Record<string, string>): string {
 // Entity Type Parameter Guide plus parameters the Parameter Reference marks as
 // valid for all types. The guide is known to be incomplete, so mismatches are
 // reported as warnings rather than errors.
-const ALWAYS = [
-  "filter.type",
-  "take",
-  "page",
-  "offset",
-  "feature.explainability",
-];
+const ALWAYS = ["filter.type", "take", "page", "offset", "feature.explainability"];
 
 const SIGNALS = [
   "signal.interests.entities",
@@ -184,8 +178,5 @@ export function validateInsightsParams(query: Record<string, string>): string[] 
   if (!allowed) return [];
   return Object.keys(query)
     .filter((key) => !allowed.has(key))
-    .map(
-      (key) =>
-        `"${key}" is not documented for filter.type=${type}; Qloo may silently ignore it.`,
-    );
+    .map((key) => `"${key}" is not documented for filter.type=${type}; Qloo may silently ignore it.`);
 }

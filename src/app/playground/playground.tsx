@@ -66,9 +66,7 @@ export function Playground({ tools }: { tools: ToolInfo[] }) {
               key={t.name}
               onClick={() => select(t.name)}
               className={`rounded-full border px-3 py-1 font-mono text-xs transition ${
-                t.name === name
-                  ? "border-amber-300 bg-amber-300 text-stone-950"
-                  : "border-stone-700 text-stone-300 hover:border-stone-500"
+                t.name === name ? "border-amber-300 bg-amber-300 text-stone-950" : "border-stone-700 text-stone-300 hover:border-stone-500"
               }`}
             >
               {t.name}
@@ -99,9 +97,7 @@ export function Playground({ tools }: { tools: ToolInfo[] }) {
         {result && (
           <>
             <div className="flex flex-wrap items-center gap-3">
-              <span className={`rounded px-2 py-0.5 font-mono text-xs ${STATUS_STYLES[result.status] ?? ""}`}>
-                {result.status}
-              </span>
+              <span className={`rounded px-2 py-0.5 font-mono text-xs ${STATUS_STYLES[result.status] ?? ""}`}>{result.status}</span>
               <span className="font-mono text-xs uppercase tracking-wider text-stone-500">{result.mode} data</span>
             </div>
             <p className="text-sm leading-6 text-stone-200">{result.summary}</p>
@@ -114,14 +110,14 @@ export function Playground({ tools }: { tools: ToolInfo[] }) {
               </ul>
             )}
             <section>
-              <h3 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">
-                Qloo requests ({result.provenance.length})
-              </h3>
+              <h3 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Qloo requests ({result.provenance.length})</h3>
               <ul className="flex flex-col gap-1">
                 {result.provenance.map((p, i) => (
-                  <li key={i} className="overflow-x-auto whitespace-nowrap rounded bg-stone-900 px-2 py-1 font-mono text-[11px] text-stone-400">
-                    <span className="text-stone-200">GET {p.path}</span>{" "}
-                    {new URLSearchParams(p.query).toString()}{" "}
+                  <li
+                    key={i}
+                    className="overflow-x-auto whitespace-nowrap rounded bg-stone-900 px-2 py-1 font-mono text-[11px] text-stone-400"
+                  >
+                    <span className="text-stone-200">GET {p.path}</span> {new URLSearchParams(p.query).toString()}{" "}
                     <span className="text-stone-500">
                       → {p.status} · {p.cached ? "cached" : `${p.durationMs}ms`}
                     </span>

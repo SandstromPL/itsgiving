@@ -1,6 +1,14 @@
 import type { FetchLike } from "../qloo";
 import { BASE_KEYWORDS, sanitizeSchema } from "./schema";
-import { LlmError, classifyHttpStatus, retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider, type Reasoning } from "./types";
+import {
+  LlmError,
+  classifyHttpStatus,
+  retryAfterHeader,
+  type LlmCall,
+  type LlmCompletion,
+  type LlmProvider,
+  type Reasoning,
+} from "./types";
 
 // DeepSeek's OpenAI-compatible chat completions (paid key). Shapes checked
 // against https://api-docs.deepseek.com (models, JSON Output and Thinking
@@ -67,7 +75,12 @@ export function deepseekProvider(options: { apiKey: string; model: string; fetch
         const reason = json.error?.message ?? raw.slice(0, 200);
         // 402 is "Insufficient Balance": out of paid credit, so rest it like a rate limit rather than retrying.
         const kind = response.status === 402 ? "rate_limit" : classifyHttpStatus(response.status);
-        throw fail(kind, `HTTP ${response.status}${reason ? `: ${reason}` : ""}`, response.status, retryAfterHeader(response.headers.get("retry-after")));
+        throw fail(
+          kind,
+          `HTTP ${response.status}${reason ? `: ${reason}` : ""}`,
+          response.status,
+          retryAfterHeader(response.headers.get("retry-after")),
+        );
       }
 
       const choice = json.choices?.[0];

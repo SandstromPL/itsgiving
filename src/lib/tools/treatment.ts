@@ -21,7 +21,10 @@ function tagBias(ids: string[] | undefined): QlooParams {
 export function oneBranchEach<T extends { name: string }>(places: T[]): T[] {
   const seen = new Set<string>();
   return places.filter((place) => {
-    const brand = place.name.split(/\s+[-|–(]\s*/)[0].trim().toLowerCase();
+    const brand = place.name
+      .split(/\s+[-|–(]\s*/)[0]
+      .trim()
+      .toLowerCase();
     if (seen.has(brand)) return false;
     seen.add(brand);
     return true;
@@ -68,7 +71,10 @@ export const referenceFilms = defineTool({
       status: references.length > 0 ? "ok" : "empty",
       summary:
         references.length > 0
-          ? `${plural(references.length, "reference")}: ${references.slice(0, 5).map((r) => `${r.name}${r.year ? ` (${r.year})` : ""}`).join(", ")}.`
+          ? `${plural(references.length, "reference")}: ${references
+              .slice(0, 5)
+              .map((r) => `${r.name}${r.year ? ` (${r.year})` : ""}`)
+              .join(", ")}.`
           : "No references matched; widen the era or raise max_popularity.",
       data: { references },
       warnings: response.warnings,
@@ -103,7 +109,10 @@ export const stylingBrands = defineTool({
       status: brands.length > 0 ? "ok" : "empty",
       summary:
         brands.length > 0
-          ? `${plural(brands.length, "brand")}: ${brands.slice(0, 6).map((b) => b.name).join(", ")}.`
+          ? `${plural(brands.length, "brand")}: ${brands
+              .slice(0, 6)
+              .map((b) => b.name)
+              .join(", ")}.`
           : `No brands matched;${input.fashion_only ? " try fashion_only=false or" : " try"} fewer style tags.`,
       data: { brands },
       warnings: response.warnings,
@@ -120,7 +129,7 @@ export const scoutLocations = defineTool({
     "mood; price_level_max keeps to the budget; near keeps to one area, e.g. a shoot base from audience_heatmap. " +
     "Results are candidates to scout: availability and filming permission must be confirmed with each venue.",
   inputSchema: z.strictObject({
-    city: z.string().min(1).describe("City or neighbourhood name, e.g. \"Mumbai\", \"Bandra\" or \"New York City\"."),
+    city: z.string().min(1).describe('City or neighbourhood name, e.g. "Mumbai", "Bandra" or "New York City".'),
     locality_id: z
       .string()
       .min(1)
@@ -145,7 +154,9 @@ export const scoutLocations = defineTool({
       .max(VENUE_KIND_VALUES.length)
       .optional()
       .describe("Only return these kinds of place. Leave out to allow any place, including hotels and offices."),
-    ambience_tag_ids: tagIds(10).optional().describe("Ambience, decor or setting tag IDs from find_tags; they rank places, never exclude them."),
+    ambience_tag_ids: tagIds(10)
+      .optional()
+      .describe("Ambience, decor or setting tag IDs from find_tags; they rank places, never exclude them."),
     require_photo: z.boolean().default(true).describe("Only return places that have a photo."),
     price_level_max: z.number().int().min(1).max(4).optional().describe("Budget ceiling on Qloo's 1-4 price level."),
     open_on: z.enum(WEEKDAYS).optional().describe("Only places open on this day (e.g. the shoot day)."),
@@ -189,7 +200,10 @@ export const scoutLocations = defineTool({
       status: locations.length > 0 ? "ok" : "empty",
       summary:
         locations.length > 0
-          ? `${plural(locations.length, "location")} ${where}: ${locations.slice(0, 5).map((l) => l.name).join(", ")}. Confirm availability and filming permission with each venue.`
+          ? `${plural(locations.length, "location")} ${where}: ${locations
+              .slice(0, 5)
+              .map((l) => l.name)
+              .join(", ")}. Confirm availability and filming permission with each venue.`
           : `No locations matched ${where}.${relax.length > 0 ? ` Try ${relax.join(", ")}.` : ""}`,
       data: { locations },
       warnings: response.warnings,

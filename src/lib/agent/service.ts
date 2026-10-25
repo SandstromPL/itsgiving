@@ -126,7 +126,8 @@ export async function streamTreatment(
       log({ outcome: "failed", message: outcome.message });
     }
   } catch (err) {
-    const aborted = signal.aborted || (err instanceof LlmError && err.kind === "aborted") || (err instanceof Error && err.name === "AbortError");
+    const aborted =
+      signal.aborted || (err instanceof LlmError && err.kind === "aborted") || (err instanceof Error && err.name === "AbortError");
     if (aborted && clientSignal.aborted) {
       log({ outcome: "client_aborted" });
       return;

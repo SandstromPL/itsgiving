@@ -1,0 +1,8 @@
+# Prettier also skips everything in .gitignore.
+package-lock.json
+
+# Docs are wrapped by hand, and AGENTS.md is written by `next dev`.
+*.md
+
+# Fixture tables read best one entry per line.
+src/lib/qloo/mock/catalog.ts

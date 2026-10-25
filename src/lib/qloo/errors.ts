@@ -1,22 +1,11 @@
 export type QlooErrorKind =
-  | "config"
-  | "auth"
-  | "forbidden"
-  | "bad_request"
-  | "not_found"
-  | "rate_limit"
-  | "upstream"
-  | "network"
-  | "timeout"
-  | "parse";
+  "config" | "auth" | "forbidden" | "bad_request" | "not_found" | "rate_limit" | "upstream" | "network" | "timeout" | "parse";
 
 const HINTS: Partial<Record<QlooErrorKind, string>> = {
   config: "Set QLOO_API_KEY (and QLOO_BASE_URL) or run with QLOO_MODE=mock.",
   auth: "Check the key and that QLOO_BASE_URL is https://hackathon.api.qloo.com; hackathon keys get 401 on api.qloo.com.",
-  forbidden:
-    "Qloo returns 403 for an unsupported filter.type (e.g. urn:entity:music); this is not a key problem.",
-  bad_request:
-    "A location/entity name may not have resolved, or a tag/audience was not a real URN.",
+  forbidden: "Qloo returns 403 for an unsupported filter.type (e.g. urn:entity:music); this is not a key problem.",
+  bad_request: "A location/entity name may not have resolved, or a tag/audience was not a real URN.",
   rate_limit: "Rate limited; back off and retry, or ask in Discord #api-help for a higher limit.",
 };
 

@@ -68,7 +68,12 @@ function cosine(a: Vector, b: Vector): number {
 
 function list(params: URLSearchParams, key: string): string[] {
   const value = params.get(key);
-  return value ? value.split(",").map((part) => part.trim()).filter(Boolean) : [];
+  return value
+    ? value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+    : [];
 }
 
 function numberParam(params: URLSearchParams, key: string): number | undefined {
@@ -125,8 +130,7 @@ interface LatLon {
 function distanceM(a: LatLon, b: LatLon): number {
   const rad = Math.PI / 180;
   const h =
-    Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 +
-    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lon - a.lon) * rad) / 2) ** 2;
+    Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lon - a.lon) * rad) / 2) ** 2;
   return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
 }
 
@@ -170,7 +174,9 @@ function locate(params: URLSearchParams): Area | undefined | null {
   const query = params.get("filter.location.query");
   if (query === null) return null;
   const located = findCity(query);
-  return located ? { name: located.city.name, center: located.city.center, city: located.city, neighborhood: located.neighborhood } : undefined;
+  return located
+    ? { name: located.city.name, center: located.city.center, city: located.city, neighborhood: located.neighborhood }
+    : undefined;
 }
 
 function inArea(entity: MockEntity, area: Area): boolean {
@@ -401,7 +407,12 @@ function insights(params: URLSearchParams): Response {
     const area = locate(params);
     if (!area) return fail(400, "A location is required for heatmaps (filter.location or filter.location.query)");
     if (!profile.hasSignal) return fail(400, "at least one valid signal or filter is required");
-    return respond({ success: true, results: { heatmap: mockHeatmap(area, profile) }, query: { localities: { filter: [{ name: area.name }] } }, _mock: true });
+    return respond({
+      success: true,
+      results: { heatmap: mockHeatmap(area, profile) },
+      query: { localities: { filter: [{ name: area.name }] } },
+      _mock: true,
+    });
   }
 
   let candidates = ENTITIES.filter((entity) => entity.subtype === type && !profile.entityIds.includes(entity.id));
@@ -447,7 +458,8 @@ function insights(params: URLSearchParams): Response {
 
   const area = locate(params);
   if (area !== null) {
-    if (!area) return fail(400, `Could not find a locality matching "${params.get("filter.location") ?? params.get("filter.location.query")}"`);
+    if (!area)
+      return fail(400, `Could not find a locality matching "${params.get("filter.location") ?? params.get("filter.location.query")}"`);
     hasFilter = true;
     candidates = candidates.filter((entity) => inArea(entity, area));
   }
@@ -515,9 +527,13 @@ function tags(params: URLSearchParams): Response {
 
 function audiences(params: URLSearchParams): Response {
   const query = normalize(params.get("filter.query") ?? "");
-  const matches = AUDIENCES.filter(
-    (au) => !query || normalize(au.name).includes(query) || au.vibes.includes(query),
-  ).map((au) => ({ id: au.id, entity_id: au.id, name: au.name, type: au.type, parents: [] }));
+  const matches = AUDIENCES.filter((au) => !query || normalize(au.name).includes(query) || au.vibes.includes(query)).map((au) => ({
+    id: au.id,
+    entity_id: au.id,
+    name: au.name,
+    type: au.type,
+    parents: [],
+  }));
   return respond({ success: true, results: { audiences: page(matches, params, 20, 50) }, _mock: true });
 }
 

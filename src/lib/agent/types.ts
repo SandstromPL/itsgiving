@@ -4,17 +4,7 @@ import type { HeatArea, HeatGrid } from "../tools/heatmap";
 import type { Brief } from "./brief";
 
 export type StepId =
-  | "resolve"
-  | "audience"
-  | "overlap"
-  | "heatmap"
-  | "plan"
-  | "tags"
-  | "references"
-  | "wardrobe"
-  | "locations"
-  | "replan"
-  | "write";
+  "resolve" | "audience" | "overlap" | "heatmap" | "plan" | "tags" | "references" | "wardrobe" | "locations" | "replan" | "write";
 
 export type StepStatus = "running" | "done" | "warning" | "skipped" | "error";
 

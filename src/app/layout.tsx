@@ -18,8 +18,7 @@ const newsreader = Newsreader({
 
 export const metadata: Metadata = {
   title: "Mise: treatments with taste",
-  description:
-    "An agentic pre-production assistant for music-video and short-film directors, grounded in Qloo's taste graph.",
+  description: "An agentic pre-production assistant for music-video and short-film directors, grounded in Qloo's taste graph.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
