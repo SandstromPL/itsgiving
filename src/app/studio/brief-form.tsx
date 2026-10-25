@@ -104,7 +104,8 @@ export function BriefForm({
           {...describe("touchstones", `${ids}-touchstones-hint`)}
         />
         <p id={`${ids}-touchstones-hint`} className="text-xs leading-5 text-faint">
-          One title per line, up to {LIMITS.touchstones}. The client&apos;s references, if any.
+          One title per line, up to {LIMITS.touchstones}. The client&apos;s references, if any. Feature films only: Qloo
+          doesn&apos;t list short films.
         </p>
         {message("touchstones")}
       </div>
@@ -158,8 +159,9 @@ export function BriefForm({
           {...describe("directorFilms", `${ids}-taste-hint`)}
         />
         <p id={`${ids}-taste-hint`} className="text-xs leading-5 text-faint">
-          Films you love, one per line, up to {LIMITS.directorFilms}. Add the year, like Rockstar (2011), to skip a
-          question when titles repeat. Mise finds where your taste meets the audience&apos;s.
+          Feature films you love, one per line, up to {LIMITS.directorFilms}. Add the year, like Rockstar (2011), to
+          skip a question when titles repeat. Qloo doesn&apos;t list short films, your own included. Mise finds where
+          your taste meets the audience&apos;s.
         </p>
         {message("directorFilms")}
       </div>
