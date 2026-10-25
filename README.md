@@ -222,9 +222,10 @@ All server-side only.
 
 ## How it works
 
-- `src/lib/qloo`: a small Qloo client. GET only, `X-Api-Key` header, bounded retries with `Retry-After`, response
-  caching, clear error kinds (a 403 for an unsupported entity type is not reported as a bad key), warnings for
-  parameters Qloo would silently ignore, and provenance for every request.
+- `src/lib/qloo`: a small Qloo client. GET only, `X-Api-Key` header, paced under Qloo's 10 calls a second, bounded
+  retries (a 429 waits out the rest of Qloo's one-second window), response caching, clear error kinds (a 403 for an
+  unsupported entity type is not reported as a bad key), warnings for parameters Qloo would silently ignore, and
+  provenance for every request.
 - `src/lib/qloo/mock`: a fake Qloo server over a small **synthetic** catalog, so the app and tests run without a key.
   Mock responses are labelled; names are real but every score and tag assignment is invented.
 - `src/lib/tools`: the agent tools described above.

@@ -1,5 +1,6 @@
 import type { QlooCache } from "./cache";
 import { QlooError, classifyStatus } from "./errors";
+import type { Pacer } from "./pacer";
 import { cacheKey, serializeParams, validateInsightsParams } from "./params";
 import type {
   ApiInfoResponse,
@@ -48,6 +49,8 @@ export interface QlooClientOptions {
   maxAttempts?: number;
   timeoutMs?: number;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /** Shared by every client on one key, so parallel calls queue under Qloo's per-second limit instead of drawing 429s. */
+  pacer?: Pacer;
   sinks?: ((provenance: Provenance) => void)[];
   /** Aborts in-flight requests and pending retries, e.g. when the treatment run times out. */
   signal?: AbortSignal;
@@ -87,6 +90,16 @@ function backoffMs(attempt: number): number {
   return Math.min(250 * 2 ** attempt + Math.random() * 100, MAX_DELAY_MS);
 }
 
+/**
+ * Qloo's 429 carries no Retry-After, only x-second-ratelimit-reset: the seconds left in its one-second window. Retrying
+ * a little after that (a full second when it's missing) keeps the retry out of the window that refused it.
+ */
+function rateLimitWaitMs(reset: string | null): number {
+  const seconds = reset?.trim() ? Number(reset) : Number.NaN;
+  const windowLeftMs = Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 1000;
+  return Math.min(windowLeftMs + 100 + Math.random() * 150, MAX_DELAY_MS);
+}
+
 function retryAfterMs(header: string | null): number | undefined {
   if (!header) return undefined;
   const seconds = Number(header);
@@ -98,9 +111,10 @@ function retryAfterMs(header: string | null): number | undefined {
 
 function errorReason(body: string): string | undefined {
   try {
-    const parsed = JSON.parse(body) as { error?: { reason?: string; message?: string } | string };
+    const parsed = JSON.parse(body) as { error?: { reason?: string; message?: string } | string; error_msg?: string };
     if (typeof parsed.error === "string") return parsed.error;
-    return parsed.error?.reason ?? parsed.error?.message;
+    // A 429 says {"error_msg": "Rate limit exceeded"}.
+    return parsed.error?.reason ?? parsed.error?.message ?? parsed.error_msg;
   } catch {
     return body.trim().slice(0, 200) || undefined;
   }
@@ -232,6 +246,9 @@ export class QlooClient {
       // An aborted run (client gone, or the run's deadline) stops here instead of retrying: rethrow its reason.
       outer?.throwIfAborted();
       if (attempt > 0) await (outer ? sleep(delay, outer) : sleep(delay));
+      // Retries queue too: Qloo counts every call against the key's per-second limit.
+      const turn = this.options.pacer?.reserve() ?? 0;
+      if (turn > 0) await (outer ? sleep(turn, outer) : sleep(turn));
 
       let response: Response;
       let body: string;
@@ -287,7 +304,9 @@ export class QlooClient {
         requestId,
       });
       if (!retryable) throw lastError;
-      delay = retryAfterMs(response.headers.get("retry-after")) ?? backoffMs(attempt);
+      delay =
+        retryAfterMs(response.headers.get("retry-after")) ??
+        (response.status === 429 ? rateLimitWaitMs(response.headers.get("x-second-ratelimit-reset")) : backoffMs(attempt));
     }
     throw lastError ?? new QlooError({ kind: "network", message: `Qloo ${path} failed.`, path });
   }

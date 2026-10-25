@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryCache } from "./cache";
 import { QlooClient, type FetchLike, type Provenance } from "./client";
 import { QlooError } from "./errors";
+import { Pacer } from "./pacer";
 import { serializeParams, validateInsightsParams } from "./params";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -82,6 +83,35 @@ describe("QlooClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalledWith(2000);
     expect(result.data).toEqual({ results: { entities: [] } });
+  });
+
+  it("waits out the rest of Qloo's one-second window before retrying a 429", async () => {
+    const sleep = vi.fn<(ms: number) => Promise<void>>(async () => {});
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(jsonResponse({ error_msg: "Rate limit exceeded" }, 429, { "x-second-ratelimit-reset": "0.48" }))
+      .mockResolvedValueOnce(jsonResponse({ results: [] }));
+    await liveClient(fetchImpl, { sleep }).search({ query: "Drive" });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(sleep.mock.calls[0][0]).toBeGreaterThanOrEqual(580);
+    expect(sleep.mock.calls[0][0]).toBeLessThanOrEqual(730);
+  });
+
+  it("waits a full second when a 429 doesn't say when the window resets, and names the limit when it gives up", async () => {
+    const sleep = vi.fn<(ms: number) => Promise<void>>(async () => {});
+    const fetchImpl = vi.fn<FetchLike>(async () => jsonResponse({ error_msg: "Rate limit exceeded" }, 429));
+    await expect(liveClient(fetchImpl, { sleep, maxAttempts: 2 }).search({ query: "Drive" })).rejects.toMatchObject({
+      kind: "rate_limit",
+      message: "Qloo /search returned 429: Rate limit exceeded",
+    });
+    expect(sleep.mock.calls[0][0]).toBeGreaterThanOrEqual(1100);
+  });
+
+  it("queues a burst through the shared pacer, across recording clients too", async () => {
+    const sleep = vi.fn<(ms: number) => Promise<void>>(async () => {});
+    const client = liveClient(async () => jsonResponse({}), { sleep, pacer: new Pacer(2, 1000, () => 0) });
+    await Promise.all([client.info(), client.info(), client.recording(() => {}).info()]);
+    expect(sleep.mock.calls).toEqual([[1000]]);
   });
 
   it("does not retry 401 and labels it as an auth error with the reason", async () => {
