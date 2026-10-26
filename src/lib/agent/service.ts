@@ -5,6 +5,8 @@ import { TmdbClient, tmdbConfigFromEnv } from "../tmdb";
 import { briefKey, type Brief } from "./brief";
 import { loadFeatured, type FeaturedItem } from "./featured";
 import { TIMING, runPipeline } from "./pipeline";
+import { forBrowser } from "./redact";
+import { sealerFromEnv } from "./seal";
 import type { AgentEvent, Treatment } from "./types";
 import { RateLimiter, TtlCache } from "./guards";
 
@@ -19,6 +21,8 @@ export interface TreatmentService {
   runTimeoutMs?: number;
   /** Pre-built treatments (scripts/featured.ts), answered like cache hits that never expire. */
   featured?: () => FeaturedItem[];
+  /** Seals each treatment sent, so it can be saved (seal.ts). Unset when accounts aren't set up. */
+  seal?: (treatment: Treatment) => string;
 }
 
 let shared: TreatmentService | undefined;
@@ -32,6 +36,7 @@ export function getTreatmentService(): TreatmentService {
     // Cached briefs skip this; it only meters fresh runs.
     limiter: new RateLimiter(6, 60 * 1000),
     featured: () => loadFeatured(),
+    seal: sealerFromEnv(),
   };
   return shared;
 }
@@ -75,11 +80,16 @@ export async function streamTreatment(
   const started = Date.now();
   const log = (fields: Record<string, unknown>) =>
     console.log(JSON.stringify({ evt: "treatment", runId, key, ms: Date.now() - started, ...fields }));
+  /** What the browser gets: the treatment in its browser form, sealed when accounts are set up. */
+  const sending = (treatment: Treatment) => {
+    const sent = forBrowser(treatment);
+    return { treatment: sent, ...(service.seal ? { seal: service.seal(sent) } : {}) };
+  };
 
   const cached = cachedTreatment(brief, service);
   emit({ type: "start", runId, qlooMode: service.qloo.mode, llmMode: service.llm.mode, cached: Boolean(cached) });
   if (cached) {
-    emit({ type: "treatment", treatment: cached, cached: true });
+    emit({ type: "treatment", cached: true, ...sending(cached) });
     emit({ type: "done" });
     log({ outcome: "cache_hit" });
     return;
@@ -110,7 +120,7 @@ export async function streamTreatment(
       const degraded = treatment.llm.some((t) => t.degraded);
       const problems = validationProblems(treatment);
       if (!degraded && treatment.complete) service.cache.set(key, treatment);
-      emit({ type: "treatment", treatment, cached: false });
+      emit({ type: "treatment", cached: false, ...sending(treatment) });
       log({
         outcome: "ok",
         degraded,

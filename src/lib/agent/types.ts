@@ -50,7 +50,8 @@ export type AgentEvent =
   | { type: "start"; runId: string; qlooMode: QlooMode; llmMode: LlmMode; cached: boolean }
   | StepEvent
   | { type: "needs_input"; message: string; items: Ambiguity[] }
-  | { type: "treatment"; treatment: Treatment; cached: boolean }
+  /** `seal` (seal.ts) lets the studio save it; there's none when accounts aren't set up. */
+  | { type: "treatment"; treatment: Treatment; cached: boolean; seal?: string }
   | { type: "error"; message: string; field?: BriefField }
   | { type: "done" };
 

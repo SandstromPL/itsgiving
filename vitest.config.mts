@@ -3,7 +3,11 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(import.meta.dirname, "src") },
+    alias: {
+      "@": path.resolve(import.meta.dirname, "src"),
+      // Next resolves "server-only" to an empty module on the server; outside Next it throws, so tests take the empty one.
+      "server-only": path.resolve(import.meta.dirname, "node_modules/server-only/empty.js"),
+    },
   },
   test: {
     environment: "node",
