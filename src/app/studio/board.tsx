@@ -190,7 +190,10 @@ function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string
   const lingo = useLingo().t;
   const tone = toneOf(t);
   if (tone.length === 0) return null;
-  const shared = tone.some((x) => x.source === "overlap");
+  const shared = tone.filter((x) => x.source === "overlap").length;
+  // Lime picks out the tags the director's films share. When they all do, picking them out says nothing: the caption
+  // says it instead, and the row stays plain.
+  const mark = shared > 0 && shared < tone.length;
   return (
     <section aria-labelledby="giving-title" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2.5">
@@ -201,20 +204,20 @@ function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string
           <span
             key={x.tag.id}
             className={
-              x.source === "overlap"
+              mark && x.source === "overlap"
                 ? "rounded-full bg-accent px-4 py-2.5 text-[17px] font-bold text-[#121211]"
                 : "rounded-full border border-line bg-card px-4 py-2.5 text-[17px]"
             }
           >
             {tagLabel(x.tag.name)}
-            {x.source === "overlap" && <span className="sr-only"> ({lingo.shared(whose)})</span>}
+            {mark && x.source === "overlap" && <span className="sr-only"> ({lingo.shared(whose)})</span>}
           </span>
         ))}
         {mock && <Tape>Mock data</Tape>}
       </div>
       <p className="text-[15px] text-faint">
         Tone tags from {mock ? "the synthetic mock, not Qloo" : "Qloo"}: what this audience over-indexes on.
-        {shared ? ` Highlighted: shared with ${whose} films.` : ""}
+        {mark ? ` Highlighted: shared with ${whose} films.` : shared > 0 ? ` All of them are shared with ${whose} films.` : ""}
       </p>
     </section>
   );
