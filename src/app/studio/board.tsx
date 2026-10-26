@@ -44,7 +44,18 @@ const SECTIONS = [
 
 /** itsgiving's own writing is set in the serif; the tool, labels and Qloo's evidence stay in the interface faces. */
 const prose = "font-serif text-[1.25rem] leading-[1.38]";
-const card = "rounded-[26px] border border-line bg-card";
+/** A card is never cut across two printed pages. */
+const card = "rounded-[26px] border border-line bg-card print:break-inside-avoid";
+
+/**
+ * On paper a film or a place is one row: its picture with Qloo's receipt under it on the left, the writing on the right
+ * (the card's `read` part, which on screen is no box at all). The third row takes whatever height the writing needs past
+ * them; a place's map link sits in the fourth, under the writing.
+ */
+const printRow = "print:grid print:grid-cols-[40%_minmax(0,1fr)] print:grid-rows-[auto_auto_1fr_auto]";
+const printPicture = "print:col-start-1 print:row-start-1";
+const printRead = "contents print:col-start-2 print:row-span-3 print:row-start-1 print:flex print:flex-col print:gap-3 print:p-5";
+const printReceipt = "print:col-start-1 print:row-start-2 print:m-4";
 
 /**
  * A grid of n cards with no hole in its last row: two columns, three from xl when the count allows, and one card (the
@@ -66,10 +77,23 @@ function fill(n: number, at: "first" | "last"): { grid: string; span: (i: number
   };
 }
 
-function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
+/** A section starts a new printed page, unless it `follows` the one before (the short ones at the end share a page). */
+function Section({
+  id,
+  title,
+  note,
+  follows = false,
+  children,
+}: {
+  id: string;
+  title: string;
+  note?: string;
+  follows?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+    <section aria-labelledby={id} className={`flex flex-col gap-6 ${follows ? "" : "print:break-before-page"}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 print:break-after-avoid">
         {/* The section bar's jump lands on the heading, so the room it leaves for the sticky bar is the heading's. */}
         <h2 id={id} className="type-head scroll-mt-24 text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
           {title}
@@ -137,7 +161,7 @@ function Cover({
     <header
       ref={ref}
       key={`${t.id}-${t.createdAt}`}
-      className="letterbox-open surface-dark grain relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10"
+      className="letterbox-open surface-dark grain relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10 print:min-h-[225mm]"
       style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
     >
       <div aria-hidden className="absolute inset-0 -z-10">
@@ -452,6 +476,46 @@ function dateStamp(iso: string): string {
   return `'${two(d.getUTCFullYear() % 100)} ${two(d.getUTCMonth() + 1)} ${two(d.getUTCDate())}`;
 }
 
+/** Any text as a CSS string: everything but letters, digits and spaces goes in as a hex escape. */
+function cssString(text: string): string {
+  const safe = [...text].map((ch) => (/[\p{L}\p{N} ]/u.test(ch) ? ch : `\\${ch.codePointAt(0)!.toString(16).padStart(6, "0")}`));
+  return `"${safe.join("")}"`;
+}
+
+/**
+ * Printing names the pages after the treatment. Chrome takes the PDF's file name from the tab's title, and the running
+ * footer (globals.css) can only take words from a style rule, so both get the title as printing starts; the tab's own
+ * title comes back after. Only the board on screen answers: Next keeps pages it has left in the document, hidden.
+ */
+function usePrintTitle(title: string, article: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    let tab: string | null = null;
+    const before = () => {
+      if (!article.current?.getClientRects().length) return;
+      tab = document.title;
+      document.title = `${title} (itsgiving treatment)`;
+      let footer = document.getElementById("print-footer");
+      if (!footer) {
+        footer = document.createElement("style");
+        footer.id = "print-footer";
+        document.head.append(footer);
+      }
+      // In Chrome this later rule beats the stylesheet's :first one, so the cover page's empty footer comes again after it.
+      footer.textContent = `@page { @bottom-left { content: ${cssString(title)}; } } @page :first { @bottom-left { content: ""; } }`;
+    };
+    const after = () => {
+      if (tab !== null) document.title = tab;
+      tab = null;
+    };
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+    };
+  }, [title, article]);
+}
+
 export function Board({
   treatment: t,
   state,
@@ -493,6 +557,7 @@ export function Board({
   const stamp = dateStamp(t.createdAt);
   const cover = useRef<HTMLElement>(null);
   const article = useRef<HTMLElement>(null);
+  usePrintTitle(t.title, article);
   // Where the shoot-base map exists, it stays put beside the locations and lights the pin of the one being read.
   const pinned = (t.base?.map?.tiles.length ?? 0) > 0 && t.locations.length > 0;
   const referenceGrid = fill(t.references.length, "first");
@@ -520,14 +585,17 @@ export function Board({
       ref={article}
       aria-labelledby="treatment-title"
       aria-busy={state === "updating"}
-      className={`flex flex-col gap-14 transition-opacity duration-300 ${state === "current" ? "" : "opacity-50"}`}
+      // Printed at four fifths of screen size: a screen's type is large print on paper, and a film or a place fits in a
+      // third of a page instead of half.
+      className={`flex flex-col gap-14 transition-opacity duration-300 print:opacity-100 print:[zoom:0.8] ${state === "current" ? "" : "opacity-50"}`}
     >
       {state === "previous" && (
         <p className="-mb-8 text-[15px] text-dim">
           This is the previous version. The latest change didn&apos;t finish, so nothing below reflects it.
         </p>
       )}
-      <div className="flex flex-col gap-6">
+      {/* The cover and its tone line are the printed title page. */}
+      <div className="flex flex-col gap-6 print:break-after-page">
         <Cover ref={cover} t={t} fontId={fontId} suggestion={suggestion} onPickFont={setPicked} />
         <Giving t={t} mock={mock} whose={whose} />
         <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} note={reworkNote} />
@@ -536,7 +604,7 @@ export function Board({
       <SectionBar t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} back={back} />
 
       <Section id="concept" title="Concept">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] print:grid-cols-[minmax(0,1fr)_22rem]">
           <p className="max-w-[44ch] font-serif text-[clamp(1.5rem,2.3vw,1.9rem)] leading-[1.32] text-pretty">{t.concept}</p>
           {toneOf(t).length > 0 && (
             <div className={`${card} flex flex-col gap-4 p-5`}>
@@ -565,28 +633,32 @@ export function Board({
         {t.references.length === 0 ? (
           <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
         ) : (
-          <ul className={`grid gap-5 ${referenceGrid.grid}`}>
+          <ul className={`grid gap-5 ${referenceGrid.grid} print:flex print:flex-col print:gap-4`}>
             {t.references.map((r, i) => (
-              <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden ${referenceGrid.span(i)}`}>
+              <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden ${referenceGrid.span(i)} ${printRow}`}>
                 <Still
                   src={r.still ? tmdbSize(r.still, "w780") : r.entity.image}
                   alt={r.still ? `Still from ${r.entity.name}` : `Poster for ${r.entity.name}`}
-                  className={`aspect-video w-full ${referenceGrid.wide(i)}`}
+                  className={`aspect-video w-full ${referenceGrid.wide(i)} print:aspect-video ${printPicture}`}
                 />
-                <div className="flex flex-1 flex-col gap-3.5 p-5">
-                  <div className="flex flex-col gap-1">
-                    <h3 className="type-head text-[1.7rem] leading-tight">
-                      {r.entity.name}
-                      {r.entity.year && <span className="ml-2 text-[1.1rem] font-normal tracking-normal text-faint">{r.entity.year}</span>}
-                    </h3>
-                    <QlooTags tags={r.qloo.tags} />
+                <div className="flex flex-1 flex-col gap-3.5 p-5 print:contents">
+                  <div className={printRead}>
+                    <div className="flex flex-col gap-1">
+                      <h3 className="type-head text-[1.7rem] leading-tight">
+                        {r.entity.name}
+                        {r.entity.year && (
+                          <span className="ml-2 text-[1.1rem] font-normal tracking-normal text-faint">{r.entity.year}</span>
+                        )}
+                      </h3>
+                      <QlooTags tags={r.qloo.tags} />
+                    </div>
+                    <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
+                    <p className={prose}>
+                      <span className="font-sans text-[13px] font-semibold text-faint">Borrow </span>
+                      {r.notes.borrow}
+                    </p>
                   </div>
-                  <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
-                  <p className={prose}>
-                    <span className="font-sans text-[13px] font-semibold text-faint">Borrow </span>
-                    {r.notes.borrow}
-                  </p>
-                  <Receipt qloo={r.qloo} mock={mock} className="mt-auto" />
+                  <Receipt qloo={r.qloo} mock={mock} className={`mt-auto ${printReceipt}`} />
                   <Why
                     label="Why this film"
                     name={r.entity.name}
@@ -636,11 +708,11 @@ export function Board({
         {t.wardrobe.length === 0 ? (
           <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
-          <ul className="grid gap-5 md:grid-cols-2">
+          <ul className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
             {t.wardrobe.map((w, i) => (
               <li
                 key={w.entity.id}
-                className={`${card} flex flex-col gap-3.5 p-5 ${i === t.wardrobe.length - 1 && i % 2 === 0 ? "md:col-span-2" : ""}`}
+                className={`${card} flex flex-col gap-3.5 p-5 ${i === t.wardrobe.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
               >
                 <div className="flex flex-col gap-1">
                   <h3 className="type-head text-[1.7rem] leading-tight">{w.entity.name}</h3>
@@ -683,7 +755,7 @@ export function Board({
           {t.locations.length === 0 ? (
             <p className="text-[15px] text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
           ) : (
-            <ul className={pinned ? "flex flex-col gap-5" : `grid gap-5 ${placeGrid.grid}`}>
+            <ul className={`${pinned ? "flex flex-col gap-5" : `grid gap-5 ${placeGrid.grid}`} print:flex print:flex-col print:gap-4`}>
               {t.locations.map((l, i) => {
                 const place = l.entity.place;
                 // Mumbai's neighbourhoods come back as ward codes ("H/W Ward"), which say less than the base does.
@@ -702,13 +774,13 @@ export function Board({
                       placeCards.current[i] = el;
                     }}
                     data-place={i}
-                    className={`${card} flex flex-col overflow-hidden ${pinned ? (reading === i ? "ring-2 ring-foreground" : "") : placeGrid.span(i)}`}
+                    className={`${card} flex flex-col overflow-hidden ${pinned ? (reading === i ? "ring-2 ring-foreground" : "") : placeGrid.span(i)} ${printRow} print:ring-0`}
                   >
-                    <div className="relative">
+                    <div className={`relative ${printPicture}`}>
                       <Still
                         src={l.entity.image}
                         alt={`Photo of ${l.entity.name}`}
-                        className={`${pinned ? "aspect-video" : `aspect-[3/2] ${placeGrid.wide(i)}`} w-full`}
+                        className={`${pinned ? "aspect-video" : `aspect-[3/2] ${placeGrid.wide(i)}`} w-full print:aspect-video`}
                       />
                       <span
                         aria-hidden
@@ -727,23 +799,26 @@ export function Board({
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-1 flex-col gap-3 p-5">
-                      <div>
-                        <h3 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h3>
-                        {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
+                    <div className="flex flex-1 flex-col gap-3 p-5 print:contents">
+                      <div className={printRead}>
+                        <div>
+                          <h3 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h3>
+                          {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
+                        </div>
+                        {place?.ambience && (
+                          <p className="text-[14px] leading-5 text-dim">
+                            <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>
+                              {mock ? "Mock note" : "Qloo"}{" "}
+                            </span>
+                            {/* The whole note is in "Why this place". */}
+                            {excerpt(place.ambience, 180)}
+                          </p>
+                        )}
+                        <p className={prose}>{l.notes.scene}</p>
                       </div>
-                      {place?.ambience && (
-                        <p className="text-[14px] leading-5 text-dim">
-                          <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>
-                            {mock ? "Mock note" : "Qloo"}{" "}
-                          </span>
-                          {/* The whole note is in "Why this place". */}
-                          {excerpt(place.ambience, 180)}
-                        </p>
-                      )}
-                      <p className={prose}>{l.notes.scene}</p>
-                      <Receipt qloo={l.qloo} mock={mock} className="mt-auto" />
-                      <div className="flex flex-wrap items-center gap-2">
+                      <Receipt qloo={l.qloo} mock={mock} className={`mt-auto ${printReceipt}`} />
+                      {/* On paper the map link (a live one in a PDF) closes the writing's column. */}
+                      <div className="flex flex-wrap items-center gap-2 print:col-start-2 print:row-start-4 print:px-5 print:pb-4">
                         <Why
                           label="Why this place"
                           name={l.entity.name}
@@ -775,7 +850,7 @@ export function Board({
       </Section>
 
       <Section id="camera" title="Camera and light">
-        <div className="grid gap-5 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
           {(
             [
               ["Lighting", t.lighting],
@@ -800,7 +875,11 @@ export function Board({
         <ul className="grid grid-cols-3 gap-4 sm:grid-cols-6">
           {t.palette.map((c) => (
             <li key={c.hex}>
-              <span aria-hidden className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10" style={{ background: c.hex }} />
+              <span
+                aria-hidden
+                className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10 print:aspect-[3/2]"
+                style={{ background: c.hex }}
+              />
               <span className="mt-2 block text-[15px] leading-tight font-semibold">{c.name}</span>
               <span className="block font-mono text-[13px] text-faint">{c.hex}</span>
             </li>
@@ -811,6 +890,7 @@ export function Board({
       <Section
         id="audience"
         title="Audience"
+        follows
         note={
           mock
             ? "Synthetic fixtures standing in for Qloo's taste graph: real names, invented affinities."
@@ -818,7 +898,7 @@ export function Board({
         }
       >
         <div className={`${card} p-6`}>
-          <dl className="grid gap-x-10 gap-y-6 md:grid-cols-[14rem_minmax(0,1fr)]">
+          <dl className="grid gap-x-10 gap-y-6 md:grid-cols-[14rem_minmax(0,1fr)] print:grid-cols-[14rem_minmax(0,1fr)]">
             {overlap.length > 0 && (
               <>
                 <dt className="text-[15px] font-semibold">Shared by {whose} films and the audience</dt>
@@ -845,7 +925,7 @@ export function Board({
         </div>
       </Section>
 
-      <Section id="credits" title="Credits">
+      <Section id="credits" title="Credits" follows>
         <div className="grid items-start gap-5 xl:grid-cols-2">
           <div className={`${card} p-6`}>
             <dl className="grid gap-x-8 gap-y-3 text-[15px] leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">

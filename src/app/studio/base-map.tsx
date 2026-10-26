@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 import { MapCredit, StreetTiles, fixed, mapFrame, type MapFrame } from "./street-map";
@@ -186,22 +186,38 @@ function HeatMap({
     `${mock ? "Synthetic heatmap" : "Qloo heatmap"} of ${city} for this audience: strongest around ${base.areas.map((a) => a.name).join(", then ")}.` +
     (chosen ? ` The shoot is based in ${chosen.name}.` : "") +
     (pins.length > 0 ? ` Locations ${pins.map((p) => p.n).join(", ")} are marked.` : "");
+  // On paper, beside the locations, the map takes the left of its block and the words the right (ShootBaseBlock), so the
+  // block is only as tall as the map and the first location fits under it, on US Letter too. Its width follows from its
+  // height, 26rem, a little under the screen's cap.
+  const paper = compact
+    ? {
+        wrap: "print:contents",
+        caption: "print:col-start-2 print:row-start-2 print:mb-0",
+        map: "print:col-start-1 print:row-span-5 print:row-start-1 print:mx-0 print:w-[calc(var(--map-height)*var(--map-ratio))] print:[--map-height:26rem]",
+        legend: "print:col-start-2 print:row-start-3 print:mt-0",
+      }
+    : { wrap: "", caption: "", map: "", legend: "" };
 
   return (
-    <div>
-      <p className="mb-3 max-w-[60ch] text-[14px] leading-5 text-dim">
+    <div className={paper.wrap}>
+      <p className={`mb-3 max-w-[60ch] text-[14px] leading-5 text-dim ${paper.caption}`}>
         <span className="font-semibold text-foreground">Where the fans are.</span> {mock ? "A synthetic heatmap" : "Qloo's heatmap"} of{" "}
         {audience} across {city}: the brighter a square, the stronger this audience is there.
       </p>
       <div
         ref={box}
-        className="relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b]"
-        style={{
-          aspectRatio: `${f.width} / ${f.height}`,
-          // Pinned beside the locations, the whole block must fit under the section bar: the rest of it (caption, legend,
-          // the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900.
-          maxWidth: compact ? `calc(max(16rem, min(30rem, 100dvh - 28rem)) * ${f.width / f.height})` : `${(34 * f.width) / f.height}rem`,
-        }}
+        className={`relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] ${paper.map}`}
+        style={
+          {
+            aspectRatio: `${f.width} / ${f.height}`,
+            // Pinned beside the locations, the whole block must fit under the section bar: the rest of it (caption,
+            // legend, the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900.
+            maxWidth: compact
+              ? `calc(var(--map-height, max(16rem, min(30rem, 100dvh - 28rem))) * ${f.width / f.height})`
+              : `${(34 * f.width) / f.height}rem`,
+            "--map-ratio": f.width / f.height,
+          } as CSSProperties
+        }
       >
         <StreetTiles frame={f} />
         <svg viewBox={`0 0 ${f.width} ${f.height}`} role="img" aria-label={summary} className="absolute inset-0 size-full">
@@ -295,7 +311,7 @@ function HeatMap({
         })}
         <MapCredit />
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim">
+      <div className={`mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim ${paper.legend}`}>
         <span className="flex items-center gap-1.5">
           Weaker
           <span aria-hidden className="flex gap-0.5">
@@ -357,8 +373,8 @@ export function ShootBaseBlock({
   const map = base.map && base.map.tiles.length > 0 && base.map;
   if (compact) {
     return (
-      <div className="surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2">
+      <div className="surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6 print:grid print:break-inside-avoid print:grid-cols-[auto_minmax(0,1fr)] print:grid-rows-[auto_auto_auto_auto_1fr] print:items-start print:gap-x-6 print:gap-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1">
           <div>
             <h4 className="text-[14px] font-semibold text-dim">Shoot base</h4>
             <p className="type-poster mt-1.5 text-[clamp(2rem,3.2vw,2.75rem)]">{chosen.name}</p>
@@ -368,7 +384,7 @@ export function ShootBaseBlock({
           </p>
         </div>
         {map && <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} active={active} compact />}
-        <p className="text-sm leading-6 text-dim">
+        <p className="text-sm leading-6 text-dim print:col-start-2 print:row-start-4">
           {base.held
             ? `${locations} is within ${km} of ${chosen.name}, so the unit can stay in one area.`
             : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${city}.`}
@@ -378,7 +394,7 @@ export function ShootBaseBlock({
     );
   }
   return (
-    <div className="surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem]">
+    <div className="surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem] print:break-inside-avoid">
       {map ? (
         <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} />
       ) : (

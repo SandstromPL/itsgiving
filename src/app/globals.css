@@ -300,11 +300,12 @@ body {
 }
 
 @media print {
-  /* Paper is light: a treatment prints in the light room whatever the screen shows. */
+  /* A treatment prints on white paper whatever the screen shows: the room's colour would be a box inside the page's
+     margins, and cards are drawn by their rules. The dark frames (cover, map) keep theirs. */
   :root:root {
-    --background: var(--light-background);
+    --background: #fff;
     --foreground: var(--light-foreground);
-    --card: var(--light-card);
+    --card: #fff;
     --field: var(--light-field);
     --track: var(--light-track);
     --line: var(--light-line);
@@ -321,5 +322,62 @@ body {
   * {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+  /* Grain is for a screen (on paper it reads as dust), and a cover prints open however soon after it lands. */
+  .grain::after {
+    display: none;
+  }
+  .letterbox-open {
+    animation: none;
+  }
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+  p,
+  li {
+    orphans: 3;
+    widows: 3;
+  }
+}
+
+/* The printed page leaves room for a running footer: the treatment's title (board.tsx puts it in as printing starts;
+   until then it's the name of the house) and the page count. The cover page goes without. Every other margin box is
+   set empty rather than left out: one left out gets Chrome's own header or footer (date, URL) when its print dialog's
+   "Headers and footers" is ticked, and "none" counts as left out. */
+@page {
+  margin: 14mm 14mm 16mm;
+  @bottom-left {
+    content: "itsgiving";
+    font-family: var(--font-instrument), Georgia, serif;
+    font-size: 11pt;
+    font-style: italic;
+    color: #4a4741;
+  }
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-size: 8pt;
+    color: #5e5a52;
+  }
+  @top-left {
+    content: "";
+  }
+  @top-center {
+    content: "";
+  }
+  @top-right {
+    content: "";
+  }
+  @bottom-center {
+    content: "";
+  }
+}
+@page :first {
+  @bottom-left {
+    content: "";
+  }
+  @bottom-right {
+    content: "";
   }
 }
