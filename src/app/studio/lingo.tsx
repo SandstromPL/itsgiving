@@ -26,6 +26,11 @@ interface Lines {
   interval: { title: string; line: string };
   directorsCut: string;
   footer: string;
+  nowShowing: string;
+  yourPoster: string;
+  makeItYours: string;
+  tryOne: string;
+  watchItWork: string;
 }
 
 const GENZ: Lines = {
@@ -46,6 +51,11 @@ const GENZ: Lines = {
   interval: { title: "INTERVAL", line: "grab a cutting chai. the second half is next." },
   directorsCut: "director's cut unlocked",
   footer: "receipts, not slop.",
+  nowShowing: "Now showing",
+  yourPoster: "your poster",
+  makeItYours: "Make it yours",
+  tryOne: "Try one",
+  watchItWork: "Watch it work",
 };
 
 const PLAIN: Lines = {
@@ -66,6 +76,11 @@ const PLAIN: Lines = {
   interval: { title: "Intermission", line: "The second half of the treatment is next." },
   directorsCut: "Director's cut on",
   footer: "Every pick is backed by Qloo data.",
+  nowShowing: "Featured treatments",
+  yourPoster: "Your treatment",
+  makeItYours: "References and your taste",
+  tryOne: "Examples",
+  watchItWork: "How it works",
 };
 
 const STORAGE_KEY = "itsgiving:unc";

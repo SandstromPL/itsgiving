@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 
@@ -122,7 +123,25 @@ const LABEL_SHIFT: Record<Side, string> = {
   left: "translate(calc(-100% - 4px), -50%)",
 };
 
-function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGrid; pins: Pin[]; city: string; mock: boolean }) {
+function HeatMap({
+  base,
+  map,
+  pins,
+  city,
+  mock,
+  active,
+  compact = false,
+}: {
+  base: ShootBase;
+  map: HeatGrid;
+  pins: Pin[];
+  city: string;
+  mock: boolean;
+  /** The location being read (0-based, as on the cards): its pin grows and shows its name. */
+  active?: number;
+  /** Pinned beside the locations: never taller than the screen leaves room for. */
+  compact?: boolean;
+}) {
   const f = frame(map, pins);
   const tone = mock ? "var(--tape)" : "var(--accent)";
   const square = f.size(map.cell.lat);
@@ -145,7 +164,10 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
     <div>
       <div
         className="relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-card"
-        style={{ aspectRatio: `${f.width} / ${f.height}`, maxWidth: `${(34 * f.width) / f.height}rem` }}
+        style={{
+          aspectRatio: `${f.width} / ${f.height}`,
+          maxWidth: compact ? `calc(min(30rem, 100dvh - 24rem) * ${f.width / f.height})` : `${(34 * f.width) / f.height}rem`,
+        }}
       >
         <svg viewBox={`0 0 ${f.width} ${f.height}`} role="img" aria-label={summary} className="absolute inset-0 size-full">
           {map.tiles.map((tile, i) => (
@@ -210,17 +232,36 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
             </span>
           );
         })}
-        {pins.map((p, i) => (
-          <span
-            key={p.n}
-            aria-hidden
-            title={p.name}
-            className="absolute grid size-[20px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-foreground text-[11px] font-bold text-frame ring-2 ring-frame"
-            style={at(placed[i])}
-          >
-            {p.n}
-          </span>
-        ))}
+        {pins.map((p, i) => {
+          const on = active !== undefined && p.n === active + 1;
+          // The name goes on whichever side of the pin has room.
+          const left = placed[i].x / f.width > 0.62;
+          return (
+            <Fragment key={p.n}>
+              <span
+                aria-hidden
+                title={p.name}
+                className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full font-bold ring-2 ring-frame ${
+                  on
+                    ? "z-10 size-[30px] bg-accent text-[13px] text-[#121211] shadow-[0_0_0_6px_rgb(228_255_58/0.3)]"
+                    : "size-[20px] bg-foreground text-[11px] text-frame"
+                }`}
+                style={at(placed[i])}
+              >
+                {p.n}
+              </span>
+              {on && (
+                <span
+                  aria-hidden
+                  className="absolute z-10 rounded-md bg-[#f2f0ea] px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-[#121211]"
+                  style={{ ...at(placed[i]), transform: left ? "translate(calc(-100% - 20px), -50%)" : "translate(20px, -50%)" }}
+                >
+                  {p.name}
+                </span>
+              )}
+            </Fragment>
+          );
+        })}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim">
         <span className="flex items-center gap-1.5">
@@ -233,7 +274,7 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
           Stronger
         </span>
         <span>Rings: {base.areas[0]?.radius_m / 1000} km shoot bases; solid is the one chosen</span>
-        {pins.length > 0 && <span>Numbers: the locations below</span>}
+        {pins.length > 0 && <span>Numbers: the locations {compact ? "beside the map" : "below"}</span>}
       </div>
     </div>
   );
@@ -241,7 +282,19 @@ function HeatMap({ base, map, pins, city, mock }: { base: ShootBase; map: HeatGr
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 
-export function ShootBaseBlock({ t, mock }: { t: Treatment; mock: boolean }) {
+export function ShootBaseBlock({
+  t,
+  mock,
+  active,
+  compact = false,
+}: {
+  t: Treatment;
+  mock: boolean;
+  /** The location being read, highlighted on the map. */
+  active?: number;
+  /** Pinned beside the location cards: the map with a short header instead of the side panel. */
+  compact?: boolean;
+}) {
   const base = t.base;
   const chosen = base?.areas.find((a) => a.ref === base.chosen) ?? base?.areas[0];
   if (!base || !chosen) return null;
@@ -249,6 +302,35 @@ export function ShootBaseBlock({ t, mock }: { t: Treatment; mock: boolean }) {
   const others = base.areas.filter((a) => a.ref !== chosen.ref);
   const evidence = mock ? "text-tape" : "text-tungsten";
   const km = `${chosen.radius_m / 1000} km`;
+  const share = (
+    <span className={`rounded-md px-1.5 py-0.5 font-bold text-[#121211] ${mock ? "bg-[#ffd6ea]" : "bg-accent"}`}>
+      {percent(chosen.share)}
+    </span>
+  );
+  if (compact) {
+    return (
+      <div className="surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2">
+          <div>
+            <h4 className="text-[14px] font-semibold text-dim">Shoot base</h4>
+            <p className="type-poster mt-1.5 text-[clamp(2rem,3.2vw,2.75rem)]">{chosen.name}</p>
+          </div>
+          <p className="text-[14px] leading-6">
+            {share} of this audience&apos;s strongest spots in {t.brief.city}
+          </p>
+        </div>
+        {base.map && base.map.tiles.length > 0 && (
+          <HeatMap base={base} map={base.map} pins={pins} city={t.brief.city} mock={mock} active={active} compact />
+        )}
+        <p className="text-sm leading-6 text-dim">
+          {base.held
+            ? `Every location is within ${km} of ${chosen.name}, so the unit can stay in one area.`
+            : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${t.brief.city}.`}
+          {others.length > 0 && ` Also strong: ${others.map((a) => `${a.name} (${percent(a.share)})`).join(", ")}.`}
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem]">
       {base.map && base.map.tiles.length > 0 ? (
@@ -261,10 +343,7 @@ export function ShootBaseBlock({ t, mock }: { t: Treatment; mock: boolean }) {
         <p className="type-poster mt-2 text-[clamp(2.4rem,4vw,3.25rem)]">{chosen.name}</p>
         {chosen.district && <p className="mt-2 text-[15px] text-dim">{chosen.district}</p>}
         <p className="mt-4 text-[15px] leading-6">
-          <span className={`rounded-md px-1.5 py-0.5 font-bold text-[#121211] ${mock ? "bg-[#ffd6ea]" : "bg-accent"}`}>
-            {percent(chosen.share)}
-          </span>{" "}
-          of this audience&apos;s strongest spots in {t.brief.city}
+          {share} of this audience&apos;s strongest spots in {t.brief.city}
         </p>
         <p className="mt-3 text-sm leading-6 text-dim">
           {base.held

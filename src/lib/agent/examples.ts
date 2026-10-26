@@ -55,4 +55,18 @@ export const EXAMPLES: Example[] = [
     brief: { artist: "Frank Ocean", touchstones: ["Forgotten"], city: "New York" },
     featured: false,
   },
+  {
+    slug: "lana-del-rey-new-york",
+    title: "Lana Del Rey",
+    detail: "Music video in New York on a premium budget.",
+    brief: { artist: "Lana Del Rey", city: "New York", budget: "premium" },
+    featured: false,
+  },
+  {
+    slug: "after-in-the-mood-for-love",
+    title: "After In the Mood for Love",
+    detail: "A short film in Mumbai on a shoestring.",
+    brief: { format: "short_film", touchstones: ["In the Mood for Love"], city: "Mumbai", budget: "shoestring" },
+    featured: false,
+  },
 ];

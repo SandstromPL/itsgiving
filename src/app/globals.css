@@ -6,25 +6,115 @@
  * cover and the shoot-base map stay dark like a projected frame; `.surface-dark` swaps the same tokens inside them.
  * Two voices never mix: Qloo evidence is mono on receipt slips (tungsten), the treatment's own writing is serif.
  * Tape pink marks anything mocked; safelight red marks errors. Every text pair passes WCAG AA, on both surfaces.
+ *
+ * Two rooms share these tokens: the light one, and a dark one chosen in the header or by the device (theme.tsx; the
+ * script in layout.tsx sets `data-theme` before first paint). `--lights` dims either toward the dark room: the
+ * landing turns it down as its posters come into view (lights.tsx). Receipts and the popover windows stay on paper.
  */
 :root {
-  --background: #f2f0ea; /* the room */
-  --foreground: #121211; /* ink, 17:1 on the room */
-  --card: #ffffff;
-  --field: #f7f5f0;
-  --line: #dad5ca; /* card borders and rules, decorative only */
-  --edge: #8c867b; /* control borders, 3.3:1 on fields */
-  --dim: #4a4741; /* secondary text, 8:1 on the room */
-  --faint: #5e5a52; /* hints, 5.9:1 on the room */
+  --light-background: #f2f0ea; /* the room */
+  --light-foreground: #121211; /* ink, 17:1 on the room */
+  --light-card: #ffffff;
+  --light-field: #f7f5f0;
+  --light-track: #eeebe4; /* the groove behind a two-way switch */
+  --light-line: #dad5ca; /* card borders and rules, decorative only */
+  --light-edge: #8c867b; /* control borders, 3.3:1 on fields */
+  --light-dim: #4a4741; /* secondary text, 8:1 on the room */
+  --light-faint: #5e5a52; /* hints, 5.9:1 on the room */
+  --light-tungsten: #855000; /* Qloo evidence, 5.8:1 on the room */
+  --light-tape: #a3195b; /* mocked, 6.2:1 on its wash */
+  --light-tape-wash: #ffe3f0;
+  --light-safelight: #b42318; /* errors, 6.5:1 on cards */
+
+  /* The dark room: the `.surface-dark` values below, so every pair keeps its contrast. */
+  --dark-background: #121211;
+  --dark-foreground: #f2f0ea;
+  --dark-card: #1c1b19;
+  --dark-field: #262421;
+  --dark-track: #2c2a26;
+  --dark-line: #34312c;
+  --dark-edge: #7a7469;
+  --dark-dim: #cfcbc2;
+  --dark-faint: #aaa498;
+  --dark-tungsten: #e8b04b;
+  --dark-tape: #f2a4c8;
+  --dark-tape-wash: #3a1f2c;
+  --dark-safelight: #ef6c5d;
+
+  --theme-background: var(--light-background);
+  --theme-foreground: var(--light-foreground);
+  --theme-card: var(--light-card);
+  --theme-field: var(--light-field);
+  --theme-track: var(--light-track);
+  --theme-line: var(--light-line);
+  --theme-edge: var(--light-edge);
+  --theme-dim: var(--light-dim);
+  --theme-faint: var(--light-faint);
+  --theme-tungsten: var(--light-tungsten);
+  --theme-tape: var(--light-tape);
+  --theme-tape-wash: var(--light-tape-wash);
+  --theme-safelight: var(--light-safelight);
+  color-scheme: light;
+
+  /* 0: house lights up. 1: down, the room fully dark. Surfaces fade with it; text flips to the dark room's ink in one
+     step past the middle (--ink-flip), so it never sits on a background as grey as itself. */
+  --lights: 0;
+  --ink-flip: clamp(0, (var(--lights) - 0.55) * 1000, 1);
+  --background: color-mix(in srgb, var(--dark-background) calc(var(--lights) * 100%), var(--theme-background));
+  --foreground: color-mix(in srgb, var(--dark-foreground) calc(var(--ink-flip) * 100%), var(--theme-foreground));
+  --card: color-mix(in srgb, var(--dark-card) calc(var(--lights) * 100%), var(--theme-card));
+  --field: color-mix(in srgb, var(--dark-field) calc(var(--lights) * 100%), var(--theme-field));
+  --track: color-mix(in srgb, var(--dark-track) calc(var(--lights) * 100%), var(--theme-track));
+  --line: color-mix(in srgb, var(--dark-line) calc(var(--lights) * 100%), var(--theme-line));
+  --edge: color-mix(in srgb, var(--dark-edge) calc(var(--lights) * 100%), var(--theme-edge));
+  --dim: color-mix(in srgb, var(--dark-dim) calc(var(--ink-flip) * 100%), var(--theme-dim));
+  --faint: color-mix(in srgb, var(--dark-faint) calc(var(--ink-flip) * 100%), var(--theme-faint));
+  --tungsten: color-mix(in srgb, var(--dark-tungsten) calc(var(--ink-flip) * 100%), var(--theme-tungsten));
+  --tape: color-mix(in srgb, var(--dark-tape) calc(var(--ink-flip) * 100%), var(--theme-tape));
+  --tape-wash: color-mix(in srgb, var(--dark-tape-wash) calc(var(--lights) * 100%), var(--theme-tape-wash));
+  --safelight: color-mix(in srgb, var(--dark-safelight) calc(var(--ink-flip) * 100%), var(--theme-safelight));
   --frame: #121211; /* the projected frame */
   --accent: #e4ff3a; /* the highlighter, always under ink text */
   --slip: #fffdf6; /* receipt paper */
   --slip-edge: #c9c1af;
-  --tungsten: #855000; /* Qloo evidence, 5.8:1 on the room */
-  --tape: #a3195b; /* mocked, 6.2:1 on its wash */
-  --tape-wash: #ffe3f0;
-  --safelight: #b42318; /* errors, 6.5:1 on cards */
-  color-scheme: light;
+}
+
+/* The dark room, chosen in the header, or by the device when nothing is chosen. */
+:root[data-theme="dark"] {
+  --theme-background: var(--dark-background);
+  --theme-foreground: var(--dark-foreground);
+  --theme-card: var(--dark-card);
+  --theme-field: var(--dark-field);
+  --theme-track: var(--dark-track);
+  --theme-line: var(--dark-line);
+  --theme-edge: var(--dark-edge);
+  --theme-dim: var(--dark-dim);
+  --theme-faint: var(--dark-faint);
+  --theme-tungsten: var(--dark-tungsten);
+  --theme-tape: var(--dark-tape);
+  --theme-tape-wash: var(--dark-tape-wash);
+  --theme-safelight: var(--dark-safelight);
+  --frame: #0a0908;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --theme-background: var(--dark-background);
+    --theme-foreground: var(--dark-foreground);
+    --theme-card: var(--dark-card);
+    --theme-field: var(--dark-field);
+    --theme-track: var(--dark-track);
+    --theme-line: var(--dark-line);
+    --theme-edge: var(--dark-edge);
+    --theme-dim: var(--dark-dim);
+    --theme-faint: var(--dark-faint);
+    --theme-tungsten: var(--dark-tungsten);
+    --theme-tape: var(--dark-tape);
+    --theme-tape-wash: var(--dark-tape-wash);
+    --theme-safelight: var(--dark-safelight);
+    --frame: #0a0908;
+    color-scheme: dark;
+  }
 }
 
 /* The cover, the run stage and the map: the same tokens, set for a dark frame. */
@@ -42,7 +132,17 @@
   --tape: #f2a4c8;
   --tape-wash: #3a1f2c;
   --safelight: #ef6c5d;
+  --track: #2c2a26;
   color: var(--foreground);
+}
+/* In the dark room a dark frame sits a shade deeper, so it still reads as a frame. */
+:root[data-theme="dark"] .surface-dark {
+  --background: #0a0908;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .surface-dark {
+    --background: #0a0908;
+  }
 }
 
 @theme inline {
@@ -50,6 +150,7 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-field: var(--field);
+  --color-track: var(--track);
   --color-line: var(--line);
   --color-edge: var(--edge);
   --color-dim: var(--dim);
@@ -172,6 +273,25 @@ body {
   animation: letterbox-open 900ms cubic-bezier(0.2, 0.7, 0.1, 1) both;
 }
 
+/* Lights down: two letterbox bars close in as the landing's room dims (studio/lights.tsx sets --lights). */
+.letterbox-bar {
+  position: fixed;
+  inset-inline: 0;
+  z-index: 35;
+  height: 2rem;
+  background: #000;
+  pointer-events: none;
+  transform: scaleY(var(--lights));
+}
+.letterbox-bar.top {
+  top: 0;
+  transform-origin: top;
+}
+.letterbox-bar.bottom {
+  bottom: 0;
+  transform-origin: bottom;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -183,6 +303,25 @@ body {
 }
 
 @media print {
+  /* Paper is light: a treatment prints in the light room whatever the screen shows. */
+  :root:root {
+    --lights: 0;
+    --theme-background: var(--light-background);
+    --theme-foreground: var(--light-foreground);
+    --theme-card: var(--light-card);
+    --theme-field: var(--light-field);
+    --theme-track: var(--light-track);
+    --theme-line: var(--light-line);
+    --theme-edge: var(--light-edge);
+    --theme-dim: var(--light-dim);
+    --theme-faint: var(--light-faint);
+    --theme-tungsten: var(--light-tungsten);
+    --theme-tape: var(--light-tape);
+    --theme-tape-wash: var(--light-tape-wash);
+    --theme-safelight: var(--light-safelight);
+    --frame: #121211;
+    color-scheme: light;
+  }
   * {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;

@@ -42,6 +42,35 @@ export function splitTitles(text: string): string[] {
     .filter(Boolean);
 }
 
+/** A link the importer reads: a TMDB list, IMDb title links or bare IMDb IDs. Anything else typed is a film title. */
+export function looksLikeImport(text: string): boolean {
+  return /themoviedb\.org\/list\/|imdb\.com\/title\/tt\d|^tt\d{7,10}\b/i.test(text.trim());
+}
+
+const sameTitle = (a: string, b: string) => a.replace(/\s+/g, " ").trim().toLowerCase() === b.replace(/\s+/g, " ").trim().toLowerCase();
+
+/** One typed film added to your taste, unless it is already there. */
+export function addFilm(form: FormState, title: string): FormState {
+  const films = splitTitles(form.directorFilms);
+  if (!title.trim() || films.some((film) => sameTitle(film, title))) return form;
+  return { ...form, directorFilms: [...films, title.trim()].join("\n") };
+}
+
+export function removeFilm(form: FormState, title: string): FormState {
+  return {
+    ...form,
+    directorFilms: splitTitles(form.directorFilms)
+      .filter((film) => film !== title)
+      .join("\n"),
+  };
+}
+
+/** An example brief as a chip: "Frank Ocean, New York" or "after In the Mood for Love, Mumbai". */
+export function exampleChip(brief: BriefInput): string {
+  const who = brief.artist ?? (brief.touchstones?.length ? `after ${brief.touchstones[0]}` : "");
+  return [who, brief.city].filter(Boolean).join(", ");
+}
+
 export type FieldName = "artist" | "touchstones" | "city" | "directorFilms";
 export interface FormProblem {
   field: FieldName;

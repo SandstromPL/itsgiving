@@ -51,13 +51,15 @@ export function Picker({
             {item.candidates.map((candidate) => (
               <label
                 key={candidate.id}
-                className="flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-card p-2.5 hover:border-edge has-checked:border-foreground has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground"
+                className="group flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-card p-2.5 hover:border-edge has-checked:border-foreground has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground"
               >
                 <input type="radio" name={item.key} value={candidate.id} required className="sr-only" />
                 <Still src={candidate.image} alt="" className="aspect-video w-20 shrink-0 rounded-lg" />
                 <span className="min-w-0">
-                  <span className="block truncate text-[16px] font-bold text-[#121211]">{candidate.name}</span>
-                  <span className="block truncate text-[13px] text-[#4a4741]">
+                  <span className="block truncate text-[16px] font-bold text-foreground group-has-checked:text-[#121211]">
+                    {candidate.name}
+                  </span>
+                  <span className="block truncate text-[13px] text-dim group-has-checked:text-[#4a4741]">
                     {[candidate.disambiguation ?? candidate.year, candidate.kind?.replace("_", " ")].filter(Boolean).join(", ")}
                   </span>
                 </span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { BUDGETS, FORMATS, NUDGES, NUDGE_LABELS, subjectPhrase, type Nudge } from "@/lib/agent/options";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
@@ -8,7 +8,8 @@ import { ShootBaseBlock } from "./base-map";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
 import { QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
-import { TitleCardPicker, suggestTitleFont, titleFont, titleStyle } from "./title-card";
+import { TitleCardPicker } from "./title-card";
+import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
 
@@ -79,11 +80,13 @@ function Also({ label, items, mock }: { label: string; items: CompactEntity[]; m
 }
 
 function Cover({
+  ref,
   t,
   fontId,
   suggestion,
   onPickFont,
 }: {
+  ref?: Ref<HTMLElement>;
   t: Treatment;
   fontId: string;
   suggestion: { id: string; why: string };
@@ -97,6 +100,7 @@ function Cover({
   );
   return (
     <header
+      ref={ref}
       key={`${t.id}-${t.createdAt}`}
       className="letterbox-open surface-dark grain relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10"
       style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
@@ -223,7 +227,7 @@ function Rework({
 
 function SectionIndex() {
   return (
-    <nav aria-label="Treatment sections" className="top-[5.25rem] z-20 sm:sticky print:hidden">
+    <nav aria-label="Treatment sections" className="print:hidden">
       <ul className="flex gap-1 overflow-x-auto rounded-full border border-line bg-card/90 p-1.5 backdrop-blur">
         {SECTIONS.map(([id, label]) => (
           <li key={id} className="shrink-0">
@@ -234,6 +238,110 @@ function SectionIndex() {
         ))}
       </ul>
     </nav>
+  );
+}
+
+/**
+ * The clapperboard: once the cover scrolls away, the title (in its title-card face), the take and the city ride
+ * along at the top, with the sections to jump to, the one being read lit up, and a film strip that fills as the
+ * reader goes down the board. Inert while hidden, so the keyboard never lands on it unseen.
+ */
+function Slate({
+  t,
+  fontId,
+  take,
+  running,
+  cover,
+  article,
+}: {
+  t: Treatment;
+  fontId: string;
+  take: number;
+  running: boolean;
+  cover: RefObject<HTMLElement | null>;
+  article: RefObject<HTMLElement | null>;
+}) {
+  const lingo = useLingo().t;
+  const [shown, setShown] = useState(false);
+  const [current, setCurrent] = useState<string | null>(null);
+  const strip = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setShown((cover.current?.getBoundingClientRect().bottom ?? 1) < 0);
+      let reading: string | null = null;
+      for (const [id] of SECTIONS) {
+        const heading = document.getElementById(id);
+        if (heading && heading.getBoundingClientRect().top <= 160) reading = id;
+      }
+      setCurrent(reading);
+      const box = article.current?.getBoundingClientRect();
+      if (box && strip.current) {
+        const progress = Math.min(1, Math.max(0, -box.top / Math.max(1, box.height - window.innerHeight)));
+        strip.current.style.transform = `scaleX(${progress})`;
+      }
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    schedule();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [cover, article]);
+
+  return (
+    <div
+      inert={!shown}
+      className={`fixed inset-x-0 top-0 z-30 transition-[translate,opacity] duration-200 print:hidden ${
+        shown ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+      }`}
+    >
+      <div className="surface-dark bg-background shadow-[0_1px_0_var(--line)]">
+        <div className="mx-auto flex w-full max-w-[80rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-8">
+          <span
+            aria-hidden
+            className="h-7 w-11 shrink-0 rounded-[4px] border border-foreground bg-[repeating-linear-gradient(135deg,var(--foreground)_0_7px,var(--background)_7px_14px)]"
+          />
+          <span className="min-w-0 truncate leading-tight" style={titleStyle(titleFont(fontId), "1.65rem")}>
+            {t.title}
+          </span>
+          <span className="shrink-0 rounded-md border border-edge px-2 py-0.5 font-mono text-[12px] text-dim">{lingo.take(take)}</span>
+          <span className="hidden shrink-0 font-mono text-[12px] text-dim sm:inline">{t.brief.city}</span>
+          {running && (
+            <span className="flex shrink-0 items-center gap-2 text-[13px] font-semibold">
+              <span aria-hidden className="size-2 rounded-full bg-accent motion-safe:animate-pulse" />
+              {lingo.cookingAgain}
+            </span>
+          )}
+          <nav
+            aria-label="Treatment sections, while reading"
+            className="quiet-scroll -mx-1 flex max-w-full gap-1 overflow-x-auto px-1 lg:ml-auto"
+          >
+            {SECTIONS.map(([id, label]) => (
+              <a
+                key={id}
+                href={`#${id}`}
+                aria-current={current === id ? "location" : undefined}
+                className="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap text-dim hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:text-[#121211]"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+        </div>
+        <div aria-hidden className="relative h-2 overflow-hidden bg-[#2a2926]">
+          <span ref={strip} className="absolute inset-0 origin-left bg-accent" style={{ transform: "scaleX(0)" }} />
+          <span className="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent_0_12px,#121211_12px_16px)]" />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -304,9 +412,30 @@ export function Board({
   const suggestion = suggestTitleFont(t);
   // The suggestion follows each rework until the director picks a face themselves.
   const [picked, setPicked] = useState<string | null>(null);
+  const fontId = picked ?? suggestion.id;
   const stamp = dateStamp(t.createdAt);
+  const cover = useRef<HTMLElement>(null);
+  const article = useRef<HTMLElement>(null);
+  // Where the shoot-base map exists, it stays put beside the locations and lights the pin of the one being read.
+  const pinned = (t.base?.map?.tiles.length ?? 0) > 0 && t.locations.length > 0;
+  const [reading, setReading] = useState(0);
+  const placeCards = useRef<(HTMLLIElement | null)[]>([]);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setReading(Number((entry.target as HTMLElement).dataset.place));
+        }
+      },
+      // A location counts as read once it crosses the upper middle of the screen.
+      { rootMargin: "-35% 0px -60% 0px" },
+    );
+    for (const el of placeCards.current) if (el) observer.observe(el);
+    return () => observer.disconnect();
+  }, [t]);
   return (
     <article
+      ref={article}
       aria-labelledby="treatment-title"
       aria-busy={state === "updating"}
       className={`flex flex-col gap-14 transition-opacity duration-300 ${state === "current" ? "" : "opacity-50"}`}
@@ -317,12 +446,13 @@ export function Board({
         </p>
       )}
       <div className="flex flex-col gap-6">
-        <Cover t={t} fontId={picked ?? suggestion.id} suggestion={suggestion} onPickFont={setPicked} />
+        <Cover ref={cover} t={t} fontId={fontId} suggestion={suggestion} onPickFont={setPicked} />
         <Giving t={t} mock={mock} />
         <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} />
       </div>
 
       <SectionIndex />
+      <Slate t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} />
 
       <Section id="concept" title="Concept">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -446,77 +576,98 @@ export function Board({
         title="Locations"
         note={`Real places in ${t.brief.city} whose regulars share this audience's taste, found by ${source}. Confirm availability and filming permission with each venue.`}
       >
-        <ShootBaseBlock t={t} mock={mock} />
-        {t.locations.length === 0 ? (
-          <p className="text-[15px] text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
-        ) : (
-          <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {t.locations.map((l, i) => {
-              const place = l.entity.place;
-              const where = [place?.kind, place?.neighborhood, place?.price_level ? `price level ${place.price_level} of 4` : undefined]
-                .filter(Boolean)
-                .join(", ");
-              const map =
-                place?.lat !== undefined && place?.lon !== undefined
-                  ? `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=17/${place.lat}/${place.lon}`
-                  : undefined;
-              return (
-                <li key={l.entity.id} className={`${card} flex flex-col overflow-hidden`}>
-                  <div className="relative">
-                    <Still src={l.entity.image} alt={`Photo of ${l.entity.name}`} className="aspect-[3/2] w-full" />
-                    <span
-                      aria-hidden
-                      className="absolute right-3 bottom-2.5 rounded-md bg-black/45 px-1.5 font-mono text-[17px] font-semibold tracking-[0.08em] text-[#ff9a3c] [text-shadow:0_0_6px_rgb(255_140_40/0.8)]"
-                    >
-                      {stamp}
-                    </span>
-                    {t.base?.map && map && (
-                      <span className="absolute top-3 left-3 grid size-8 place-items-center rounded-full bg-[#121211] text-[14px] font-bold text-white">
-                        <span className="sr-only">Location </span>
-                        {i + 1}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex flex-1 flex-col gap-3 p-5">
-                    <div>
-                      <h4 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h4>
-                      {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
-                    </div>
-                    {place?.ambience && (
-                      <p className="line-clamp-3 text-[14px] leading-5 text-dim">
-                        <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>{mock ? "Mock note" : "Qloo"} </span>
-                        {place.ambience}
-                      </p>
-                    )}
-                    <p className={prose}>{l.notes.scene}</p>
-                    <Receipt qloo={l.qloo} mock={mock} className="mt-auto" />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Why
-                        label="Why this place"
-                        name={l.entity.name}
-                        qloo={l.qloo}
-                        note={place?.ambience}
-                        read={[{ term: "The scene", text: l.notes.scene }]}
-                        writtenBy={t.writtenBy}
-                        mock={mock}
+        <div className={pinned ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "contents"}>
+          <div className={pinned ? "lg:sticky lg:top-24" : ""}>
+            <ShootBaseBlock t={t} mock={mock} active={pinned ? reading : undefined} compact={pinned} />
+          </div>
+          {t.locations.length === 0 ? (
+            <p className="text-[15px] text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
+          ) : (
+            <ul className={pinned ? "flex flex-col gap-5" : "grid gap-5 sm:grid-cols-2 xl:grid-cols-3"}>
+              {t.locations.map((l, i) => {
+                const place = l.entity.place;
+                const where = [place?.kind, place?.neighborhood, place?.price_level ? `price level ${place.price_level} of 4` : undefined]
+                  .filter(Boolean)
+                  .join(", ");
+                const map =
+                  place?.lat !== undefined && place?.lon !== undefined
+                    ? `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=17/${place.lat}/${place.lon}`
+                    : undefined;
+                return (
+                  <li
+                    key={l.entity.id}
+                    ref={(el) => {
+                      placeCards.current[i] = el;
+                    }}
+                    data-place={i}
+                    className={`${card} flex flex-col overflow-hidden ${pinned && reading === i ? "ring-2 ring-foreground" : ""}`}
+                  >
+                    <div className="relative">
+                      <Still
+                        src={l.entity.image}
+                        alt={`Photo of ${l.entity.name}`}
+                        className={`${pinned ? "aspect-video" : "aspect-[3/2]"} w-full`}
                       />
-                      {map && (
-                        <a
-                          href={map}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-full px-3 py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
+                      <span
+                        aria-hidden
+                        className="absolute right-3 bottom-2.5 rounded-md bg-black/45 px-1.5 font-mono text-[17px] font-semibold tracking-[0.08em] text-[#ff9a3c] [text-shadow:0_0_6px_rgb(255_140_40/0.8)]"
+                      >
+                        {stamp}
+                      </span>
+                      {t.base?.map && map && (
+                        <span
+                          className={`absolute top-3 left-3 grid size-8 place-items-center rounded-full text-[14px] font-bold ${
+                            pinned && reading === i ? "bg-accent text-[#121211]" : "bg-[#121211] text-white"
+                          }`}
                         >
-                          Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
-                        </a>
+                          <span className="sr-only">Location </span>
+                          {i + 1}
+                        </span>
                       )}
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    <div className="flex flex-1 flex-col gap-3 p-5">
+                      <div>
+                        <h4 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h4>
+                        {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
+                      </div>
+                      {place?.ambience && (
+                        <p className="line-clamp-3 text-[14px] leading-5 text-dim">
+                          <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>
+                            {mock ? "Mock note" : "Qloo"}{" "}
+                          </span>
+                          {place.ambience}
+                        </p>
+                      )}
+                      <p className={prose}>{l.notes.scene}</p>
+                      <Receipt qloo={l.qloo} mock={mock} className="mt-auto" />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Why
+                          label="Why this place"
+                          name={l.entity.name}
+                          qloo={l.qloo}
+                          note={place?.ambience}
+                          read={[{ term: "The scene", text: l.notes.scene }]}
+                          writtenBy={t.writtenBy}
+                          mock={mock}
+                        />
+                        {map && (
+                          <a
+                            href={map}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-full px-3 py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
+                          >
+                            Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
         <Also label="More to scout:" items={t.extras.locations} mock={mock} />
       </Section>
 

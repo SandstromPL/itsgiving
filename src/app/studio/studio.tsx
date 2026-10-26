@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { EXAMPLES } from "@/lib/agent/examples";
-import type { FeaturedCover } from "@/lib/agent/featured";
+import { EXAMPLES, type Example } from "@/lib/agent/examples";
+import type { FeaturedCover, FeaturedReplay } from "@/lib/agent/featured";
 import { STEP_LABELS, STEP_ORDER, type Nudge } from "@/lib/agent/options";
 import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
@@ -12,11 +12,14 @@ import { Board } from "./board";
 import { BriefForm } from "./brief-form";
 import { DirectorsCut, Wordmark, useConsoleNote, useDirectorsCut } from "./eggs";
 import { EMPTY_FORM, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
-import { FeaturedPosters, Hero, HowItWorks, TryExamples } from "./landing";
+import { Hero, HowItWorks, NowShowing } from "./landing";
+import { LetterboxBars, useLightsDown } from "./lights";
 import { LingoProvider, UncSwitch, useLingo } from "./lingo";
 import { ModeBadges } from "./parts";
 import { Picker } from "./picker";
+import { Replay } from "./replay";
 import { StreamError, streamTreatment } from "./stream";
+import { ThemeSwitch } from "./theme";
 import { RunStage, Timeline } from "./timeline";
 
 type Phase = "idle" | "running" | "needs_input" | "done" | "error";
@@ -99,7 +102,17 @@ function FailCard({ problem, onRetry }: { problem: string; onRetry?: () => void 
   );
 }
 
-export function Studio(props: { initialBadges: ReactNode; featured: FeaturedCover[] }) {
+interface StudioProps {
+  initialBadges: ReactNode;
+  featured: FeaturedCover[];
+  /** One featured run to replay on the landing; none on a server without live data. */
+  replay?: FeaturedReplay;
+}
+
+/** Briefs offered as "Try one" chips: the ones without a pre-built treatment, so they run live. */
+const TRY = EXAMPLES.filter((example) => !example.featured);
+
+export function Studio(props: StudioProps) {
   return (
     <LingoProvider>
       <StudioScreen {...props} />
@@ -107,7 +120,7 @@ export function Studio(props: { initialBadges: ReactNode; featured: FeaturedCove
   );
 }
 
-function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; featured: FeaturedCover[] }) {
+function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   const { t: lingo } = useLingo();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -131,9 +144,11 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
   const focusTitle = useRef(false);
   const failedBefore = useRef(false);
   const briefPanel = useRef<HTMLDivElement>(null);
+  const posters = useRef<HTMLElement>(null);
   const [cut, exitCut] = useDirectorsCut();
   const running = phase === "running";
   useConsoleNote(treatment);
+  useLightsDown(posters, !treatment);
 
   // Leaving the page mid-run shouldn't keep spending model quota and credit.
   useEffect(() => () => active.current?.abort(), []);
@@ -284,6 +299,13 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
     window.scrollTo({ top: 0 });
   };
 
+  /** A "Try one" chip fills the brief without running it, so the director sees what it holds first. */
+  const fillExample = (example: Example) => {
+    setForm(formFromBrief(example.brief));
+    setFormProblem(null);
+    setStatus(`Filled the brief with ${example.title}. ${example.detail}`);
+  };
+
   const pick = (chosen: Record<string, string>) => {
     if (!pending || running) return;
     void run({ ...pending, picks: { ...pending.picks, ...chosen } });
@@ -310,6 +332,8 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
       onStop={() => stopActive.current()}
       running={running}
       problem={formProblem}
+      examples={TRY}
+      onExample={fillExample}
     />
   );
   const picker = question && phase === "needs_input" && (
@@ -324,8 +348,9 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
-      {/* On phones: the wordmark and the switch on one row, the badges under them, and the header scrolls away. */}
-      <header className="top-0 z-30 border-b border-line/80 bg-background/90 backdrop-blur sm:sticky print:static print:border-0">
+      {/* On phones: the wordmark and the switch on one row, the badges and the theme under them. The header scrolls
+          away: the landing keeps its brief in reach, and a treatment has its clapperboard bar. */}
+      <header className="border-b border-line/80 print:border-0">
         <div className="mx-auto flex min-h-[4.5rem] w-full max-w-[80rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-8">
           <div className="flex min-w-0 items-center gap-5">
             <h1>
@@ -348,6 +373,7 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
               </button>
             )}
             {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={treatment ?? undefined} /> : initialBadges}
+            <ThemeSwitch />
           </div>
         </div>
       </header>
@@ -365,7 +391,7 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
             )}
             {phase === "error" && runProblem && <FailCard problem={runProblem} onRetry={retry} />}
             {running && (
-              <div className="top-[5.25rem] z-20 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-foreground bg-card py-2 pr-2 pl-5 sm:sticky sm:rounded-full print:hidden">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-foreground bg-card py-2 pr-2 pl-5 sm:rounded-full print:hidden">
                 <span aria-hidden className="size-2.5 rounded-full bg-foreground motion-safe:animate-pulse" />
                 <span className="font-bold">{lingo.cookingAgain}</span>
                 {current && <span className="text-[15px] text-dim">{current}</span>}
@@ -391,8 +417,10 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
           </div>
         ) : (
           <>
-            <section aria-label="Studio" className="flex flex-wrap items-start gap-x-10 gap-y-8">
-              <div className="min-w-0 flex-[999_1_32rem]">
+            {/* A split studio: on wide screens the brief stays in reach on the right while the posters scroll by on
+                the left; on phones it comes straight after the headline. */}
+            <section aria-label="Studio" className="grid items-start gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,27rem)]">
+              <div className="min-w-0 lg:col-start-1 lg:row-start-1">
                 {running ? (
                   <RunStage steps={steps} startedAt={startedAt} thinking={pending?.form.thinking ?? "deep"} />
                 ) : picker ? (
@@ -410,11 +438,24 @@ function StudioScreen({ initialBadges, featured }: { initialBadges: ReactNode; f
                   <Hero />
                 )}
               </div>
-              <div className="w-full min-w-0 flex-[1_1_22rem] lg:max-w-[29rem]">{brief}</div>
+              <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-stretch">
+                <div className="quiet-scroll lg:sticky lg:top-12 lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:rounded-[28px]">
+                  {brief}
+                </div>
+              </div>
+              <div className="min-w-0 lg:col-start-1 lg:row-start-2">
+                <NowShowing
+                  ref={posters}
+                  examples={EXAMPLES}
+                  covers={featured}
+                  form={form}
+                  running={running}
+                  onTry={(example) => tryExample(formFromBrief(example.brief))}
+                />
+              </div>
             </section>
-            <FeaturedPosters examples={EXAMPLES} covers={featured} onTry={(example) => tryExample(formFromBrief(example.brief))} />
-            <HowItWorks />
-            <TryExamples examples={EXAMPLES} covers={featured} onTry={(example) => tryExample(formFromBrief(example.brief))} />
+            {replay ? <Replay replay={replay} /> : <HowItWorks />}
+            <LetterboxBars />
           </>
         )}
       </main>

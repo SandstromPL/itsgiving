@@ -78,6 +78,20 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   the Qloo heatmap's shoot base in Mumbai, or a tone tag elsewhere.
 - **unc mode.** The words around the work are Gen Z slang by default. A switch in the header turns them into plain
   English for producers, label people and judges. The treatment, the receipts and the run log read the same in both.
+- **Clapperboard and pinned map.** Once the cover scrolls away, a bar with the title, the take and the city stays at
+  the top, lights up the section being read and fills a film strip as you go. In Locations, the shoot-base map stays
+  put beside the places and lights up the pin of the one in view.
+
+### The studio
+
+- **Split screen.** On wide screens the brief stays in reach on the right while the posters scroll by on the left; on
+  phones it comes right after the headline. "Try one" fills it with an example, "your poster" fills in as you type,
+  and the optional references and taste sit in a "Make it yours" drawer.
+- **Lights down.** Scrolling into the posters dims the room and closes in two letterbox bars; scrolling back brings
+  the lights up. With reduced motion it switches at the halfway point instead of fading.
+- **Watch it work.** One real featured run replayed as you scroll: the audience Qloo read, the city's heatmap, the
+  shoot base, the receipts, then the title.
+- **Light, dark or your device's choice,** switched in the header and remembered per browser.
 
 ### Featured treatments
 

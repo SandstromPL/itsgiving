@@ -1,9 +1,20 @@
 "use client";
 
-import { useId, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useId, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from "react";
+import type { Example } from "@/lib/agent/examples";
 import { BUDGETS, FORMATS, IMPORT_LIMIT, THINKING, TMDB_NOTICE, type Budget, type Format, type Thinking } from "@/lib/agent/options";
-import type { ImportedFilm, TasteImport } from "@/lib/agent/taste";
-import { LIMITS, type FieldName, type FormProblem, type FormState } from "./form";
+import type { TasteImport } from "@/lib/agent/taste";
+import {
+  LIMITS,
+  addFilm,
+  exampleChip,
+  looksLikeImport,
+  removeFilm,
+  splitTitles,
+  type FieldName,
+  type FormProblem,
+  type FormState,
+} from "./form";
 import { useLingo } from "./lingo";
 
 const field =
@@ -11,9 +22,13 @@ const field =
 const label = "text-[13px] font-medium text-dim";
 const hint = "text-[13px] leading-5 text-faint";
 /** A two-way switch: the chosen side is a solid pill inside a soft track. */
-const track = "grid grid-cols-2 gap-1 rounded-full bg-[#eeebe4] p-1";
+const track = "grid grid-cols-2 gap-1 rounded-full bg-track p-1";
 const option =
   "cursor-pointer rounded-full px-3 py-2.5 text-center text-[15px] text-dim hover:text-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
+const chip = "flex items-center gap-0.5 rounded-full border border-line bg-card py-0.5 pr-0.5 pl-3 text-[13px]";
+
+/** A field's accessibility wiring: marked invalid and pointed at the message when it is the one failing. */
+type Describe = (name: FieldName, hint?: string) => { "aria-invalid"?: boolean; "aria-describedby"?: string };
 
 const filmName = (film: { title: string; year?: number }) => `${film.title}${film.year ? ` (${film.year})` : ""}`;
 
@@ -32,35 +47,49 @@ function importSummary(result: TasteImport): string {
   return parts.join(" ");
 }
 
+function RemoveButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={`Remove ${name}`}
+      onClick={onClick}
+      className="grid size-7 place-items-center rounded-full text-dim hover:bg-field hover:text-foreground"
+    >
+      <span aria-hidden>×</span>
+    </button>
+  );
+}
+
 /**
- * Imports the director's taste from a public TMDB list or IMDb links. The films found in Qloo show as chips; the
- * brief carries their IMDb IDs, so the pipeline looks them up exactly.
+ * Your taste in one place: films you type, and films imported from a public TMDB list or IMDb links (each looked up
+ * in Qloo by its IMDb ID, so nothing is guessed). Both show as chips; the brief carries the titles and the IDs.
  */
-function TasteImportField({
-  imported,
-  from,
+function TasteField({
+  form,
   onChange,
+  describe,
+  message,
 }: {
-  imported: ImportedFilm[];
-  from: string;
-  onChange: (imported: ImportedFilm[], from: string) => void;
+  form: FormState;
+  onChange: Dispatch<SetStateAction<FormState>>;
+  describe: Describe;
+  message: (name: FieldName) => ReactNode;
 }) {
   const ids = useId();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const typed = splitTitles(form.directorFilms);
+  const count = typed.length + form.imported.length;
 
-  const run = async () => {
-    if (busy || !text.trim()) return;
+  const importFrom = async (source: string) => {
     setBusy(true);
-    setError("");
-    setStatus("");
     try {
       const response = await fetch("/api/taste", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ source: text }),
+        body: JSON.stringify({ source }),
       });
       const body = (await response.json().catch(() => ({}))) as Partial<TasteImport> & { error?: string };
       if (!response.ok || !body.found || !body.source) {
@@ -68,7 +97,12 @@ function TasteImportField({
         return;
       }
       const result = body as TasteImport;
-      onChange(result.found, result.source.kind === "tmdb" ? `the TMDB list “${result.source.name}”` : "IMDb links");
+      // An update, not a snapshot: the import lands seconds later, after any edits made meanwhile.
+      onChange((current) => ({
+        ...current,
+        imported: result.found,
+        importedFrom: result.source.kind === "tmdb" ? `the TMDB list “${result.source.name}”` : "IMDb links",
+      }));
       setStatus(importSummary(result));
       setText("");
     } catch {
@@ -78,41 +112,84 @@ function TasteImportField({
     }
   };
 
+  const add = () => {
+    const value = text.trim();
+    if (busy || !value) return;
+    setError("");
+    setStatus("");
+    if (looksLikeImport(value)) {
+      void importFrom(value);
+      return;
+    }
+    if (value.length > LIMITS.name) {
+      setError(`Each title must be under ${LIMITS.name} characters.`);
+      return;
+    }
+    if (typed.length >= LIMITS.directorFilms) {
+      setError(`Type up to ${LIMITS.directorFilms} films, or import a list for up to ${IMPORT_LIMIT}.`);
+      return;
+    }
+    onChange((current) => addFilm(current, value));
+    setText("");
+    setStatus(`Added ${value}.`);
+  };
+
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={`${ids}-import`} className={label}>
-        Import your taste (optional)
+      <label htmlFor={`${ids}-taste`} className={label}>
+        Your taste{count > 0 ? `: ${count} film${count === 1 ? "" : "s"}` : ""}
       </label>
+      {count > 0 && (
+        <ul aria-label="Films you love" className="mb-1 flex flex-wrap gap-1.5">
+          {typed.map((title) => (
+            <li key={`typed-${title}`} className={chip}>
+              {title}
+              <RemoveButton name={title} onClick={() => onChange((current) => removeFilm(current, title))} />
+            </li>
+          ))}
+          {form.imported.map((film) => (
+            <li key={film.imdb} className={chip}>
+              {filmName(film)}
+              <RemoveButton
+                name={filmName(film)}
+                onClick={() => onChange((current) => ({ ...current, imported: current.imported.filter((f) => f.imdb !== film.imdb) }))}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex gap-2">
         <input
-          id={`${ids}-import`}
+          id={`${ids}-taste`}
           className={`${field} min-w-0 flex-1`}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            // Enter imports; it must not submit the brief around it.
+            // Enter adds the film; it must not submit the brief around it.
             if (e.key === "Enter") {
               e.preventDefault();
-              void run();
+              add();
             }
           }}
-          placeholder="TMDB list or IMDb links"
+          placeholder="e.g. In the Mood for Love"
           autoComplete="off"
           spellCheck={false}
-          aria-describedby={`${ids}-import-hint`}
+          {...describe("directorFilms", `${ids}-taste-hint`)}
         />
         <button
           type="button"
-          onClick={() => void run()}
+          onClick={add}
           aria-disabled={busy || !text.trim()}
           className="shrink-0 rounded-2xl border border-foreground bg-card px-4 text-[15px] font-bold hover:bg-foreground hover:text-background aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:bg-card aria-disabled:hover:text-foreground"
         >
-          {busy ? "Importing…" : "Import"}
+          {busy ? "Importing…" : looksLikeImport(text) ? "Import" : "Add"}
         </button>
       </div>
-      <p id={`${ids}-import-hint`} className={hint}>
-        A public TMDB list, or IMDb title links, up to {IMPORT_LIMIT} films. itsgiving looks each one up in Qloo by its IMDb ID, so nothing
-        is guessed. {TMDB_NOTICE}
+      <p id={`${ids}-taste-hint`} className={hint}>
+        Feature films you love, one at a time, or paste a public TMDB list or IMDb links (up to {IMPORT_LIMIT}). Add the year, like Rockstar
+        (2011), when titles repeat. Qloo doesn&apos;t list short films, your own included.{" "}
+        {form.imported.length > 0 && `Imported from ${form.importedFrom}. `}
+        {TMDB_NOTICE}
       </p>
       <p role="status" className="text-[13px] leading-5 text-dim empty:hidden">
         {status}
@@ -122,48 +199,7 @@ function TasteImportField({
           {error}
         </p>
       )}
-      {imported.length > 0 && (
-        <div className="rounded-2xl border border-line bg-field p-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[13px] text-dim">
-              {imported.length} film{imported.length === 1 ? "" : "s"} from {from}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                onChange([], "");
-                setStatus("Import cleared.");
-              }}
-              className="text-[13px] font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
-            >
-              Clear
-            </button>
-          </div>
-          <ul aria-label="Imported films" className="mt-2 flex flex-wrap gap-1.5">
-            {imported.map((film) => (
-              <li
-                key={film.imdb}
-                className="flex items-center gap-0.5 rounded-full border border-line bg-card py-0.5 pr-0.5 pl-3 text-[13px]"
-              >
-                {filmName(film)}
-                <button
-                  type="button"
-                  aria-label={`Remove ${filmName(film)}`}
-                  onClick={() =>
-                    onChange(
-                      imported.filter((f) => f.imdb !== film.imdb),
-                      from,
-                    )
-                  }
-                  className="grid size-6 place-items-center rounded-full text-dim hover:bg-field hover:text-foreground"
-                >
-                  <span aria-hidden>×</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {message("directorFilms")}
     </div>
   );
 }
@@ -175,6 +211,8 @@ export function BriefForm({
   onStop,
   running,
   problem,
+  examples = [],
+  onExample,
 }: {
   form: FormState;
   onChange: Dispatch<SetStateAction<FormState>>;
@@ -182,6 +220,9 @@ export function BriefForm({
   onStop: () => void;
   running: boolean;
   problem: FormProblem | null;
+  /** Briefs to fill the form with, as chips at the top. */
+  examples?: Example[];
+  onExample?: (example: Example) => void;
 }) {
   const ids = useId();
   const { t } = useLingo();
@@ -193,7 +234,7 @@ export function BriefForm({
   const isVideo = form.format === "music_video";
   const errorId = `${ids}-problem`;
   /** The failing field gets aria-invalid and points at the message; the others keep their hints. */
-  const describe = (name: FieldName, hint?: string) => ({
+  const describe: Describe = (name, hint) => ({
     "aria-invalid": problem?.field === name ? true : undefined,
     "aria-describedby": [problem?.field === name ? errorId : undefined, hint].filter(Boolean).join(" ") || undefined,
   });
@@ -203,6 +244,38 @@ export function BriefForm({
         {problem.message}
       </p>
     ) : null;
+
+  // The optional extras sit in a drawer; a short film's touchstones are its audience, so they stay out in the card.
+  const touchstoneCount = splitTitles(form.touchstones).length;
+  const extras = (isVideo ? touchstoneCount : 0) + splitTitles(form.directorFilms).length + form.imported.length;
+  const [drawerOpen, setDrawerOpen] = useState(extras > 0);
+  // A problem inside the drawer keeps it open, so the message is never hidden.
+  const drawerHasProblem = problem?.field === "directorFilms" || (isVideo && problem?.field === "touchstones");
+  const open = drawerOpen || drawerHasProblem;
+
+  const touchstones = (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={`${ids}-touchstones`} className={label}>
+        Touchstone films {isVideo ? "(optional)" : ""}
+      </label>
+      <textarea
+        id={`${ids}-touchstones`}
+        className={`${field} resize-y`}
+        rows={2}
+        value={form.touchstones}
+        onChange={(e) => set("touchstones", e.target.value)}
+        placeholder={"e.g. Past Lives\nAftersun"}
+        {...describe("touchstones", `${ids}-touchstones-hint`)}
+      />
+      <p id={`${ids}-touchstones-hint`} className={hint}>
+        {isVideo
+          ? `One title per line, up to ${LIMITS.touchstones}. The client's references, if any.`
+          : `One title per line, up to ${LIMITS.touchstones}. The films your short is after: they define its audience.`}{" "}
+        Feature films only: Qloo doesn&apos;t list short films.
+      </p>
+      {message("touchstones")}
+    </div>
+  );
 
   return (
     <form
@@ -217,6 +290,26 @@ export function BriefForm({
         </h2>
         <p className="text-[13px] text-faint">Nothing personal goes to Qloo</p>
       </div>
+
+      {examples.length > 0 && onExample && (
+        <div className="flex flex-col gap-2">
+          <p className={label}>{t.tryOne}</p>
+          <ul aria-label={t.tryOne} className="flex flex-wrap gap-1.5">
+            {examples.map((example) => (
+              <li key={example.slug}>
+                <button
+                  type="button"
+                  onClick={() => onExample(example)}
+                  title={example.detail}
+                  className="min-h-9 rounded-full border border-edge bg-card px-3.5 text-[14px] font-semibold hover:border-foreground hover:bg-field"
+                >
+                  {exampleChip(example.brief)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <fieldset>
         <legend className="sr-only">Format</legend>
@@ -256,25 +349,7 @@ export function BriefForm({
         {message("artist")}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${ids}-touchstones`} className={label}>
-          Touchstone films {isVideo ? "(optional)" : ""}
-        </label>
-        <textarea
-          id={`${ids}-touchstones`}
-          className={`${field} resize-y`}
-          rows={2}
-          value={form.touchstones}
-          onChange={(e) => set("touchstones", e.target.value)}
-          placeholder={"e.g. Past Lives\nAftersun"}
-          {...describe("touchstones", `${ids}-touchstones-hint`)}
-        />
-        <p id={`${ids}-touchstones-hint`} className={hint}>
-          One title per line, up to {LIMITS.touchstones}. The client&apos;s references, if any. Feature films only: Qloo doesn&apos;t list
-          short films.
-        </p>
-        {message("touchstones")}
-      </div>
+      {!isVideo && touchstones}
 
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] gap-2.5">
         <div className="flex flex-col gap-1.5">
@@ -306,32 +381,41 @@ export function BriefForm({
       </div>
       {message("city")}
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${ids}-taste`} className={label}>
-          Your taste (optional)
-        </label>
-        <textarea
-          id={`${ids}-taste`}
-          className={`${field} resize-y`}
-          rows={3}
-          value={form.directorFilms}
-          onChange={(e) => set("directorFilms", e.target.value)}
-          placeholder={"e.g. In the Mood for Love\nDonnie Darko"}
-          {...describe("directorFilms", `${ids}-taste-hint`)}
-        />
-        <p id={`${ids}-taste-hint`} className={hint}>
-          Feature films you love, one per line, up to {LIMITS.directorFilms}. Add the year, like Rockstar (2011), to skip a question when
-          titles repeat. Qloo doesn&apos;t list short films, your own included. itsgiving finds where your taste meets the audience&apos;s.
-        </p>
-        {message("directorFilms")}
+      <div className="overflow-hidden rounded-[20px] border border-line">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`${ids}-drawer`}
+          onClick={() => setDrawerOpen(!open)}
+          className="flex min-h-15 w-full items-center justify-between gap-3 bg-field px-4 py-3 text-left hover:bg-track"
+        >
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[16px] font-bold">{t.makeItYours}</span>
+            <span className="text-[13px] text-faint">{isVideo ? "Touchstones, your taste, an import" : "Your taste, an import"}</span>
+          </span>
+          <span className="flex items-center gap-2.5">
+            {extras > 0 && <span className="rounded-full bg-accent px-2.5 py-1 text-[12px] font-bold text-[#121211]">{extras} added</span>}
+            <svg
+              aria-hidden
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </span>
+        </button>
+        <div id={`${ids}-drawer`} hidden={!open} className="flex flex-col gap-4 border-t border-line p-4">
+          {isVideo && touchstones}
+          <TasteField form={form} onChange={onChange} describe={describe} message={message} />
+        </div>
       </div>
-
-      <TasteImportField
-        imported={form.imported}
-        from={form.importedFrom}
-        // An update, not a snapshot: the import lands seconds later, after any edits made meanwhile.
-        onChange={(imported, importedFrom) => onChange((current) => ({ ...current, imported, importedFrom }))}
-      />
 
       <fieldset className="flex flex-col gap-1.5">
         <legend className={`mb-1.5 ${label}`}>Thinking</legend>
@@ -365,7 +449,7 @@ export function BriefForm({
         <button
           type="submit"
           aria-disabled={running}
-          className="h-14 flex-1 rounded-full bg-foreground px-5 text-[18px] font-bold text-background hover:bg-[#2b2925] aria-disabled:cursor-progress aria-disabled:opacity-60"
+          className="h-14 flex-1 rounded-full bg-foreground px-5 text-[18px] font-bold text-background hover:opacity-90 aria-disabled:cursor-progress aria-disabled:opacity-60"
         >
           {running ? "Building treatment…" : "Build treatment"}
         </button>

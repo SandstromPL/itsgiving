@@ -84,7 +84,8 @@ export function Wordmark() {
 
   return (
     <button type="button" onClick={tap} aria-label="itsgiving" className="flex items-center gap-2.5 rounded-xl text-left">
-      <span aria-hidden className="grid h-5 w-[30px] shrink-0 place-items-center rounded-md bg-foreground">
+      {/* An ink tile in either room, like the tab icon: in the dark one its edge keeps it visible. */}
+      <span aria-hidden className="grid h-5 w-[30px] shrink-0 place-items-center rounded-md bg-[#121211] ring-1 ring-edge/60">
         <span className="size-2 rounded-full bg-accent" />
       </span>
       <span aria-hidden className="text-[27px] leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
