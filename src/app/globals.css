@@ -178,9 +178,12 @@ body {
   scrollbar-color: var(--line) transparent;
 }
 
-/* Popovers ("why", the title-card window) are windows: white, ink-edged, with a hard shadow. */
+/* Popovers ("why", the title-card window, sign-in and the account menu) are windows: white, ink-edged, with a hard
+   shadow. */
 [popover].why,
-[popover].window {
+[popover].window,
+[popover].dialog,
+[popover].menu {
   border: 2px solid #121211;
   border-radius: 22px;
   background: #ffffff;
@@ -189,14 +192,24 @@ body {
   padding: 0;
   overflow: auto;
 }
-[popover].why {
+[popover].why,
+[popover].dialog {
   margin: auto;
   max-width: min(30rem, calc(100vw - 2rem));
   max-height: calc(100vh - 4rem);
 }
 [popover].why::backdrop,
-[popover].window::backdrop {
+[popover].window::backdrop,
+[popover].dialog::backdrop {
   background: rgb(18 18 17 / 0.3);
+}
+/* The account menu drops from the header's right-hand corner, where its button is. */
+[popover].menu {
+  position: fixed;
+  inset: 4.75rem 1rem auto auto;
+  margin: 0;
+  width: min(17rem, calc(100vw - 2rem));
+  box-shadow: 6px 6px 0 #121211;
 }
 /* The title-card window sits to the right of the cover, so the title it restyles stays in view. */
 [popover].window {

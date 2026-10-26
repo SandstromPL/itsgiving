@@ -147,6 +147,7 @@ export function UncSwitch() {
       role="switch"
       aria-checked={unc}
       onClick={() => setUnc(!unc)}
+      aria-label="unc mode"
       title="unc mode: plain English for everything around the treatment"
       className="flex min-h-11 items-center gap-2.5 rounded-full border border-foreground bg-card py-1.5 pr-4 pl-2 text-[15px] font-bold whitespace-nowrap print:hidden"
     >
@@ -158,7 +159,11 @@ export function UncSwitch() {
           className={`absolute top-[3px] size-[18px] rounded-full transition-[left] duration-200 ${unc ? "left-[21px] bg-accent" : "left-[3px] bg-foreground"}`}
         />
       </span>
-      unc mode
+      {/* "unc" alone below laptop width, so the account button fits beside it: in the first row on phones, in the one
+          row on tablets. */}
+      <span>
+        unc<span className="hidden lg:inline"> mode</span>
+      </span>
     </button>
   );
 }

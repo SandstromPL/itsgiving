@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AccountButton } from "./account";
 import { Wordmark } from "./eggs";
 import { jumpOnClick, onScreen } from "./jump";
 import { UncSwitch } from "./lingo";
@@ -18,11 +19,13 @@ export type Section = (typeof NAV)[number]["id"];
 
 /**
  * The header on every page: the wordmark, the same three links with the current section lit, the plain-copy switch
- * (its choice carries across pages, so it's on every one) and the theme. Pages add only status badges, live or mock.
+ * (its choice carries across pages, so it's on every one), the account button (when accounts are set up; it reads
+ * the session in the browser) and the theme. Pages add only status badges, live or mock.
  * Each page names its section rather than the header reading the URL: with Cache Components a pathname read can
  * suspend on a route's fallback shell, and a featured treatment's page must stay static. It scrolls away with the
- * page; a board has its own sticky section bar. On phones it takes two rows: the wordmark and the unc switch, then
- * the links and the theme. Badges wrap below only when they warn (mock data); "Live Qloo data" stays off phones.
+ * page; a board has its own sticky section bar. On phones it takes two rows: the wordmark, the unc switch and the
+ * account button, then the links and the theme. Badges wrap below only when they warn (mock data); "Live Qloo data"
+ * stays off phones.
  */
 export function SiteHeader({
   home = false,
@@ -37,14 +40,15 @@ export function SiteHeader({
   return (
     <header className="border-b border-line/80 print:border-0">
       <div className="mx-auto flex min-h-[4.5rem] w-full max-w-[80rem] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-8">
-        <div className="order-1 sm:mr-2">
+        <div className="order-1 lg:mr-2">
           <Wordmark href={home ? undefined : "/"} />
         </div>
         <div className={`order-2 ml-auto sm:order-4 ${badges ? "sm:ml-0" : ""} print:hidden`}>
           <UncSwitch />
         </div>
-        <span aria-hidden className="order-3 basis-full sm:hidden" />
-        <nav aria-label="Site" className="order-4 -ml-2.5 flex items-center gap-1 sm:order-2 sm:ml-0 print:hidden">
+        <AccountButton className="order-3 sm:order-5 print:hidden" />
+        <span aria-hidden className="order-4 basis-full sm:hidden" />
+        <nav aria-label="Site" className="order-5 -ml-2.5 flex items-center gap-1 sm:order-2 sm:ml-0 print:hidden">
           {NAV.map((item) => {
             const here = item.id === current;
             return (
@@ -57,7 +61,7 @@ export function SiteHeader({
                 // The examples link points at the homepage's strip, so on a featured treatment it's the current
                 // section rather than the current page.
                 aria-current={here ? (item.id === "examples" ? "true" : "page") : undefined}
-                className={`rounded-full px-2.5 py-2 text-[15px] font-semibold sm:px-3 ${
+                className={`rounded-full px-2.5 py-2 text-[15px] font-semibold lg:px-3 ${
                   here ? "bg-foreground text-background" : "text-dim hover:bg-card hover:text-foreground"
                 }`}
               >
@@ -66,10 +70,10 @@ export function SiteHeader({
             );
           })}
         </nav>
-        <div className="order-5 ml-auto sm:ml-0 print:hidden">
+        <div className="order-6 ml-auto sm:ml-0 print:hidden">
           <ThemeSwitch />
         </div>
-        {badges && <div className="order-6 flex flex-wrap items-center gap-2 sm:order-3 sm:ml-auto print:hidden">{badges}</div>}
+        {badges && <div className="order-7 flex flex-wrap items-center gap-2 sm:order-3 sm:ml-auto print:hidden">{badges}</div>}
       </div>
     </header>
   );
