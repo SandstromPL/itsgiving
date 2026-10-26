@@ -20,7 +20,7 @@ export default function Home() {
       <SiteHeader home />
       <main className="flex flex-1 flex-col">
         <Hero cover={covers[0]} fontId={first && suggestTitleFont(first.treatment).id} />
-        <NowShowing covers={covers} />
+        <NowShowing covers={covers.length > 1 ? covers.slice(1) : covers} />
         {run ? <HowItWorks run={run} /> : <HowItWorksSteps />}
         <div className="mx-auto w-full max-w-[80rem] px-4 pb-20 sm:px-8">
           <StartYourOwn />

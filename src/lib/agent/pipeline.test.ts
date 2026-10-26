@@ -7,7 +7,7 @@ import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
 import { distanceM } from "../tools/heatmap";
-import { NONE_PICK, subjectPhrase } from "./options";
+import { NONE_PICK, excerpt, subjectPhrase } from "./options";
 import { clipSentences, closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { describeBrief, planSchema } from "./plan";
 import { cachedTreatment, streamTreatment, type TreatmentService } from "./service";
@@ -645,6 +645,14 @@ describe("text helpers", () => {
     expect(clipped.length).toBeLessThanOrEqual(200);
     expect(clipped.endsWith("doorways.")).toBe(true);
     expect(clipSentences("Short.", 200)).toBe("Short.");
+  });
+
+  it("makes excerpts that end on a sentence, or on a word with an ellipsis", () => {
+    const note = "The atmosphere is nostalgic and vintage. Guests can enjoy a quiet, authentic dining experience by the window.";
+    expect(excerpt(note, 60)).toBe("The atmosphere is nostalgic and vintage.");
+    expect(excerpt("A long run of words without any full stop in it at all", 30)).toBe("A long run of words without…");
+    expect(excerpt("Quiet, warm; welcoming staff", 14)).toBe("Quiet, warm…");
+    expect(excerpt(note, 500)).toBe(note);
   });
 
   it("swaps whole refs only, longest first", () => {

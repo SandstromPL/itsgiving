@@ -45,6 +45,19 @@ export const NONE_PICK = "none";
 /** TMDB's required notice, shown wherever an imported TMDB list appears. */
 export const TMDB_NOTICE = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
 
+/**
+ * A short excerpt of a longer text: whole sentences when one fits, else whole words and an ellipsis. Never cut
+ * mid-word, as a CSS line clamp does ("a quiet dining experi…").
+ */
+export function excerpt(text: string, max: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const end = clean.lastIndexOf(". ", max - 1);
+  if (end > max / 2) return clean.slice(0, end + 1);
+  const space = clean.lastIndexOf(" ", max - 1);
+  return `${clean.slice(0, space > 0 ? space : max - 1).replace(/[,;:]$/, "")}…`;
+}
+
 /** "A", "A and B", "A, B and C". */
 export function joinNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;

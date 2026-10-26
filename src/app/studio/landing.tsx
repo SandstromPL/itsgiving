@@ -28,6 +28,8 @@ export const secondaryButton =
   "inline-flex min-h-14 items-center justify-center rounded-full border border-foreground px-7 text-[17px] font-bold hover:bg-card";
 
 const posterTitle = "text-[clamp(1.6rem,2.3vw,2.15rem)] leading-[0.92] font-extrabold tracking-[-0.045em] text-balance";
+/** A poster's place in "Now showing": most of a phone's width in the sideways row, a grid cell from small screens up. */
+const poster = "w-[78%] shrink-0 snap-start sm:w-auto";
 
 /** A finished treatment's cover, opening like a letterbox on load: the page's one moment of motion. */
 function HeroCover({ cover, fontId }: { cover: FeaturedCover; fontId: string }) {
@@ -42,7 +44,7 @@ function HeroCover({ cover, fontId }: { cover: FeaturedCover; fontId: string }) 
         {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 size-full opacity-55" />}
         <span className="absolute inset-0 bg-[linear-gradient(0deg,rgb(10_9_8/0.9)_0%,rgb(10_9_8/0.3)_58%,rgb(10_9_8/0.55)_100%)]" />
       </span>
-      <span className="self-start rounded-full border border-edge px-3.5 py-2 text-[14px] text-dim">{cover.line}</span>
+      <span className="self-start rounded-[19px] border border-edge px-3.5 py-2 text-[14px] text-dim">{cover.line}</span>
       <span className="flex flex-col gap-4">
         <span className="max-w-[14ch] text-balance" style={titleStyle(titleFont(fontId), "clamp(2.6rem, 4.6vw, 4.5rem)")}>
           {cover.title}
@@ -93,7 +95,9 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
 
 /**
  * "Now showing": the featured treatments as posters, each a link to its own page, in a dark strip whichever room the
- * reader chose. The projector's beam (`.beam` in globals.css) fades in once, the first time the strip comes into view.
+ * reader chose, and last the poster for the one they haven't made yet, a way into the studio. The homepage leaves out
+ * the treatment its hero already shows. The projector's beam (`.beam` in globals.css) fades in once, the first time the
+ * strip comes into view.
  */
 export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
   const { t, unc } = useLingo();
@@ -139,9 +143,11 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
           </h2>
           <p className="text-[16px] text-dim">Built from live Qloo data. Each one opens at once.</p>
         </div>
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-5">
+        {/* On a phone the posters sit in a row that scrolls sideways, the next one peeking in, rather than four screens
+            of posters one under another. */}
+        <ul className="quiet-scroll -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pt-1 pb-3 sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] sm:gap-5 sm:overflow-visible sm:p-0">
           {covers.map((cover) => (
-            <li key={cover.slug}>
+            <li key={cover.slug} className={poster}>
               <Link
                 href={`/t/${cover.slug}`}
                 className="flex w-full flex-col overflow-hidden rounded-[26px] ring-1 ring-white/10 transition-transform duration-200 hover:-translate-y-1"
@@ -159,7 +165,7 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
                     </span>
                   )}
                   <span className={posterTitle}>{cover.title}</span>
-                  <span className="text-[15px] text-dim">{cover.line}</span>
+                  <span className="text-[15px] text-pretty text-dim">{cover.line}</span>
                 </span>
                 <span
                   aria-hidden
@@ -173,6 +179,25 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
               </Link>
             </li>
           ))}
+          <li className={poster}>
+            <Link
+              href="/studio"
+              aria-label={`${t.nextUp.title}: start a treatment`}
+              className="flex w-full flex-col overflow-hidden rounded-[26px] bg-frame transition-transform duration-200 [outline:2px_dashed_var(--accent)] [outline-offset:-10px] hover:-translate-y-1"
+            >
+              <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
+                <span className="font-mono text-[12px] text-dim">{t.nextUp.label}</span>
+                <span className="flex flex-col gap-3">
+                  <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
+                    {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
+                  </span>
+                  <span className={posterTitle}>{t.nextUp.title}</span>
+                  <span className="text-[15px] text-dim">Your artist or film, your city</span>
+                </span>
+              </span>
+              <span aria-hidden className="h-3 w-full bg-[#2a2926]" />
+            </Link>
+          </li>
         </ul>
       </div>
     </section>

@@ -7,6 +7,7 @@ import {
   NUDGES,
   NUDGE_LABELS,
   audiencePhrase,
+  excerpt,
   joinNames,
   subjectPhrase,
   treatmentWho,
@@ -15,6 +16,7 @@ import {
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { ShootBaseBlock, locationPins } from "./base-map";
+import { jumpOnClick } from "./jump";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
 import { QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
@@ -42,9 +44,10 @@ const card = "rounded-[26px] border border-line bg-card";
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="flex scroll-mt-24 flex-col gap-6">
+    <section aria-labelledby={id} className="flex flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <h3 id={id} className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
+        {/* The section bar's jump lands on the heading, so the room it leaves for the sticky bar is the heading's. */}
+        <h3 id={id} className="type-head scroll-mt-24 text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
           {title}
         </h3>
         {note && <p className="max-w-[60ch] text-[15px] leading-6 text-faint">{note}</p>}
@@ -119,13 +122,13 @@ function Cover({
       </div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-edge px-3.5 py-2 text-[14px] text-dim">
+          <span className="rounded-[19px] border border-edge px-3.5 py-2 text-[14px] text-dim">
             {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
           </span>
           {who.standIns.length > 0 && (
             <span
               title={`Qloo doesn't have ${who.artists[0] ?? "the artist"}, so this audience stands in.`}
-              className="rounded-full border border-edge px-3.5 py-2 text-[14px] text-dim"
+              className="rounded-[19px] border border-edge px-3.5 py-2 text-[14px] text-dim"
             >
               Audience read through {joinNames(who.standIns)}
             </span>
@@ -275,7 +278,7 @@ function SectionBar({
       setStuck((cover.current?.getBoundingClientRect().bottom ?? 1) < 0);
       let reading: string | null = null;
       for (const [id] of SECTIONS) {
-        const heading = document.getElementById(id);
+        const heading = article.current?.querySelector(`#${id}`);
         if (heading && heading.getBoundingClientRect().top <= 120) reading = id;
       }
       setCurrent(reading);
@@ -326,6 +329,7 @@ function SectionBar({
             <a
               key={id}
               href={`#${id}`}
+              onClick={(event) => jumpOnClick(event, article.current?.querySelector<HTMLElement>(`#${id}`))}
               aria-current={current === id ? "location" : undefined}
               className="shrink-0 rounded-full px-3 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim hover:text-foreground aria-[current=location]:bg-foreground aria-[current=location]:text-background"
             >
@@ -647,11 +651,12 @@ export function Board({
                         {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
                       </div>
                       {place?.ambience && (
-                        <p className="line-clamp-3 text-[14px] leading-5 text-dim">
+                        <p className="text-[14px] leading-5 text-dim">
                           <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>
                             {mock ? "Mock note" : "Qloo"}{" "}
                           </span>
-                          {place.ambience}
+                          {/* The whole note is in "Why this place". */}
+                          {excerpt(place.ambience, 180)}
                         </p>
                       )}
                       <p className={prose}>{l.notes.scene}</p>

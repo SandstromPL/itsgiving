@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Wordmark } from "./eggs";
+import { jumpOnClick, onScreen } from "./jump";
 import { UncSwitch } from "./lingo";
 import { ThemeSwitch } from "./theme";
 
@@ -50,6 +51,9 @@ export function SiteHeader({
               <Link
                 key={item.id}
                 href={item.href}
+                // On the homepage the strip is on this page: Next does nothing for a link to the address it's already
+                // on, so the link jumps there itself, every time.
+                onClick={home && item.id === "examples" ? (event) => jumpOnClick(event, onScreen("now-showing")) : undefined}
                 // The examples link points at the homepage's strip, so on a featured treatment it's the current
                 // section rather than the current page.
                 aria-current={here ? (item.id === "examples" ? "true" : "page") : undefined}

@@ -27,6 +27,8 @@ interface Lines {
   directorsCut: string;
   footer: string;
   nowShowing: string;
+  /** The last poster in "Now showing": the treatment the reader hasn't made yet. */
+  nextUp: { label: string; title: string };
   yourPoster: string;
   makeItYours: string;
   tryOne: string;
@@ -52,6 +54,7 @@ const GENZ: Lines = {
   directorsCut: "director's cut unlocked",
   footer: "receipts, not slop.",
   nowShowing: "Now showing",
+  nextUp: { label: "coming soon", title: "yours" },
   yourPoster: "your poster",
   makeItYours: "Make it yours",
   tryOne: "Try one",
@@ -77,6 +80,7 @@ const PLAIN: Lines = {
   directorsCut: "Director's cut on",
   footer: "Every pick is backed by Qloo data.",
   nowShowing: "Featured treatments",
+  nextUp: { label: "Your own", title: "Make your own" },
   yourPoster: "Your treatment",
   makeItYours: "More options",
   tryOne: "Examples",

@@ -96,9 +96,10 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 ### The pages
 
 - **The homepage** explains and proves, and holds no form: the headline, a finished cover, "Start a treatment" and
-  "See a finished one"; "Now showing", the featured treatments as posters in a dark strip under a still projector
-  beam; and "How it works", one real featured run step by step beside what each step produced. Nothing on it moves
-  or changes as you scroll; the one motion is the cover opening like a letterbox when the page loads.
+  "See a finished one"; "Now showing", the other featured treatments as posters in a dark strip under a still
+  projector beam (a sideways row on a phone), ending on a poster for the reader's own, the way into the studio; and
+  "How it works", one real featured run step by step beside what each step produced. Nothing on it moves or changes
+  as you scroll; the one motion is the cover opening like a letterbox when the page loads.
 - **The studio** (`/studio`) is the tool. A music video starts from its artist and a city; a short film from the films
   it's after and a city. The rest waits under "Make it yours": a video's reference films and stand-in artists, a
   short's "music its audience loves" (an artist whose fans it's for, which shapes the audience, not the story), your
@@ -107,7 +108,8 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   "Back to" the treatment's title opens it again, even after a visit to the homepage.
 - **Featured treatments** (`/t/<slug>`) are pages of their own, built with the site, so Back, reload and links work as
   anywhere. A rework chip there hands the treatment to the studio, which opens it at once and re-runs it with the
-  change.
+  change. On every board, the section bar jumps within the page and puts the section in the address without adding
+  history, so Back always leaves the page (or, in the studio, returns to the brief).
 - **About** (`/about`) says who itsgiving is for first (music-video directors, short-film makers, and the labels,
   managers and producers who commission them), then what it is, what Qloo is, and how each step of a run uses Qloo.
 - **One header on every page:** Examples, Studio and About, with the current section lit (a featured treatment counts

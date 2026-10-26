@@ -11,6 +11,7 @@ import { BriefForm } from "./brief-form";
 import { useReceipts } from "./eggs";
 import { briefLine, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
 import { HandoffReader, type Handoff } from "./handoff";
+import { onScreen } from "./jump";
 import { YourPoster } from "./landing";
 import { useLingo } from "./lingo";
 import { BackArrow, ModeBadges } from "./parts";
@@ -177,7 +178,10 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     const onScroll = () => {
       if (window.location.pathname === "/studio") spot.current = { y: window.scrollY, key: entryKey() };
     };
-    const onPop = () => {
+    const onPop = (event: PopStateEvent) => {
+      // An entry with no state comes from a plain "#id" jump (the address bar, say): a place on this view, not a move
+      // between the brief and the board.
+      if (event.state === null) return;
       const next = onBoardEntry() ? "board" : "studio";
       if (next === viewNow.current) return;
       if (next === "studio") {
@@ -222,7 +226,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   useEffect(() => {
     if (!treatment || view !== "board" || !focusTitle.current) return;
     focusTitle.current = false;
-    document.getElementById("treatment-title")?.focus();
+    // The board on screen: a featured page left earlier is still in the document, hidden, with its own title.
+    onScreen("treatment-title")?.focus();
   }, [treatment, view]);
 
   useEffect(() => {
@@ -523,7 +528,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
             <RunStage steps={steps} startedAt={startedAt} thinking={pending.form.thinking} />
           </div>
         ) : (
-          <div className="flex flex-col gap-8">
+          // One column on wide screens: the way back, a question or a failure line up with the brief beneath them.
+          <div className="flex w-full flex-col gap-8 lg:mx-auto lg:max-w-[59rem]">
             {treatment && (
               <button
                 id="reopen-board"
