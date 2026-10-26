@@ -7,8 +7,9 @@ import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
 import { distanceM } from "../tools/heatmap";
+import { NONE_PICK, subjectPhrase } from "./options";
 import { clipSentences, closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
-import { planSchema } from "./plan";
+import { describeBrief, planSchema } from "./plan";
 import { cachedTreatment, streamTreatment, type TreatmentService } from "./service";
 import type { AgentEvent, StepEvent } from "./types";
 import { refScrubber, writeSchema, type WriteContext } from "./write";
@@ -172,6 +173,88 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     const t = treatmentOf(outcome);
     expect(t.locations).toEqual([]);
     expect(steps.find((s) => s.id === "locations" && s.status === "error")).toBeTruthy();
+  });
+});
+
+describe("an artist Qloo doesn't have", () => {
+  it("keeps the artist's name and reads the audience through stand-ins", async () => {
+    const { outcome, steps } = await run({ artist: "Chaar Diwaari", stand_ins: ["Prateek Kuhad", "When Chai Met Toast"], city: "Mumbai" });
+    const t = treatmentOf(outcome);
+    expect(t.who).toEqual({ artists: ["Chaar Diwaari"], films: [], standIns: ["Prateek Kuhad", "When Chai Met Toast"] });
+    expect(t.subjects.map((s) => s.name)).toEqual(["Prateek Kuhad", "When Chai Met Toast"]);
+    expect(t.logline).toContain("for Chaar Diwaari");
+    expect(t.notes).toContain(
+      "Qloo doesn't have Chaar Diwaari, so the audience was read through Prateek Kuhad and When Chai Met Toast; the treatment keeps Chaar Diwaari's name.",
+    );
+    expect(steps.findLast((s) => s.id === "resolve")).toMatchObject({
+      status: "warning",
+      summary: expect.stringContaining("read through"),
+    });
+  });
+
+  it("asks for stand-ins on their field when nothing else carries the audience", async () => {
+    const none = await run({ artist: "Chaar Diwaari", city: "Mumbai" });
+    expect(none.outcome).toMatchObject({ kind: "failed", field: "stand_ins", message: expect.stringContaining("Name up to 3 artists") });
+    const unknown = await run({ artist: "Chaar Diwaari", stand_ins: ["Nobody Anyone Knows"], city: "Mumbai" });
+    expect(unknown.outcome).toMatchObject({
+      kind: "failed",
+      field: "stand_ins",
+      message: expect.stringContaining("or Nobody Anyone Knows"),
+    });
+  });
+
+  it("doesn't use stand-ins when Qloo has the artist", async () => {
+    const t = treatmentOf((await run({ artist: "Prateek Kuhad", stand_ins: ["Divine"], city: "Mumbai" })).outcome);
+    expect(t.subjects.map((s) => s.name)).toEqual(["Prateek Kuhad"]);
+    expect(t.notes).toContain("Qloo has Prateek Kuhad, so the stand-in artists weren't needed.");
+  });
+
+  it("offers None of these for near misses, then builds from the films without the artist", async () => {
+    const first = await run({ artist: "Prateek", touchstones: ["Masaan"], city: "Mumbai" });
+    if (first.outcome.kind !== "needs_input") throw new Error(`expected a question, got ${first.outcome.kind}`);
+    const [question] = first.outcome.items;
+    expect(question).toMatchObject({ role: "artist", exact: false, candidates: [{ name: "Prateek Kuhad" }] });
+    expect(first.outcome.message).toContain("nothing under these exact names");
+
+    const none = await run({ artist: "Prateek", touchstones: ["Masaan"], city: "Mumbai", picks: { [question.key]: NONE_PICK } });
+    const t = treatmentOf(none.outcome);
+    expect(t.who?.artists).toEqual(["Prateek"]);
+    expect(t.subjects.map((s) => s.name)).toEqual(["Masaan"]);
+    expect(t.notes).toContain("Qloo doesn't have Prateek, so the audience was read from the reference films alone.");
+  });
+
+  it("reads a musician Qloo files only as a person", async () => {
+    const t = treatmentOf((await run({ artist: "Raftaar", city: "Mumbai" })).outcome);
+    expect(t.subjects[0]).toMatchObject({ name: "Raftaar", kind: "person" });
+    expect(t.who?.artists).toEqual(["Raftaar"]);
+    expect(t.notes.join(" ")).toContain("as a person");
+  });
+
+  it("tells the model what Qloo couldn't supply, outside the user's brief", () => {
+    const prompt = describeBrief(brief({ artist: "Chaar Diwaari", stand_ins: ["Prateek Kuhad"], city: "Mumbai" }), {
+      artistNames: ["Chaar Diwaari"],
+      touchstoneNames: [],
+      directorNames: [],
+      standInNames: ["Prateek Kuhad"],
+      artistMissing: true,
+    });
+    expect(prompt.indexOf("NOTE")).toBeGreaterThan(prompt.indexOf("shoot city"));
+    expect(prompt).toContain("artists with a similar audience the director named: Prateek Kuhad");
+  });
+});
+
+describe("a short film", () => {
+  it("is after its films, and its artist only says whose fans it's for", async () => {
+    const b = brief({ format: "short_film", artist: "Prateek Kuhad", touchstones: ["Masaan"], city: "Mumbai" });
+    const prompt = describeBrief(b, { artistNames: ["Prateek Kuhad"], touchstoneNames: ["Masaan (2015)"], directorNames: [] });
+    expect(prompt).toContain("music its audience loves: Prateek Kuhad");
+    expect(prompt).not.toContain("artist: ");
+    expect(subjectPhrase(["Prateek Kuhad"], ["Masaan"], "short_film")).toBe("after Masaan, for fans of Prateek Kuhad");
+
+    const t = treatmentOf((await run({ format: "short_film", artist: "Prateek Kuhad", touchstones: ["Masaan"], city: "Mumbai" })).outcome);
+    expect(t.who).toEqual({ artists: ["Prateek Kuhad"], films: ["Masaan"], standIns: [] });
+    // The template writer, too, writes a lead and a story, not a performer and a song.
+    expect(`${t.concept} ${t.beats.map((beat) => beat.description).join(" ")}`).not.toMatch(/performer|song|the artist/);
   });
 });
 
@@ -592,6 +675,16 @@ describe("director taste import", () => {
     const groupA = t.qloo.steps.overlap?.[0]?.query["a.signal.interests.entities"] ?? "";
     for (const name of ["In the Mood for Love", "Donnie Darko", "Se7en"]) expect(groupA).toContain(mockEntityId(name));
     expect(t.notes).toContain("1 of your imported films isn't in Qloo's catalog, so it was left out.");
+  });
+
+  it("keys stand-ins only when there are some, in any order", () => {
+    const base = { artist: "Chaar Diwaari", city: "Mumbai" };
+    const modes = { qloo: "mock", llm: "mock" };
+    expect(briefKey(brief({ ...base, stand_ins: [] }), modes)).toBe(briefKey(brief(base), modes));
+    const key = briefKey(brief({ ...base, stand_ins: ["Divine", "Prateek Kuhad"] }), modes);
+    expect(briefKey(brief({ ...base, stand_ins: ["Prateek Kuhad", "Divine", "divine"] }), modes)).toBe(key);
+    expect(key).not.toBe(briefKey(brief(base), modes));
+    expect(briefSchema.safeParse({ ...base, stand_ins: ["A", "B", "C", "D"] }).success).toBe(false);
   });
 
   it("keeps a brief's cache key when nothing is imported, and ignores import order and repeats", () => {

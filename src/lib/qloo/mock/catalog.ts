@@ -65,6 +65,7 @@ export function mockId(seed: string): string {
 const MOVIE = "urn:entity:movie";
 const TV = "urn:entity:tv_show";
 const ARTIST = "urn:entity:artist";
+const PERSON = "urn:entity:person";
 const BRAND = "urn:entity:brand";
 const PLACE = "urn:entity:place";
 
@@ -238,6 +239,11 @@ function artist(name: string, popularity: number, vibes: string[], tags: string[
   };
 }
 
+/** Live Qloo files some musicians only as people (Raftaar, 2026-10-26). */
+function person(name: string, popularity: number, vibes: string[]): MockEntity {
+  return { id: mockId(`${PERSON}:${name}`), name, subtype: PERSON, popularity, vibes, tags: [], properties: { image: { url: STILL } } };
+}
+
 function brand(name: string, popularity: number, vibes: string[], tags: string[]): MockEntity {
   // Live clothing brands carry the parent genre (urn:tag:genre:brand:fashion) as well as the specific ones.
   return { id: mockId(`${BRAND}:${name}`), name, subtype: BRAND, popularity, vibes, tags: [G_FASHION, ...tags], properties: {} };
@@ -332,6 +338,7 @@ export const ENTITIES: MockEntity[] = [
   // Spotify ID taken from Qloo's own recipe "resolve-a-spotify-id-to-a-qloo-entity".
   artist("Sabrina Carpenter", 0.9, ["playful", "romantic", "retro", "maximalist"], [m("pop")], "74KM79TiuVKeVCqs8QtB0B"),
   artist("Divine", 0.7, ["urban", "gritty", "rebellious"], [m("hip_hop")]),
+  person("Raftaar", 0.9, ["urban", "rebellious", "epic", "playful"]),
 
   brand("Nicobar", 0.45, ["warm", "minimalist", "folk", "tender"], [f("contemporary"), s("bohemian")]),
   brand("Fabindia", 0.7, ["warm", "folk", "nostalgic"], [f("ethnic_wear"), s("bohemian")]),

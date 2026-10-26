@@ -37,11 +37,8 @@ export interface ToneCandidate {
   source: "audience" | "overlap";
 }
 
-export interface PlanContext {
+export interface PlanContext extends Who {
   brief: Brief;
-  artistNames: string[];
-  touchstoneNames: string[];
-  directorNames: string[];
   candidates: ToneCandidate[];
   leans: string[];
   /** Areas of the shoot city where the audience over-indexes, strongest first (Qloo heatmap). */
@@ -103,14 +100,20 @@ export interface Who {
   artistNames: string[];
   touchstoneNames: string[];
   directorNames: string[];
+  /** Artists whose audience stands in for a music video's artist that Qloo doesn't have. */
+  standInNames?: string[];
+  /** The music video's artist isn't in Qloo: the name stays, the audience comes from the stand-ins or the films. */
+  artistMissing?: boolean;
 }
 
 export function describeBrief(brief: Brief, who: Who): string {
   const price = priceLevelMax(brief);
+  const isVideo = brief.format === "music_video";
   const lines = [
     "BRIEF",
-    `format: ${brief.format === "music_video" ? "music video" : "short film"}`,
-    ...(who.artistNames.length > 0 ? [`artist: ${who.artistNames.join(", ")}`] : []),
+    `format: ${isVideo ? "music video" : "short film"}`,
+    // A short film isn't about its artist: the artist only says whose fans it's for.
+    ...(who.artistNames.length > 0 ? [`${isVideo ? "artist" : "music its audience loves"}: ${who.artistNames.join(", ")}`] : []),
     ...(who.touchstoneNames.length > 0 ? [`touchstone films: ${who.touchstoneNames.join(", ")}`] : []),
     `shoot city: ${brief.city}`,
     `budget: ${BUDGETS[brief.budget].label.toLowerCase()}${price ? ` (venues up to price level ${price} of 4)` : ""}`,
@@ -121,6 +124,17 @@ export function describeBrief(brief: Brief, who: Who): string {
     lines.push(`director's own favourite films: ${who.directorNames.slice(0, 12).join(", ")}${more > 0 ? ` and ${more} more` : ""}`);
   }
   if (brief.nudges.length > 0) lines.push(`director asks to: ${brief.nudges.map((n) => NUDGE_TEXT[n]).join("; ")}`);
+  // Outside BRIEF, which is the user's data: this is itsgiving telling the model what Qloo couldn't supply.
+  if (who.artistMissing) {
+    const from = who.standInNames?.length
+      ? `artists with a similar audience the director named: ${who.standInNames.join(", ")}`
+      : "the touchstone films alone";
+    lines.push(
+      "",
+      "NOTE",
+      `Qloo has no entry for the artist, so the audience evidence below comes from ${from}. Say nothing about the artist's music, sound or image beyond the name.`,
+    );
+  }
   return lines.join("\n");
 }
 
@@ -201,7 +215,7 @@ export function mockPlan(ctx: PlanContext): PlanDraft {
   const format = ctx.brief.format === "music_video" ? "A music video" : "A short film";
   return {
     direction:
-      `${format} ${subjectPhrase(ctx.artistNames, ctx.touchstoneNames)}, built on ${toneNames.slice(0, 3).join(", ") || "the audience's taste"}` +
+      `${format} ${subjectPhrase(ctx.artistNames, ctx.touchstoneNames, ctx.brief.format)}, built on ${toneNames.slice(0, 3).join(", ") || "the audience's taste"}` +
       (shared ? `, where the director's own taste meets the audience at ${shared.tag.name.toLowerCase()}.` : "."),
     ...(ctx.candidates.length > 0 ? { tone: tone.map((c) => c.ref) } : {}),
     deep_cuts: ctx.brief.nudges.includes("deeper_cuts") ? "deep" : "balanced",

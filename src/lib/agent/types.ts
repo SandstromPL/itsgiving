@@ -30,7 +30,7 @@ export interface StepEvent {
   llm?: LlmTrace;
 }
 
-export type Role = "artist" | "touchstone" | "director";
+export type Role = "artist" | "touchstone" | "director" | "stand_in";
 
 export interface Ambiguity {
   /** pickKey(type, input): the key the client sends back in brief.picks. */
@@ -38,16 +38,30 @@ export interface Ambiguity {
   input: string;
   role: Role;
   status: "ambiguous" | "not_found";
+  /** False when none of the candidates has the name as typed: they are Qloo's nearest names, and may all be wrong. */
+  exact: boolean;
   candidates: CompactEntity[];
 }
+
+/** A brief field a failed run points at, so the studio can show the message there. */
+export type BriefField = "stand_ins";
 
 export type AgentEvent =
   | { type: "start"; runId: string; qlooMode: QlooMode; llmMode: LlmMode; cached: boolean }
   | StepEvent
   | { type: "needs_input"; message: string; items: Ambiguity[] }
   | { type: "treatment"; treatment: Treatment; cached: boolean }
-  | { type: "error"; message: string }
+  | { type: "error"; message: string; field?: BriefField }
   | { type: "done" };
+
+/** Who a treatment is for and after, by name. The audience can come from someone else: see standIns. */
+export interface TreatmentWho {
+  /** The artist as the brief names them: Qloo's spelling when Qloo has them, the brief's when it doesn't. */
+  artists: string[];
+  films: string[];
+  /** Artists whose audience stood in for an artist Qloo doesn't have. */
+  standIns: string[];
+}
 
 /** What Qloo itself said about an item, kept apart from the LLM's interpretation. */
 export interface QlooEvidence {
@@ -119,7 +133,10 @@ export interface Treatment {
   /** Qloo results the writer did not cite, still shown as evidence. */
   extras: { references: CompactEntity[]; brands: CompactEntity[]; locations: CompactEntity[] };
   audience: { taste_tags: CompactTag[]; overlap: CompactTag[]; leans: string[] };
+  /** The entities whose audience Qloo read. */
   subjects: CompactEntity[];
+  /** Missing on treatments built before stand-ins (2026-10-26); treatmentWho() falls back to the subjects. */
+  who?: TreatmentWho;
   director: CompactEntity[];
   /** Relaxations, skipped items and other caveats, in plain words. */
   notes: string[];

@@ -78,6 +78,49 @@ describe("resolve_entities", () => {
     expect(item).toMatchObject({ status: "resolved", match: { id: "A" }, among: 2 });
   });
 
+  it("offers only near misses when no title has the name, and marks them as not exact", async () => {
+    // The mock matches by prefix, so "Prateek" finds Prateek Kuhad: a word in common, worth asking about.
+    const near = await runTool("resolve_entities", { items: [{ name: "Prateek", type: "artist" }] }, ctx);
+    const [item] = (near.data as { items: { status: string; exact?: boolean; candidates?: CompactEntity[] }[] }).items;
+    expect(item).toMatchObject({ status: "ambiguous", exact: false });
+    expect(item.candidates?.map((c) => c.name)).toEqual(["Prateek Kuhad"]);
+
+    // Qloo's search always returns its closest names; live "Chaar Diwaari" gave only "Chaartaar", another band.
+    const searching = (names: string[]) =>
+      new QlooClient({
+        mode: "mock",
+        baseUrl: "https://mock.qloo.invalid",
+        fetch: async (url) => {
+          const people = decodeURIComponent(url).includes("urn:entity:person");
+          const results = people
+            ? []
+            : names.map((name, i) => ({ entity_id: `E${i}`, name, subtype: "urn:entity:artist", popularity: 0.8 }));
+          return new Response(JSON.stringify({ results }), { status: 200 });
+        },
+      });
+    const resolve = async (name: string, names: string[]) => {
+      const result = await runTool("resolve_entities", { items: [{ name, type: "artist" }] }, { qloo: searching(names) });
+      return (result.data as { items: { status: string; exact?: boolean; candidates?: CompactEntity[] }[] }).items[0];
+    };
+    expect(await resolve("Chaar Diwaari", ["Chaartaar"])).toMatchObject({ status: "not_found" });
+    expect(await resolve("Radiohed", ["Radiohead", "Radio Moscow"])).toMatchObject({
+      status: "ambiguous",
+      exact: false,
+      candidates: [{ name: "Radiohead" }],
+    });
+  });
+
+  it("looks for an artist among people when Qloo has no artist of that name", async () => {
+    const result = await runTool("resolve_entities", { items: [{ name: "Raftaar", type: "artist" }] }, ctx);
+    const [item] = (result.data as { items: { status: string; match?: CompactEntity; note?: string }[] }).items;
+    expect(item).toMatchObject({ status: "resolved", match: { name: "Raftaar", kind: "person" } });
+    expect(item.note).toContain("as a person");
+    expect(result.provenance.map((p) => p.query.types)).toEqual(["urn:entity:artist", "urn:entity:person"]);
+    // An artist Qloo has costs one search, not two.
+    const found = await runTool("resolve_entities", { items: [{ name: "Prateek Kuhad", type: "artist" }] }, ctx);
+    expect(found.provenance).toHaveLength(1);
+  });
+
   it("uses the year to pick between same-name titles", async () => {
     const result = await runTool("resolve_entities", { items: [{ name: "Forgotten", type: "movie", year: 2017 }] }, ctx);
     expect(result.status).toBe("ok");

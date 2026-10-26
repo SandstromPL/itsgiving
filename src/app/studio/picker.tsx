@@ -1,17 +1,25 @@
 "use client";
 
 import { useEffect, useRef, type FormEvent } from "react";
+import { NONE_PICK } from "@/lib/agent/options";
 import type { Ambiguity, Role } from "@/lib/agent/types";
 import { useLingo } from "./lingo";
 import { Still } from "./parts";
 
 const ROLE: Record<Role, string> = {
   artist: "the artist",
-  touchstone: "your touchstones",
+  touchstone: "your films",
   director: "your taste",
+  stand_in: "your stand-in artists",
 };
 
-/** Asks which entity a name means instead of guessing; only Qloo's own candidates can be picked. */
+const optionCard =
+  "group flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-card p-2.5 hover:border-edge has-checked:border-foreground has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
+
+/**
+ * Asks which entity a name means instead of guessing; only Qloo's own candidates can be picked. When none has the name
+ * as typed they are only Qloo's nearest names, so it says so and offers "None of these".
+ */
 export function Picker({
   message,
   items,
@@ -47,12 +55,12 @@ export function Picker({
           <legend className="mb-2 text-[15px] font-semibold">
             &ldquo;{item.input}&rdquo;, from {ROLE[item.role]}
           </legend>
+          {!item.exact && (
+            <p className="-mt-1 mb-1 text-[14px] leading-5 text-dim">Qloo has nothing under this exact name. These are its nearest:</p>
+          )}
           <div className="grid gap-2.5 sm:grid-cols-2">
             {item.candidates.map((candidate) => (
-              <label
-                key={candidate.id}
-                className="group flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-card p-2.5 hover:border-edge has-checked:border-foreground has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground"
-              >
+              <label key={candidate.id} className={optionCard}>
                 <input type="radio" name={item.key} value={candidate.id} required className="sr-only" />
                 <Still src={candidate.image} alt="" className="aspect-video w-20 shrink-0 rounded-lg" />
                 <span className="min-w-0">
@@ -65,6 +73,20 @@ export function Picker({
                 </span>
               </label>
             ))}
+            {!item.exact && (
+              <label className={optionCard}>
+                <input type="radio" name={item.key} value={NONE_PICK} required className="sr-only" />
+                <span className="grid aspect-video w-20 shrink-0 place-items-center rounded-lg bg-field text-[22px] text-dim" aria-hidden>
+                  ×
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[16px] font-bold text-foreground group-has-checked:text-[#121211]">None of these</span>
+                  <span className="block text-[13px] text-dim group-has-checked:text-[#4a4741]">
+                    {item.role === "artist" ? "They aren't in Qloo" : "Leave it out"}
+                  </span>
+                </span>
+              </label>
+            )}
           </div>
         </fieldset>
       ))}

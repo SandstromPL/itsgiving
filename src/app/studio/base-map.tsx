@@ -178,7 +178,9 @@ function HeatMap({
         className="relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b]"
         style={{
           aspectRatio: `${f.width} / ${f.height}`,
-          maxWidth: compact ? `calc(min(30rem, 100dvh - 24rem) * ${f.width / f.height})` : `${(34 * f.width) / f.height}rem`,
+          // Pinned beside the locations, the whole block must fit under the section bar: the rest of it (caption, legend,
+          // the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900.
+          maxWidth: compact ? `calc(max(16rem, min(30rem, 100dvh - 28rem)) * ${f.width / f.height})` : `${(34 * f.width) / f.height}rem`,
         }}
       >
         <StreetTiles frame={f} />

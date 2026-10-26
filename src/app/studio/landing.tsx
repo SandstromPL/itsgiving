@@ -71,8 +71,8 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
           their taste.
         </h1>
         <p className="max-w-[34ch] text-[1.3rem] leading-[1.45] text-dim">
-          Give it an artist and a city. It reads what the fans actually love on Qloo and writes a treatment you can pitch, with receipts for
-          every pick.
+          Give it an artist, or the films your short is after, and a city. It reads what that audience actually loves on Qloo and writes a
+          treatment you can pitch, with receipts for every pick.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link href="/studio" className={primaryButton}>
@@ -173,7 +173,8 @@ export function YourPoster({ form }: { form: FormState }) {
   const isVideo = form.format === "music_video";
   const who = form.artist.trim();
   const after = splitTitles(form.touchstones);
-  const title = who || (isVideo ? "your artist here" : after.length > 0 ? `after ${after[0]}` : "your short here");
+  // A music video is named for its artist; a short film for the films it's after.
+  const title = isVideo ? who || "your artist here" : after.length > 0 ? `after ${after[0]}` : "your short here";
   return (
     <div
       aria-hidden
@@ -185,7 +186,7 @@ export function YourPoster({ form }: { form: FormState }) {
           <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
             {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
           </span>
-          <span className={`${posterTitle} ${who || after.length > 0 ? "text-foreground" : "text-faint"}`}>{title}</span>
+          <span className={`${posterTitle} ${(isVideo ? who : after.length > 0) ? "text-foreground" : "text-faint"}`}>{title}</span>
           <span className="text-[15px] text-dim">{briefLine(form)}</span>
         </span>
       </span>
@@ -305,7 +306,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
 }
 
 const STEPS = [
-  ["Read the fans", "Qloo shows what the artist's audience over-indexes on, and where it meets your own taste."],
+  ["Read the fans", "Qloo shows what the audience of an artist or a film over-indexes on, and where it meets your own taste."],
   ["Find where they are", "A heatmap of the city picks the neighbourhood to base the shoot in."],
   ["Plan and write", "The model turns that evidence into a concept, beats, wardrobe and locations."],
   ["Bring receipts", "Every film, brand and place shows why Qloo picked it, kept apart from the writing."],
@@ -341,9 +342,9 @@ export function StartYourOwn() {
     >
       <div className="flex flex-col gap-2">
         <h2 id="start-heading" className="type-head text-[clamp(1.9rem,3vw,2.5rem)] leading-tight">
-          Make one for your artist.
+          Make one for your next video or short.
         </h2>
-        <p className="text-[1.1rem] text-dim">An artist and a city are enough to start.</p>
+        <p className="text-[1.1rem] text-dim">An artist or a film, and a city, are enough to start.</p>
       </div>
       <Link href="/studio" className={primaryButton}>
         Start a treatment

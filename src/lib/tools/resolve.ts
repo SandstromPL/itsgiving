@@ -8,7 +8,8 @@ type Resolution =
    * place name was read as something other than Qloo's first match.
    */
   | { input: string; status: "resolved"; match: CompactEntity; among?: number; note?: string }
-  | { input: string; status: "ambiguous"; candidates: CompactEntity[] }
+  /** `exact` is false when no candidate has the name as typed: they are near misses, and may all be wrong. */
+  | { input: string; status: "ambiguous"; candidates: CompactEntity[]; exact: boolean }
   | { input: string; status: "not_found" };
 
 const itemSchema = z.strictObject({
@@ -46,11 +47,39 @@ function pick(item: z.output<typeof itemSchema>, candidates: CompactEntity[]): R
   if (top && next && (top.popularity ?? 0) - (next.popularity ?? 0) >= DOMINANT_GAP) {
     return { input: item.name, status: "resolved", match: top, among: exact.length };
   }
-  return { input: item.name, status: "ambiguous", candidates: (exact.length > 0 ? exact : candidates).slice(0, 5) };
+  if (exact.length > 0) return { input: item.name, status: "ambiguous", candidates: exact.slice(0, 5), exact: true };
+  // Nothing has the name as typed. Search still returns Qloo's closest names, which for an artist it doesn't have
+  // are other artists entirely (live "Chaar Diwaari" gave "Chaartaar"), so only plausible slips are offered.
+  const near = candidates.filter((c) => nearMiss(wanted, normalizeName(c.name)));
+  return near.length > 0
+    ? { input: item.name, status: "ambiguous", candidates: near.slice(0, 5), exact: false }
+    : { input: item.name, status: "not_found" };
 }
 
 /** How much more popular (0-1 percentile) one same-name title must be to be taken without asking. */
 export const DOMINANT_GAP = 0.5;
+
+/** Levenshtein distance between two normalized names. */
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++)
+      row[j] = Math.min(previous[j] + 1, row[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    previous = row;
+  }
+  return previous[b.length];
+}
+
+/**
+ * A candidate worth asking about when nothing matched exactly: a small typo away ("Radiohed"), or sharing a whole
+ * word of three letters or more with what was typed ("Kendrick" for Kendrick Lamar).
+ */
+export function nearMiss(wanted: string, name: string): boolean {
+  if (editDistance(wanted, name) <= Math.max(1, Math.floor(wanted.length / 6))) return true;
+  const words = new Set(wanted.split(" ").filter((word) => word.length >= 3));
+  return name.split(" ").some((word) => words.has(word));
+}
 
 /** Qloo names some states and counties after their main city; a shoot city of that name means the city. */
 const WIDER_THAN_A_CITY = new Set(["state", "county", "region", "province", "country"]);
@@ -82,8 +111,10 @@ export const resolveEntities = defineTool({
   description:
     "Turn names the user mentions (artists, films, TV shows, brands, places, people, cities) into Qloo entity IDs. " +
     "Call this before any other Qloo tool whenever you only have a name, and again whenever the user adds new references. " +
-    "Each item comes back resolved, ambiguous (with up to 5 candidates) or not found. For ambiguous or missing items, " +
-    "ask the user which one they mean instead of guessing. Cities (type locality) always resolve to the best match.",
+    "Each item comes back resolved, ambiguous (with up to 5 candidates; exact is false when they are only near misses) " +
+    "or not found. For ambiguous or missing items, ask the user which one they mean instead of guessing. An artist with " +
+    "no exact match is also looked for among people, since Qloo files some musicians only there. Cities (type locality) " +
+    "always resolve to the best match.",
   inputSchema: z.strictObject({
     items: z.array(itemSchema).min(1).max(10).describe("Names to resolve, up to 10 per call."),
   }),
@@ -95,15 +126,25 @@ export const resolveEntities = defineTool({
     ],
   },
   async run(input, { qloo }) {
+    const search = async (name: string, type: z.output<typeof itemSchema>["type"]) =>
+      entityList((await qloo.search({ query: name, types: entityUrn(type), take: 5 })).data);
+    const compact = (entities: QlooEntity[]) => entities.map((e) => compactEntity(e, { maxTags: 5 }));
     const items = await Promise.all(
-      input.items.map(async (item) => {
-        const response = await qloo.search({ query: item.name, types: entityUrn(item.type), take: 5 });
-        const entities = entityList(response.data);
+      input.items.map(async (item): Promise<Resolution> => {
+        const entities = await search(item.name, item.type);
         if (item.type === "locality") return pickLocality(item, entities);
-        return pick(
-          item,
-          entities.map((e) => compactEntity(e, { maxTags: 5 })),
-        );
+        const found = pick(item, compact(entities));
+        if (item.type !== "artist" || found.status === "resolved" || (found.status === "ambiguous" && found.exact)) return found;
+        // Qloo files some musicians only as people: live "Raftaar" is a person, not an artist (2026-10-26), and a
+        // person's fans are an audience like any other.
+        const person = pick({ ...item, type: "person" }, compact(await search(item.name, "person")));
+        if (person.status === "resolved") {
+          return {
+            ...person,
+            note: `Qloo lists ${person.match.name} as a person rather than a music artist, so the audience comes from that entry.`,
+          };
+        }
+        return person.status === "ambiguous" && person.exact ? person : found;
       }),
     );
     const resolved = items.filter((i) => i.status === "resolved").length;

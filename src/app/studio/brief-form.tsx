@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useId, useRef, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from "react";
 import type { Example } from "@/lib/agent/examples";
 import { BUDGETS, FORMATS, IMPORT_LIMIT, THINKING, TMDB_NOTICE, type Budget, type Format, type Thinking } from "@/lib/agent/options";
 import type { TasteImport } from "@/lib/agent/taste";
@@ -226,6 +226,7 @@ export function BriefForm({
 }) {
   const ids = useId();
   const { t } = useLingo();
+  const formRef = useRef<HTMLFormElement>(null);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => onChange({ ...form, [key]: value });
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -245,18 +246,73 @@ export function BriefForm({
       </p>
     ) : null;
 
-  // The optional extras sit in a drawer; a short film's touchstones are its audience, so they stay out in the card.
-  const touchstoneCount = splitTitles(form.touchstones).length;
-  const extras = (isVideo ? touchstoneCount : 0) + splitTitles(form.directorFilms).length + form.imported.length;
+  // The optional extras sit in a drawer. A music video starts from its artist, a short film from the films it's after;
+  // the other one is an extra.
+  const extras =
+    (isVideo ? splitTitles(form.touchstones).length + splitTitles(form.standIns).length : form.artist.trim() ? 1 : 0) +
+    splitTitles(form.directorFilms).length +
+    form.imported.length;
   const [drawerOpen, setDrawerOpen] = useState(extras > 0);
   // A problem inside the drawer keeps it open, so the message is never hidden.
-  const drawerHasProblem = problem?.field === "directorFilms" || (isVideo && problem?.field === "touchstones");
+  const drawerHasProblem =
+    problem?.field === "directorFilms" ||
+    (isVideo ? problem?.field === "touchstones" || problem?.field === "standIns" : problem?.field === "artist");
   const open = drawerOpen || drawerHasProblem;
+
+  // A problem takes focus to its field, which may be in the drawer it just opened (a run can fail on the stand-ins).
+  useEffect(() => {
+    if (problem) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [problem]);
+
+  const artist = (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={`${ids}-artist`} className={label}>
+        {isVideo ? "Artist" : "Music its audience loves (optional)"}
+      </label>
+      <input
+        id={`${ids}-artist`}
+        className={field}
+        value={form.artist}
+        onChange={(e) => set("artist", e.target.value)}
+        placeholder="e.g. Prateek Kuhad"
+        autoComplete="off"
+        {...describe("artist", isVideo ? undefined : `${ids}-artist-hint`)}
+      />
+      {!isVideo && (
+        <p id={`${ids}-artist-hint`} className={hint}>
+          An artist whose fans your short is for, if any. It shapes the audience, not the story.
+        </p>
+      )}
+      {message("artist")}
+    </div>
+  );
+
+  const standIns = (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={`${ids}-standins`} className={label}>
+        Stand-in artists (optional)
+      </label>
+      <textarea
+        id={`${ids}-standins`}
+        className={`${field} resize-y`}
+        rows={2}
+        value={form.standIns}
+        onChange={(e) => set("standIns", e.target.value)}
+        placeholder={"e.g. Seedhe Maut\nPrabh Deep"}
+        {...describe("standIns", `${ids}-standins-hint`)}
+      />
+      <p id={`${ids}-standins-hint`} className={hint}>
+        Only used if Qloo doesn&apos;t have your artist: up to {LIMITS.standIns} artists with a similar audience, one per line. Their fans
+        carry the audience, and the treatment keeps your artist&apos;s name.
+      </p>
+      {message("standIns")}
+    </div>
+  );
 
   const touchstones = (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={`${ids}-touchstones`} className={label}>
-        Touchstone films {isVideo ? "(optional)" : ""}
+        {isVideo ? "Reference films (optional)" : "Films it's after"}
       </label>
       <textarea
         id={`${ids}-touchstones`}
@@ -270,7 +326,7 @@ export function BriefForm({
       <p id={`${ids}-touchstones-hint`} className={hint}>
         {isVideo
           ? `One title per line, up to ${LIMITS.touchstones}. The client's references, if any.`
-          : `One title per line, up to ${LIMITS.touchstones}. The films your short is after: they define its audience.`}{" "}
+          : `One title per line, up to ${LIMITS.touchstones}. They define your short's audience.`}{" "}
         Feature films only: Qloo doesn&apos;t list short films.
       </p>
       {message("touchstones")}
@@ -279,6 +335,7 @@ export function BriefForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={submit}
       aria-labelledby={`${ids}-title`}
       className="flex flex-col gap-4 rounded-[28px] border border-line bg-card p-6 sm:p-7"
@@ -313,23 +370,7 @@ export function BriefForm({
         </div>
       </fieldset>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${ids}-artist`} className={label}>
-          {isVideo ? "Artist" : "Artist or band (optional)"}
-        </label>
-        <input
-          id={`${ids}-artist`}
-          className={field}
-          value={form.artist}
-          onChange={(e) => set("artist", e.target.value)}
-          placeholder="e.g. Prateek Kuhad"
-          autoComplete="off"
-          {...describe("artist")}
-        />
-        {message("artist")}
-      </div>
-
-      {!isVideo && touchstones}
+      {isVideo ? artist : touchstones}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor={`${ids}-city`} className={label}>
@@ -358,7 +399,7 @@ export function BriefForm({
           <span className="flex flex-col gap-0.5">
             <span className="text-[16px] font-bold">{t.makeItYours}</span>
             <span className="text-[13px] text-faint">
-              {isVideo ? "Reference films, your own films, budget, depth" : "Your own films, budget, depth"}
+              {isVideo ? "Reference films, stand-in artists, your own films, budget, depth" : "Music, your own films, budget, depth"}
             </span>
           </span>
           <span className="flex items-center gap-2.5">
@@ -380,7 +421,14 @@ export function BriefForm({
           </span>
         </button>
         <div id={`${ids}-drawer`} hidden={!open} className="flex flex-col gap-4 border-t border-line p-4">
-          {isVideo && touchstones}
+          {isVideo ? (
+            <>
+              {touchstones}
+              {standIns}
+            </>
+          ) : (
+            artist
+          )}
           <TasteField form={form} onChange={onChange} describe={describe} message={message} />
           <div className="flex flex-col gap-1.5">
             <label htmlFor={`${ids}-budget`} className={label}>

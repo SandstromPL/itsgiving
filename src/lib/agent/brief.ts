@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { normalizeName } from "../tools/shared";
-import { BUDGETS, FORMATS, IMPORT_LIMIT, NUDGES, THINKING, type Budget, type Format, type Thinking } from "./options";
+import { BUDGETS, FORMATS, IMPORT_LIMIT, NUDGES, STAND_IN_LIMIT, THINKING, type Budget, type Format, type Thinking } from "./options";
 
 export { BUDGETS, NUDGES, THINKING, type Budget, type Nudge, type Thinking } from "./options";
 
@@ -14,6 +14,8 @@ export const briefSchema = z
   .strictObject({
     format: z.enum(Object.keys(FORMATS) as [Format, ...Format[]]).default("music_video"),
     artist: z.string().trim().max(80).refine(noControl, CONTROL_MESSAGE).optional(),
+    /** Artists with a similar audience, read in the artist's place when Qloo doesn't have them (music videos only). */
+    stand_ins: z.array(name).max(STAND_IN_LIMIT).default([]),
     touchstones: z.array(name).max(5).default([]),
     city: name,
     budget: z.enum(Object.keys(BUDGETS) as [Budget, ...Budget[]]).default("indie"),
@@ -61,6 +63,7 @@ export function normalizeBrief(brief: Brief): Brief {
   return {
     ...brief,
     artist: brief.artist ? tidy(brief.artist) || undefined : undefined,
+    stand_ins: dedupe((brief.stand_ins ?? []).map(tidy)),
     touchstones: dedupe(brief.touchstones.map(tidy)),
     city: tidy(brief.city),
     director_films: dedupe(brief.director_films.map(tidy)),
@@ -83,6 +86,8 @@ export function briefKey(brief: Brief, modes: { qloo: string; llm: string }): st
     director: brief.director_films.map(normalizeName).sort(),
     // Only when present, so briefs without an import (and treatments built before it) keep their keys.
     ...(brief.director_imdb_ids?.length ? { imported: [...brief.director_imdb_ids].sort() } : {}),
+    // The same for stand-ins, which also don't depend on their order.
+    ...(brief.stand_ins?.length ? { stand_ins: brief.stand_ins.map(normalizeName).sort() } : {}),
     picks: Object.entries(brief.picks).sort(([a], [b]) => a.localeCompare(b)),
     nudges: [...brief.nudges].sort(),
     thinking: brief.thinking,

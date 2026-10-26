@@ -5,7 +5,7 @@ import { runTool } from "../tools/registry";
 import { VENUE_KIND_VALUES, normalizeName } from "../tools/shared";
 import type { ToolResult } from "../tools/types";
 import { pickKey, priceLevelMax, type Brief } from "./brief";
-import { STEP_LABELS, type Thinking } from "./options";
+import { NONE_PICK, STAND_IN_LIMIT, STEP_LABELS, joinNames, type Thinking } from "./options";
 import {
   DEEP_CUT_CEILING,
   SYSTEM_PROMPT,
@@ -18,7 +18,21 @@ import {
   type PlanDraft,
   type ToneCandidate,
 } from "./plan";
-import type { AgentEvent, Ambiguity, BaseArea, LlmStep, LlmTrace, Pick, QlooEvidence, Role, StepId, StepStatus, Treatment } from "./types";
+import type {
+  AgentEvent,
+  Ambiguity,
+  BaseArea,
+  BriefField,
+  LlmStep,
+  LlmTrace,
+  Pick,
+  QlooEvidence,
+  Role,
+  StepId,
+  StepStatus,
+  Treatment,
+  TreatmentWho,
+} from "./types";
 import { mockDraft, normalizeDraft, refScrubber, writePrompt, writeSchema, type Draft, type Ref, type WriteContext } from "./write";
 
 // The lean agent: code runs every Qloo tool deterministically and the LLM is
@@ -36,11 +50,12 @@ export interface PipelineDeps {
 export type PipelineOutcome =
   | { kind: "treatment"; treatment: Treatment }
   | { kind: "needs_input"; message: string; items: Ambiguity[] }
-  | { kind: "failed"; message: string };
+  /** `field`: the brief field that can fix it, when there is one. */
+  | { kind: "failed"; message: string; field?: BriefField };
 
 type Resolution =
   | { input: string; status: "resolved"; match: CompactEntity; among?: number; note?: string }
-  | { input: string; status: "ambiguous"; candidates: CompactEntity[] }
+  | { input: string; status: "ambiguous"; candidates: CompactEntity[]; exact: boolean }
   | { input: string; status: "not_found" };
 
 interface NameSpec {
@@ -238,12 +253,15 @@ export async function runPipeline(
     return result.data;
   };
 
-  // 1. Resolve the artist, touchstones and the director's films.
+  // 1. Resolve the artist, touchstones and the director's films, and any artists standing in for an artist Qloo lacks.
+  const isVideo = brief.format === "music_video";
   const film = (input: string, role: Role): NameSpec => ({ input, ...parseTitle(input), type: "movie", role });
-  const subjectSpecs: NameSpec[] = [
-    ...(brief.artist ? [{ input: brief.artist, name: brief.artist, type: "artist" as const, role: "artist" as const }] : []),
-    ...brief.touchstones.map((input) => film(input, "touchstone")),
-  ];
+  const musician = (input: string, role: Role): NameSpec => ({ input, name: input, type: "artist", role });
+  const artistSpec = brief.artist ? musician(brief.artist, "artist") : undefined;
+  const touchstoneSpecs = brief.touchstones.map((input) => film(input, "touchstone"));
+  // Stand-ins only speak for a music video's artist. They're looked up with the rest but used only if Qloo lacks the artist.
+  const standInSpecs = isVideo && artistSpec ? (brief.stand_ins ?? []).map((input) => musician(input, "stand_in")) : [];
+  const subjectSpecs: NameSpec[] = [...(artistSpec ? [artistSpec] : []), ...touchstoneSpecs, ...standInSpecs];
   const directorSpecs: NameSpec[] = brief.director_films.map((input) => film(input, "director"));
   const endResolve = begin("resolve", STEP_LABELS.resolve);
   const asItems = (specs: NameSpec[]) => ({ items: specs.map(({ name, year, type }) => ({ name, type, ...(year ? { year } : {}) })) });
@@ -273,7 +291,7 @@ export async function runPipeline(
   }
 
   const ambiguities: Ambiguity[] = [];
-  const missing: string[] = [];
+  const missing: NameSpec[] = [];
   const settle = (spec: NameSpec, resolution: Resolution | undefined): CompactEntity | undefined => {
     const key = pickKey(spec.type, spec.input);
     if (resolution?.status === "resolved") {
@@ -283,22 +301,55 @@ export async function runPipeline(
           `"${spec.input}" matched ${resolution.among} titles in Qloo; itsgiving used the far better-known ${m.name}${m.year ? ` (${m.year})` : ""}.`,
         );
       }
+      if (resolution.note) notes.push(resolution.note);
       return resolution.match;
     }
     if (resolution?.status === "ambiguous") {
-      // A pick only counts if it is one of the candidates Qloo returned.
+      // A pick only counts if it is one of the candidates Qloo returned, or none of them.
       const chosen = resolution.candidates.find((c) => c.id === brief.picks[key]);
       if (chosen) return chosen;
-      ambiguities.push({ key, input: spec.input, role: spec.role, status: "ambiguous", candidates: resolution.candidates });
-      return undefined;
+      if (brief.picks[key] !== NONE_PICK) {
+        ambiguities.push({
+          key,
+          input: spec.input,
+          role: spec.role,
+          status: "ambiguous",
+          exact: resolution.exact,
+          candidates: resolution.candidates,
+        });
+        return undefined;
+      }
     }
-    missing.push(spec.input);
+    missing.push(spec);
     return undefined;
   };
-  const subjects = uniqueBy(
-    subjectSpecs.map((spec, i) => settle(spec, subjectResult.data?.items[i])).filter((e): e is CompactEntity => Boolean(e)),
-    (e) => e.id,
-  );
+  const settleAll = (specs: NameSpec[]) =>
+    specs.map((spec) => settle(spec, subjectResult.data?.items[subjectSpecs.indexOf(spec)])).filter((e): e is CompactEntity => Boolean(e));
+
+  // The artist first: whether Qloo has them decides whether the stand-ins are needed.
+  let artist: CompactEntity | undefined;
+  let artistMissing = false;
+  if (artistSpec) {
+    const resolution = subjectResult.data.items[0];
+    const answered = brief.picks[pickKey(artistSpec.type, artistSpec.input)] !== undefined;
+    const nearMissesOnly = resolution?.status === "not_found" || (resolution?.status === "ambiguous" && !resolution.exact && !answered);
+    if (standInSpecs.length > 0 && nearMissesOnly) {
+      // The director already named who carries the audience, so Qloo's nearest names aren't worth a question.
+      artistMissing = true;
+      if (resolution?.status === "ambiguous") {
+        notes.push(
+          `Qloo's nearest names to "${artistSpec.input}" were ${joinNames(resolution.candidates.slice(0, 3).map((c) => c.name))}.`,
+        );
+      }
+    } else {
+      artist = settle(artistSpec, resolution);
+      artistMissing = missing.includes(artistSpec);
+    }
+  }
+  const touchstones = settleAll(touchstoneSpecs);
+  const standIns = artistMissing ? settleAll(standInSpecs) : [];
+  if (artist && standInSpecs.length > 0) notes.push(`Qloo has ${artist.name}, so the stand-in artists weren't needed.`);
+  const subjects = uniqueBy([...(artist ? [artist] : []), ...touchstones, ...standIns], (e) => e.id);
   const director = uniqueBy(
     [
       ...directorSpecs
@@ -313,19 +364,53 @@ export async function runPipeline(
     // The same title can sit in two lists (touchstones and your taste); one question answers both.
     const questions = uniqueBy(ambiguities, (a) => a.key);
     endResolve("warning", `Need your call on ${questions.map((a) => `"${a.input}"`).join(", ")}.`);
-    return { kind: "needs_input", message: "Some names match more than one title in Qloo, so itsgiving won't guess.", items: questions };
+    const message = questions.every((q) => q.exact)
+      ? "Some names match more than one title in Qloo, so itsgiving won't guess."
+      : questions.every((q) => !q.exact)
+        ? "Qloo has nothing under these exact names, so itsgiving won't guess. Pick the right one, or none of them."
+        : "Some names need your call before itsgiving goes on.";
+    return { kind: "needs_input", message, items: questions };
   }
+  // A music video keeps its artist's name whatever Qloo has; only the audience comes from someone else.
+  const artistGone = isVideo && artistMissing;
   if (subjects.length === 0) {
-    endResolve("error", `Not found: ${missing.join(", ")}.`);
+    endResolve("error", `Not found: ${missing.map((m) => m.input).join(", ")}.`);
+    if (artistGone && brief.artist) {
+      const triedStandIns = missing.filter((m) => m.role === "stand_in").map((m) => m.input);
+      return {
+        kind: "failed",
+        field: "stand_ins",
+        message:
+          triedStandIns.length > 0
+            ? `Qloo doesn't have ${brief.artist}, or ${joinNames(triedStandIns)}. Try other artists with a similar audience.`
+            : `Qloo doesn't have ${brief.artist}. Name up to ${STAND_IN_LIMIT} artists with a similar audience: the treatment keeps ${brief.artist}'s name and reads their fans instead.`,
+      };
+    }
     return {
       kind: "failed",
-      message: `Qloo couldn't find ${missing.map((m) => `"${m}"`).join(", ")}. Check the spelling or try another artist or film.`,
+      message: `Qloo couldn't find ${missing.map((m) => `"${m.input}"`).join(", ")}. Check the spelling or try another artist or film.`,
     };
   }
-  if (missing.length > 0) notes.push(`Not in Qloo's catalog, so left out: ${missing.join(", ")}.`);
+  if (artistGone && brief.artist) {
+    notes.push(
+      standIns.length > 0
+        ? `Qloo doesn't have ${brief.artist}, so the audience was read through ${joinNames(names(standIns))}; the treatment keeps ${brief.artist}'s name.`
+        : `Qloo doesn't have ${brief.artist}, so the audience was read from the reference films alone.`,
+    );
+  }
+  const leftOut = missing.filter((m) => !(artistGone && m === artistSpec)).map((m) => m.input);
+  if (leftOut.length > 0) notes.push(`Not in Qloo's catalog, so left out: ${leftOut.join(", ")}.`);
+  const resolvedLine =
+    artistGone && brief.artist
+      ? [
+          `${brief.artist} (not in Qloo)`,
+          ...(standIns.length > 0 ? [`read through ${joinNames(names(standIns))}`] : []),
+          ...names(touchstones),
+        ]
+      : names(subjects);
   endResolve(
-    missing.length > 0 ? "warning" : "done",
-    `${names(subjects).join(", ")}${director.length > 0 ? `; your taste: ${director.length} film${director.length === 1 ? "" : "s"}` : ""}.`,
+    missing.length > 0 || artistGone ? "warning" : "done",
+    `${resolvedLine.join(", ")}${director.length > 0 ? `; your taste: ${director.length} film${director.length === 1 ? "" : "s"}` : ""}.`,
   );
 
   const subjectIds = subjects.map((e) => e.id);
@@ -399,9 +484,13 @@ export async function runPipeline(
 
   // 3. Plan (LLM call 1).
   const who = {
-    artistNames: names(subjects.filter((e) => e.kind === "artist")),
-    touchstoneNames: names(subjects.filter((e) => e.kind !== "artist")),
+    // A music video is for its artist by name, in Qloo or not. A short film's artist only says whose fans it's for,
+    // so one Qloo lacks drops out.
+    artistNames: isVideo ? (brief.artist ? [artist?.name ?? brief.artist] : []) : artist ? [artist.name] : [],
+    touchstoneNames: names(touchstones),
     directorNames: names(director),
+    standInNames: names(standIns),
+    artistMissing: artistGone,
   };
   const planContext: PlanContext = {
     brief,
@@ -727,6 +816,8 @@ export async function runPipeline(
     run,
     plan,
     subjects,
+    // Plain names for the board; the prompts above carry the films' years.
+    who: { artists: who.artistNames, films: touchstones.map((e) => e.name), standIns: standIns.map((e) => e.name) },
     director,
     tasteTags,
     overlap,
@@ -754,6 +845,7 @@ interface AssembleInput {
   run: Execution;
   plan: Plan;
   subjects: CompactEntity[];
+  who: TreatmentWho;
   director: CompactEntity[];
   tasteTags: CompactTag[];
   overlap: CompactTag[];
@@ -850,6 +942,7 @@ function assemble(input: AssembleInput): Treatment {
     },
     audience: { taste_tags: input.tasteTags, overlap: input.overlap, leans: input.leans },
     subjects: input.subjects,
+    who: input.who,
     director: input.director,
     notes: input.notes,
     llm: input.traces,

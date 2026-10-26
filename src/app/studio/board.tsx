@@ -1,7 +1,17 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
-import { BUDGETS, FORMATS, NUDGES, NUDGE_LABELS, audiencePhrase, subjectPhrase, type Nudge } from "@/lib/agent/options";
+import {
+  BUDGETS,
+  FORMATS,
+  NUDGES,
+  NUDGE_LABELS,
+  audiencePhrase,
+  joinNames,
+  subjectPhrase,
+  treatmentWho,
+  type Nudge,
+} from "@/lib/agent/options";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { ShootBaseBlock, locationPins } from "./base-map";
@@ -94,10 +104,8 @@ function Cover({
 }) {
   // Mock placeholders carry their own "not Qloo data" text, which would fight the title.
   const still = t.references.find((r) => r.entity.image && !r.entity.image.startsWith("/mock/"))?.entity.image;
-  const subject = subjectPhrase(
-    t.subjects.filter((s) => s.kind === "artist").map((s) => s.name),
-    t.subjects.filter((s) => s.kind !== "artist").map((s) => s.name),
-  );
+  const who = treatmentWho(t);
+  const subject = subjectPhrase(who.artists, who.films, t.brief.format);
   return (
     <header
       ref={ref}
@@ -114,6 +122,14 @@ function Cover({
           <span className="rounded-full border border-edge px-3.5 py-2 text-[14px] text-dim">
             {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
           </span>
+          {who.standIns.length > 0 && (
+            <span
+              title={`Qloo doesn't have ${who.artists[0] ?? "the artist"}, so this audience stands in.`}
+              className="rounded-full border border-edge px-3.5 py-2 text-[14px] text-dim"
+            >
+              Audience read through {joinNames(who.standIns)}
+            </span>
+          )}
           {t.mock.qloo && <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>}
         </div>
         <TitleCardPicker title={t.title} fontId={fontId} suggestion={suggestion} onPick={onPickFont} />
@@ -569,7 +585,7 @@ export function Board({
         note={`Real places in ${t.brief.city} whose regulars share this audience's taste, found by ${source}. Confirm availability and filming permission with each venue.`}
       >
         <div className={pinned ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "contents"}>
-          <div className={pinned ? "lg:sticky lg:top-20" : ""}>
+          <div className={pinned ? "lg:tall:sticky lg:tall:top-20" : ""}>
             <ShootBaseBlock
               base={t.base}
               pins={locationPins(t)}

@@ -36,8 +36,14 @@ fast and cheap, and within the free fallback models' limits.
    (`import_external_ids`), so nothing about them is guessed. Names that match more
    than one title go to a picker in the UI instead of being guessed; only Qloo's own candidates can be picked. A year
    in brackets, like "Rockstar (2011)", settles it without asking, and so does one match being far better known than
-   the rest (the treatment notes which one was used). The shoot city is resolved too, as a Qloo locality: a state or
-   county that shares its name with a city ("New York") is read as the city.
+   the rest (the treatment notes which one was used). When no title has the name as typed, the picker says so and
+   offers only near misses (a small typo, or a word in common) plus "None of these"; Qloo's search always returns its
+   closest names, and for an artist it doesn't have those are other artists entirely. An artist with no exact match
+   is also looked for among Qloo's people, where it files some musicians (Raftaar, MC Stan). For an artist Qloo
+   doesn't have at all, the director can name up to three **stand-in artists** with a similar audience: their fans
+   carry the audience, the treatment keeps the artist's name, and the model is told to say nothing about the artist
+   beyond it. The shoot city is resolved too, as a Qloo locality: a state or county that shares its name with a city
+   ("New York") is read as the city.
 3. **Read the audience** (`read_audience`), **map where the fans are** (`audience_heatmap`) and, when the director
    lists films, **compare** their taste with the audience (`taste_overlap`). The calls run at once. The heatmap scores
    every tile of the city for the audience; itsgiving groups the hottest tenth into the three strongest areas, 2 km in
@@ -93,9 +99,10 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   "See a finished one"; "Now showing", the featured treatments as posters in a dark strip under a still projector
   beam; and "How it works", one real featured run step by step beside what each step produced. Nothing on it moves
   or changes as you scroll; the one motion is the cover opening like a letterbox when the page loads.
-- **The studio** (`/studio`) is the tool. The brief asks for an artist (or the films a short is after) and a city; the
-  references, your own films, the budget and the thinking depth wait under "Make it yours", and "your poster" fills in
-  beside it. While a treatment builds, the brief folds into one line and the run takes the page: a countdown, the
+- **The studio** (`/studio`) is the tool. A music video starts from its artist and a city; a short film from the films
+  it's after and a city. The rest waits under "Make it yours": a video's reference films and stand-in artists, a
+  short's "music its audience loves" (an artist whose fans it's for, which shapes the audience, not the story), your
+  own films, the budget and the thinking depth. "Your poster" fills in beside it. While a treatment builds, the brief folds into one line and the run takes the page: a countdown, the
   step it's on, every Qloo call, and the tab's title counting the seconds. Back from a board returns to the brief, and
   "Back to" the treatment's title opens it again, even after a visit to the homepage.
 - **Featured treatments** (`/t/<slug>`) are pages of their own, built with the site, so Back, reload and links work as
@@ -285,6 +292,10 @@ All server-side only.
 - Qloo's film catalog is feature-length: short films are missing even when they have IMDb pages (Oscar winners
   included), so a director's own shorts can't stand for their taste. Music is artist-level only, with no songs or
   albums, so a treatment reads the artist's audience, not the particular song.
+- Qloo doesn't have every artist. Small acts can be there, yet others are missing, even ones MusicBrainz and Wikidata
+  list, and some are filed only as people. A treatment for an artist Qloo lacks reads
+  the audience of stand-ins the director names, which is an approximation and says so.
+- Qloo's affinities describe what groups tend to like, never what any one person will do.
 
 ## Credits
 

@@ -122,7 +122,7 @@ export async function streamTreatment(
       emit({ type: "needs_input", message: outcome.message, items: outcome.items });
       log({ outcome: "needs_input", items: outcome.items.length });
     } else {
-      emit({ type: "error", message: outcome.message });
+      emit({ type: "error", message: outcome.message, ...(outcome.field ? { field: outcome.field } : {}) });
       log({ outcome: "failed", message: outcome.message });
     }
   } catch (err) {

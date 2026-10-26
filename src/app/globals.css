@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Screens tall enough to pin a board's shoot-base map beside its locations: below this the map is at its 16rem floor
+   (base-map.tsx) and its block no longer fits under the section bar, so it scrolls with the page. */
+@custom-variant tall (@media (min-height: 44rem));
+
 /*
  * itsgiving: Gen Z, professionally. A warm off-white room, ink type and ink pill buttons, and one highlighter accent
  * used only where it means something: stickers, the tone shared with your taste, the rank on a receipt. A treatment's

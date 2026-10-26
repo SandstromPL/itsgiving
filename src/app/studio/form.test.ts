@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FORM, addFilm, exampleChip, looksLikeImport, removeFilm } from "./form";
+import { EMPTY_FORM, addFilm, exampleChip, formFromBrief, looksLikeImport, removeFilm, toBrief, validateForm } from "./form";
+
+describe("the brief by format", () => {
+  const inMumbai = { ...EMPTY_FORM, city: "Mumbai" };
+
+  it("starts a music video from its artist and a short film from the films it's after", () => {
+    expect(validateForm({ ...inMumbai, artist: "Prateek Kuhad" })).toBeNull();
+    expect(validateForm({ ...inMumbai, format: "short_film", artist: "Prateek Kuhad" })).toMatchObject({ field: "touchstones" });
+    expect(validateForm({ ...inMumbai, format: "short_film", touchstones: "Past Lives" })).toBeNull();
+    expect(validateForm({ ...inMumbai, artist: "Chaar Diwaari", standIns: "A\nB\nC\nD" })).toMatchObject({ field: "standIns" });
+  });
+
+  it("sends stand-ins only for a music video's artist, and fills them back in", () => {
+    const form = { ...inMumbai, artist: "Chaar Diwaari", standIns: "Seedhe Maut\nPrabh Deep" };
+    expect(toBrief(form).stand_ins).toEqual(["Seedhe Maut", "Prabh Deep"]);
+    expect(toBrief({ ...form, format: "short_film", touchstones: "Past Lives" }).stand_ins).toEqual([]);
+    expect(toBrief({ ...form, artist: "" }).stand_ins).toEqual([]);
+    expect(formFromBrief(toBrief(form)).standIns).toBe("Seedhe Maut\nPrabh Deep");
+  });
+});
 
 describe("the brief's taste field", () => {
   it("tells an import link from a film title", () => {

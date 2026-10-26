@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { CompactEntity } from "../qloo";
 import type { Brief } from "./brief";
 import { subjectPhrase } from "./options";
-import { areaLabel, describeBrief, vibeOf, type ToneCandidate, type Vibe } from "./plan";
+import { areaLabel, describeBrief, vibeOf, type ToneCandidate, type Vibe, type Who } from "./plan";
 import type { BaseArea } from "./types";
 
 // The writing LLM call. Every Qloo item is listed under a short ref (R1, B1,
@@ -14,11 +14,8 @@ export interface Ref<T> {
   item: T;
 }
 
-export interface WriteContext {
+export interface WriteContext extends Who {
   brief: Brief;
-  artistNames: string[];
-  touchstoneNames: string[];
-  directorNames: string[];
   direction: string;
   tone: ToneCandidate[];
   references: Ref<CompactEntity>[];
@@ -160,11 +157,10 @@ function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): strin
   if (item.tags.length > 0) bits.push(item.tags.slice(0, 4).join(", "));
   // Qloo's own read of the room, clipped so six places stay within Groq's tokens-per-minute budget.
   if (item.place?.ambience) bits.push(`"${item.place.ambience.slice(0, 140)}"`);
-  // With one subject every pick is "via" it; only spend tokens on this when it discriminates.
-  const via =
-    ctx.artistNames.length + ctx.touchstoneNames.length > 1
-      ? (item.because ?? []).map((b) => ctx.names.get(b.entity_id)).filter(Boolean)
-      : [];
+  // With one subject every pick is "via" it; only spend tokens on this when it discriminates. An artist Qloo lacks
+  // drove nothing: their stand-ins did.
+  const signals = (ctx.artistMissing ? 0 : ctx.artistNames.length) + ctx.touchstoneNames.length + (ctx.standInNames?.length ?? 0);
+  const via = signals > 1 ? (item.because ?? []).map((b) => ctx.names.get(b.entity_id)).filter(Boolean) : [];
   if (via.length > 0) bits.push(`via ${via.slice(0, 2).join(", ")}`);
   return bits.join(" · ");
 }
@@ -231,7 +227,7 @@ const LIGHTING: Record<Vibe, string[]> = {
   bright: [
     "High-key and even, with saturated gels for colour pops.",
     "Hard daylight exteriors with crisp shadows.",
-    "Coloured fill to separate the artist from the background.",
+    "Coloured fill to separate the subject from the background.",
   ],
 };
 
@@ -271,22 +267,41 @@ export function mockDraft(ctx: WriteContext): Draft {
     ctx.tone.map((t) => t.tag.name),
     ctx.brief.nudges.includes("darker"),
   );
-  const subject = subjectPhrase(ctx.artistNames, ctx.touchstoneNames);
+  const subject = subjectPhrase(ctx.artistNames, ctx.touchstoneNames, ctx.brief.format);
   const toneNames = ctx.tone.map((t) => t.tag.name.toLowerCase());
   const refs = ctx.references.slice(0, 4);
   const places = ctx.places.slice(0, 3);
   const brands = ctx.brands.slice(0, 3);
   const palette = PALETTES[vibe];
   const placeName = (i: number) => places[i % Math.max(places.length, 1)]?.item.name ?? ctx.brief.city;
-  const format = ctx.brief.format === "music_video" ? "music video" : "short film";
+  const isVideo = ctx.brief.format === "music_video";
+  const format = isVideo ? "music video" : "short film";
   const beatNames = ["Open", "Drift", "Turn", "Release"];
+  // A music video follows its artist and the song; a short film, its lead and the story.
+  const beatLines = isVideo
+    ? [
+        "the artist alone, the city still waking",
+        "movement picks up and the frame loosens",
+        "a held look, the song's turn",
+        "the crowd or the quiet, whichever the song earns",
+      ]
+    : [
+        "the lead alone, the city still waking",
+        "the story moves and the frame loosens",
+        "a held look, the turn",
+        "the crowd or the quiet, whichever the ending earns",
+      ];
+  const sceneLines = isVideo
+    ? ["establish the artist in their element", "the middle section's movement", "the final turn"]
+    : ["establish the lead in their world", "the story's middle", "the final turn"];
 
   return {
     title: TITLES[vibe][hashOf(subject) % TITLES[vibe].length],
-    logline: `A ${format} ${subject} that moves through ${placeName(0)}${places.length > 1 ? ` and ${placeName(1)}` : ""}, cut to the ${toneNames.slice(0, 2).join(" and ") || "textures"} its audience over-indexes on.`,
+    // "after Masaan, for fans of Prateek Kuhad" closes on a phrase of its own, so the clause after it needs a comma.
+    logline: `A ${format} ${subject}${!isVideo && ctx.artistNames.length > 0 ? "," : ""} that moves through ${placeName(0)}${places.length > 1 ? ` and ${placeName(1)}` : ""}, cut to the ${toneNames.slice(0, 2).join(" and ") || "textures"} its audience over-indexes on.`,
     concept:
-      `${ctx.direction} The film stays close to the performer and lets the city do the talking: ` +
-      `${places.map((p) => p.item.name).join(", ") || ctx.brief.city} stand in for the song's emotional rooms. ` +
+      `${ctx.direction} The film stays close to ${isVideo ? "the performer" : "its lead"} and lets the city do the talking: ` +
+      `${places.map((p) => p.item.name).join(", ") || ctx.brief.city} stand in for the ${isVideo ? "song's emotional rooms" : "story's rooms"}. ` +
       (refs.length > 0 ? `Visually it borrows from ${refs.map((r) => r.item.name).join(", ")}. ` : "") +
       (brands.length > 0
         ? `Wardrobe pulls from ${brands.map((b) => b.item.name).join(", ")}, kept within a ${palette
@@ -299,7 +314,7 @@ export function mockDraft(ctx: WriteContext): Draft {
       : {}),
     beats: beatNames.map((title, i) => ({
       title,
-      description: `${placeName(i)}: ${["the artist alone, the city still waking", "movement picks up and the frame loosens", "a held look, the song's turn", "the crowd or the quiet, whichever the song earns"][i]}.`,
+      description: `${placeName(i)}: ${beatLines[i]}.`,
       ...(refs.length > 0 ? { reference: refs[i % refs.length].ref } : {}),
     })),
     ...(refs.length > 0
@@ -323,7 +338,7 @@ export function mockDraft(ctx: WriteContext): Draft {
       ? {
           locations: places.map((p, i) => ({
             ref: p.ref,
-            scene: `The ${beatNames[i].toLowerCase()} beat: ${i === 0 ? "establish the artist in their element" : i === 1 ? "the middle section's movement" : "the final turn"}.`,
+            scene: `The ${beatNames[i].toLowerCase()} beat: ${sceneLines[Math.min(i, 2)]}.`,
           })),
         }
       : {}),

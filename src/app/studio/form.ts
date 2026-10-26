@@ -1,5 +1,5 @@
 import type { BriefInput } from "@/lib/agent/brief";
-import type { Budget, Format, Nudge, Thinking } from "@/lib/agent/options";
+import { STAND_IN_LIMIT, type Budget, type Format, type Nudge, type Thinking } from "@/lib/agent/options";
 import type { ImportedFilm } from "@/lib/agent/taste";
 
 // The brief form's state and the conversions between it and a brief. Kept apart from the component so
@@ -8,6 +8,8 @@ import type { ImportedFilm } from "@/lib/agent/taste";
 export interface FormState {
   format: Format;
   artist: string;
+  /** Artists with a similar audience, one per line: they carry a music video's audience when Qloo lacks the artist. */
+  standIns: string;
   touchstones: string;
   city: string;
   budget: Budget;
@@ -22,6 +24,7 @@ export interface FormState {
 export const EMPTY_FORM: FormState = {
   format: "music_video",
   artist: "",
+  standIns: "",
   touchstones: "",
   city: "",
   budget: "indie",
@@ -32,7 +35,7 @@ export const EMPTY_FORM: FormState = {
 };
 
 /** The server's limits (src/lib/agent/brief.ts), checked here so nothing is dropped or rejected silently. */
-export const LIMITS = { touchstones: 5, directorFilms: 8, name: 80 } as const;
+export const LIMITS = { touchstones: 5, standIns: STAND_IN_LIMIT, directorFilms: 8, name: 80 } as const;
 
 /** One title per line (or separated by semicolons); commas stay, since titles like "Paris, Texas" have them. */
 export function splitTitles(text: string): string[] {
@@ -81,7 +84,7 @@ export function exampleChip(brief: BriefInput): string {
   return [who, brief.city].filter(Boolean).join(", ");
 }
 
-export type FieldName = "artist" | "touchstones" | "city" | "directorFilms";
+export type FieldName = "artist" | "touchstones" | "standIns" | "city" | "directorFilms";
 export interface FormProblem {
   field: FieldName;
   message: string;
@@ -89,19 +92,32 @@ export interface FormProblem {
 
 /** Client-side check of a brief, in the order a director reads the form. */
 export function validateForm(form: FormState): FormProblem | null {
+  const isVideo = form.format === "music_video";
   const touchstones = splitTitles(form.touchstones);
+  const standIns = splitTitles(form.standIns);
   const films = splitTitles(form.directorFilms);
   const tooLong = (titles: string[]) => titles.find((t) => t.length > LIMITS.name);
-  if (form.artist.trim().length > LIMITS.name) return { field: "artist", message: `Keep the artist name under ${LIMITS.name} characters.` };
-  if (!form.artist.trim() && touchstones.length === 0) {
-    return { field: "artist", message: "Add an artist or at least one touchstone film." };
+  // A music video starts from its artist; a short film from the films it's after.
+  if (isVideo && form.artist.trim().length > LIMITS.name) {
+    return { field: "artist", message: `Keep the artist name under ${LIMITS.name} characters.` };
   }
+  if (isVideo && !form.artist.trim() && touchstones.length === 0) {
+    return { field: "artist", message: "Add the artist, or some reference films." };
+  }
+  if (!isVideo && touchstones.length === 0) return { field: "touchstones", message: "Add at least one film your short is after." };
   if (touchstones.length > LIMITS.touchstones) {
-    return { field: "touchstones", message: `Use up to ${LIMITS.touchstones} touchstone films; you have ${touchstones.length}.` };
+    return { field: "touchstones", message: `Use up to ${LIMITS.touchstones} films; you have ${touchstones.length}.` };
   }
   if (tooLong(touchstones)) return { field: "touchstones", message: `Each title must be under ${LIMITS.name} characters.` };
   if (!form.city.trim()) return { field: "city", message: "Add the shoot city." };
   if (form.city.trim().length > LIMITS.name) return { field: "city", message: `Keep the city under ${LIMITS.name} characters.` };
+  if (!isVideo && form.artist.trim().length > LIMITS.name) {
+    return { field: "artist", message: `Keep the artist name under ${LIMITS.name} characters.` };
+  }
+  if (isVideo && standIns.length > LIMITS.standIns) {
+    return { field: "standIns", message: `Use up to ${LIMITS.standIns} stand-in artists; you have ${standIns.length}.` };
+  }
+  if (isVideo && tooLong(standIns)) return { field: "standIns", message: `Each name must be under ${LIMITS.name} characters.` };
   if (films.length > LIMITS.directorFilms) {
     return { field: "directorFilms", message: `Use up to ${LIMITS.directorFilms} of your films; you have ${films.length}.` };
   }
@@ -113,6 +129,8 @@ export function toBrief(form: FormState, picks: Record<string, string> = {}, nud
   return {
     format: form.format,
     artist: form.artist.trim() || undefined,
+    // Stand-ins only speak for a music video's artist.
+    stand_ins: form.format === "music_video" && form.artist.trim() ? splitTitles(form.standIns) : [],
     touchstones: splitTitles(form.touchstones),
     city: form.city.trim(),
     budget: form.budget,
@@ -129,6 +147,7 @@ export function formFromBrief(brief: BriefInput): FormState {
   return {
     format: brief.format ?? EMPTY_FORM.format,
     artist: brief.artist ?? "",
+    standIns: (brief.stand_ins ?? []).join("\n"),
     touchstones: (brief.touchstones ?? []).join("\n"),
     city: brief.city,
     budget: brief.budget ?? EMPTY_FORM.budget,

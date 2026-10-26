@@ -243,6 +243,15 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
       setStatus(`The treatment didn't finish. ${message}`);
     };
 
+    /** A run the brief can fix (Qloo lacks the artist): the message goes on the field that fixes it, not on a failure card. */
+    const askOnField = (problem: FormProblem) => {
+      pendingNudge.current = null;
+      setFormProblem(problem);
+      setPhase("idle");
+      setSteps(stopRunningSteps("Stopped before it finished."));
+      setStatus(problem.message);
+    };
+
     const onEvent = (event: AgentEvent) => {
       if (active.current !== controller) return; // a newer run has taken over
       clearTimeout(watchdog);
@@ -297,7 +306,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
         }
         case "error":
           finished = true;
-          fail(event.message);
+          if (event.field === "stand_ins") askOnField({ field: "standIns", message: event.message });
+          else fail(event.message);
           break;
         case "done":
           break;
@@ -516,7 +526,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 <div className="flex flex-col gap-3">
                   <h1 className="type-poster text-[clamp(3rem,6vw,4.75rem)]">new treatment</h1>
                   <p className="max-w-[40ch] text-[1.15rem] leading-[1.5] text-dim">
-                    An artist and a city are enough to start. Everything else is optional.
+                    {form.format === "music_video" ? "An artist and a city" : "A film it's after and a city"} are enough to start.
+                    Everything else is optional.
                   </p>
                 </div>
                 <BriefForm

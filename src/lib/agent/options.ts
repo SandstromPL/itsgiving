@@ -1,6 +1,6 @@
 // Brief options shared by the server and the browser (no Node imports here).
 
-import type { StepId } from "./types";
+import type { StepId, TreatmentWho } from "./types";
 
 /** Iterate chips: each one re-runs plan and write with a nudge. */
 export const NUDGES = ["darker", "more_90s", "deeper_cuts", "cheaper_locations"] as const;
@@ -36,6 +36,12 @@ export type Thinking = keyof typeof THINKING;
 /** Films a director can import as their taste: taste_overlap compares up to 25 entities a side. */
 export const IMPORT_LIMIT = 25;
 
+/** Artists that can stand in for one Qloo doesn't have. */
+export const STAND_IN_LIMIT = 3;
+
+/** The answer to "which one did you mean?" when it is none of Qloo's candidates. */
+export const NONE_PICK = "none";
+
 /** TMDB's required notice, shown wherever an imported TMDB list appears. */
 export const TMDB_NOTICE = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
 
@@ -44,20 +50,37 @@ export function joinNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** "for Frank Ocean, after Past Lives and Aftersun": who it is for, and what it is after. */
-export function subjectPhrase(artists: string[], touchstones: string[]): string {
-  return [artists.length > 0 && `for ${joinNames(artists)}`, touchstones.length > 0 && `after ${joinNames(touchstones)}`]
-    .filter(Boolean)
-    .join(", ");
+/**
+ * Who it is for and what it is after. A music video is for its artist: "for Frank Ocean, after Forgotten". A short
+ * film is after its films, and an artist only says whose fans it is for: "after Past Lives, for fans of Prateek Kuhad".
+ */
+export function subjectPhrase(artists: string[], touchstones: string[], format: Format = "music_video"): string {
+  const after = touchstones.length > 0 && `after ${joinNames(touchstones)}`;
+  if (format === "short_film") return [after, artists.length > 0 && `for fans of ${joinNames(artists)}`].filter(Boolean).join(", ");
+  return [artists.length > 0 && `for ${joinNames(artists)}`, after].filter(Boolean).join(", ");
 }
+
+/** Who a treatment names, by role; treatments built before it kept names fall back to their subjects' kinds. */
+export function treatmentWho(t: { who?: TreatmentWho; subjects: { name: string; kind?: string }[] }): TreatmentWho {
+  return (
+    t.who ?? {
+      artists: t.subjects.filter((s) => s.kind === "artist").map((s) => s.name),
+      films: t.subjects.filter((s) => s.kind !== "artist").map((s) => s.name),
+      standIns: [],
+    }
+  );
+}
+
+/** Qloo files some musicians only as people (Raftaar, 2026-10-26); either way, their fans are an audience. */
+const isMusician = (kind?: string) => kind === "artist" || kind === "person";
 
 /**
  * Whose taste a heatmap shows: "Prateek Kuhad's audience", or "the audience for Frank Ocean and Forgotten (2017)".
  * Films carry their year, since so many titles are shared.
  */
 export function audiencePhrase(subjects: { name: string; kind?: string; year?: number }[]): string {
-  const artists = subjects.filter((s) => s.kind === "artist").map((s) => s.name);
-  const others = subjects.filter((s) => s.kind !== "artist").map((s) => (s.year ? `${s.name} (${s.year})` : s.name));
+  const artists = subjects.filter((s) => isMusician(s.kind)).map((s) => s.name);
+  const others = subjects.filter((s) => !isMusician(s.kind)).map((s) => (s.year ? `${s.name} (${s.year})` : s.name));
   if (artists.length === 1 && others.length === 0) return `${artists[0]}'s audience`;
   const who = [...artists, ...others];
   return who.length > 0 ? `the audience for ${joinNames(who)}` : "this audience";
