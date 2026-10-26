@@ -116,9 +116,14 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   history, so Back always leaves the page (or, in the studio, returns to the brief).
 - **About** (`/about`) says who itsgiving is for first (music-video directors, short-film makers, and the labels,
   managers and producers who commission them), then what it is, what Qloo is, and how each step of a run uses Qloo.
+- **Saved treatments** (`/s/<id>`), with accounts set up: Save on a studio board keeps the treatment in the director's
+  account (signing in with Google or GitHub first if needed, then coming back to the same board, saved). Its page is
+  private until its owner turns on the share link; then anyone with the link reads it, like an example, and its rework
+  chips take it to the studio as their own take. **Your treatments** (`/saved`) lists them.
 - **One header on every page:** Examples, Studio and About, with the current section lit (a featured treatment counts
-  as Examples), then the unc-mode switch and the theme, since both choices carry across pages. Pages add only status
-  badges, live or mock. On phones it takes two rows, and only the mock warnings among the badges show there.
+  as Examples), then the unc-mode switch, the account button (Sign in, or your initial with your treatments and Sign
+  out) and the theme, since those choices carry across pages. Pages add only status badges, live or mock. On phones
+  it takes two rows, and only the mock warnings among the badges show there.
 - **Light or dark,** switched in the header and remembered per browser. Light is the default, and nothing on a page
   changes it.
 
@@ -225,6 +230,19 @@ npm run dev                  # http://localhost:3000
 
 With no keys at all the app still runs end to end on the synthetic Qloo mock and the mock LLM, both clearly labelled.
 
+Accounts (saving and sharing) are optional and run on [Supabase](https://supabase.com/). Without its keys every
+account control hides itself. To try them locally (needs Docker), start a local Supabase and put the printed API URL,
+publishable key and secret key in `.env.local`:
+
+```bash
+npx supabase start            # applies supabase/migrations; the ports are in supabase/config.toml
+npx supabase status -o env    # API_URL, PUBLISHABLE_KEY, SECRET_KEY
+```
+
+For the hosted project: apply `supabase/migrations` (with `npx supabase db push`, or by pasting the file into the SQL
+editor), turn on the Google and GitHub providers (their callback is `https://<ref>.supabase.co/auth/v1/callback`),
+turn off the Email provider, and set the Site URL and the redirect URLs (`<site>/auth/callback`).
+
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Dev server: the treatment builder at `/`, the tool playground at `/playground` |
@@ -236,7 +254,7 @@ With no keys at all the app still runs end to end on the synthetic Qloo mock and
 
 ### Environment variables
 
-All server-side only.
+All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for the browser.
 
 | Variable | Description |
 | --- | --- |
@@ -253,6 +271,8 @@ All server-side only.
 | `LLM_TIMEOUT_MS` | Per-call timeout for calls that don't set their own (default 20000); treatment steps use `TIMING` |
 | `ITSGIVING_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
 | `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list and for the reference films' stills. IMDb links work without it; without stills, covers show the palette alone |
+| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional: the Supabase project's URL and publishable key, which turn accounts on (read at build time) |
+| `SUPABASE_SECRET_KEY` | With the two above: the project's secret key, used only on the server, to read and write saved treatments and to seal each treatment it builds so only those can be saved |
 
 ### API routes
 
@@ -261,6 +281,13 @@ All server-side only.
   run budget (120 s deep, 90 s quick, under a 150 s `maxDuration`) and a 24-hour cache keyed by the normalized brief.
 - `POST /api/taste`: takes `{ "source": "<TMDB list link or IMDb links>" }` and returns the films Qloo knows, by IMDb
   ID, plus the ones it left out. At most 26 TMDB calls and one Qloo call; 8 imports a minute per IP.
+- `POST /api/saved`: saves `{ treatment, seal }` to the signed-in person's account. The seal must be the server's
+  own (an HMAC it attached when it built the treatment), at most 100 per person; saving the same take again returns
+  the same id.
+- `PATCH /api/saved/{id}` with `{ "shared": true | false }`, and `DELETE /api/saved/{id}`: the owner's only; anyone
+  else gets a 404.
+- `GET /auth/callback`: where Google or GitHub sends someone back after signing in (through Supabase); it only ever
+  returns them to a path on this site.
 - `GET /api/health`: makes a real Qloo call and reports mode, host and provenance, plus the LLM chain (never called).
 - `GET /api/tools`: tool definitions (JSON Schema) with an example input each.
 - `POST /api/tools/{name}`: runs a tool (development only unless `ITSGIVING_TOOL_PLAYGROUND=1`).
@@ -279,6 +306,10 @@ All server-side only.
   rate limit, cache and SSE service behind `/api/treatment`.
 - `src/app/studio`: the treatment builder UI: intake, live agent timeline with every Qloo request, ambiguity picker,
   and the board with "why" popovers that keep Qloo's evidence apart from itsgiving's interpretation.
+- `src/lib/supabase`, `src/lib/saved`, `supabase/migrations`: accounts. Supabase Auth signs people in with Google or
+  GitHub; the browser reads the session itself, so the static pages stay static, and `src/proxy.ts` keeps it fresh on
+  the pages that read it on the server. Saved treatments sit in one table that grants browsers nothing: only the
+  server reads and writes it, naming the owner in every query.
 
 ## Data handling
 
@@ -288,6 +319,10 @@ All server-side only.
 - Keys stay on the server, and Qloo responses are never committed to this repository.
 - A TMDB import reads only the list's name and its films' titles, years and IMDb IDs. Nothing about the list's owner
   is kept, and only IMDb IDs go to Qloo.
+- Accounts: Supabase keeps the name and email that Google or GitHub share at sign-in; itsgiving keeps the treatments
+  people save, in a private database (they hold Qloo data, which may be stored privately but never in git). None of
+  it goes to Qloo or the LLMs. A saved treatment is private until its owner shares it; shared pages are never indexed
+  and don't name their owner, and deleting a treatment removes it and its link.
 
 ## Limitations
 
@@ -307,6 +342,9 @@ All server-side only.
   list, and some are filed only as people. A treatment for an artist Qloo lacks reads
   the audience of stand-ins the director names, which is an approximation and says so.
 - Qloo's affinities describe what groups tend to like, never what any one person will do.
+- Accounts run on Supabase's free plan, which pauses a project after a week without traffic: saving and shared pages
+  then say they're unavailable until it's resumed, while building treatments carries on. Google's sign-in screen shows
+  the Supabase project's address rather than itsgiving's name, which would need a verified domain.
 
 ## Credits
 

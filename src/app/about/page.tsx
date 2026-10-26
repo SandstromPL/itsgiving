@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { accountsOn } from "@/lib/supabase/config";
 import { StartYourOwn } from "../studio/landing";
 import { SiteHeader } from "../studio/site-header";
 
@@ -147,8 +148,11 @@ export default function About() {
               treatment you can pitch, built on what that audience loves.
             </p>
             <p className={lead}>
-              Add the films you love and it finds where your taste meets theirs: your voice, their taste. Every treatment has its own page,
-              prints to PDF, and takes a rework in one tap: darker, more 90s, deeper cuts, cheaper locations. No sign-up.
+              Add the films you love and it finds where your taste meets theirs: your voice, their taste. Every treatment prints to PDF and
+              takes a rework in one tap: darker, more 90s, deeper cuts, cheaper locations.
+              {accountsOn
+                ? " No account is needed to build one; sign in with Google or GitHub to save it and share it by link."
+                : " No sign-up."}
             </p>
           </div>
           <div className="flex flex-col gap-3 rounded-[28px] border border-line bg-card p-6 sm:p-8">
@@ -235,6 +239,22 @@ export default function About() {
             ))}
           </ul>
         </section>
+
+        {accountsOn && (
+          <section aria-labelledby="account-heading" className="flex flex-col gap-5">
+            <h2 id="account-heading" className={sectionHead}>
+              Accounts and your data
+            </h2>
+            <p className={lead}>
+              Building a treatment needs no account. Signing in with Google or GitHub is only for saving treatments and sharing them.
+              itsgiving keeps your name and email from that sign-in and the treatments you save; none of it goes to Qloo or the AI models.
+            </p>
+            <p className={lead}>
+              A saved treatment is private until you turn on its share link. Shared pages are never indexed and don&apos;t say whose they
+              are, and deleting a treatment takes its link down with it.
+            </p>
+          </section>
+        )}
 
         <StartYourOwn />
       </main>
