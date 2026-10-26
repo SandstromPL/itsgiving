@@ -196,8 +196,8 @@ function Leader({ elapsed, expected }: { elapsed: number; expected: number }) {
 
 /**
  * The stage while a first treatment is being built: the run itself, step by step, instead of an empty frame. Past
- * ten seconds people look away, so it says how long a run usually takes, which step it's on, and keeps the tab's
- * title counting.
+ * ten seconds people look away, so it says how long a run usually takes (the depth's hint), which step it's on, and
+ * keeps the tab's title counting.
  */
 export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; startedAt: number; thinking: Thinking }) {
   const elapsed = useElapsed(startedAt);
@@ -216,7 +216,7 @@ export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; s
         <div className="min-w-0 flex-[1_1_16rem]">
           <h2 className="type-poster text-[clamp(3rem,6vw,5.25rem)]">{t.cooking}</h2>
           <p className="mt-3 text-[17px] leading-6 text-dim">
-            {THINKING[thinking].hint} Qloo first, then the writer: usually about {expected} s.{" "}
+            {THINKING[thinking].hint} Qloo first, then the writer.{" "}
             <span aria-hidden className="font-mono text-foreground">
               {elapsed} s
             </span>
