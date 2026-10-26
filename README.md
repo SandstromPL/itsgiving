@@ -239,9 +239,13 @@ npx supabase start            # applies supabase/migrations; the ports are in su
 npx supabase status -o env    # API_URL, PUBLISHABLE_KEY, SECRET_KEY
 ```
 
-For the hosted project: apply `supabase/migrations` (with `npx supabase db push`, or by pasting the file into the SQL
-editor), turn on the Google and GitHub providers (their callback is `https://<ref>.supabase.co/auth/v1/callback`),
-turn off the Email provider, and set the Site URL and the redirect URLs (`<site>/auth/callback`).
+For the hosted project: keep the Data API on and serving `public` when you create it ("Automatically expose new
+tables" can stay off: the migration grants the server's role itself). Apply `supabase/migrations` (with
+`npx supabase db push`, or by pasting the file into the SQL editor), turn on the Google and GitHub providers (their
+callback is `https://<ref>.supabase.co/auth/v1/callback`) and turn off the Email provider. Set the Site URL to the
+site, which lets sign-ins come back to its `/auth/callback`. To sign in from `npm run dev` against the hosted project,
+also add `http://localhost:3000/**` to the redirect URLs: an exact `/auth/callback` entry won't match the `?next=` the
+app adds.
 
 | Command | Purpose |
 | --- | --- |
