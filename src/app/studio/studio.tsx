@@ -6,6 +6,7 @@ import { THINKING, type Nudge } from "@/lib/agent/options";
 import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
+import { accountsOn } from "@/lib/supabase/config";
 import { Board } from "./board";
 import { BriefForm } from "./brief-form";
 import { useReceipts } from "./eggs";
@@ -16,6 +17,7 @@ import { YourPoster } from "./landing";
 import { useLingo } from "./lingo";
 import { BackArrow, ModeBadges } from "./parts";
 import { Picker } from "./picker";
+import { SaveControl } from "./save";
 import { studioSession, type RunInput } from "./session";
 import { SiteHeader } from "./site-header";
 import { StreamError, streamTreatment } from "./stream";
@@ -113,6 +115,10 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const [phase, setPhase] = useState<Phase>(saved.board ? "done" : "idle");
   const [steps, setSteps] = useState<StepEvent[]>(saved.board?.steps ?? []);
   const [treatment, setTreatment] = useState<Treatment | null>(saved.board?.treatment ?? null);
+  /** The server's seal on the board's treatment: what lets it be saved (none when accounts aren't set up). */
+  const [seal, setSeal] = useState<string | null>(saved.board?.seal ?? null);
+  /** The board was handed back after signing in to save it: SaveControl saves it once the session is known. */
+  const [saveOnOpen, setSaveOnOpen] = useState(false);
   /** The board, or the brief around it: a treatment stays in memory when the director steps back out. */
   const [view, setView] = useState<"studio" | "board">("studio");
   /** The run in flight (or last attempted), and the run that produced the board. */
@@ -149,8 +155,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
 
   // The visit remembers the studio as it was left.
   useEffect(() => {
-    studioSession.write({ form, board: treatment && shown ? { treatment, shown, take, steps } : null });
-  }, [form, treatment, shown, take, steps]);
+    studioSession.write({ form, board: treatment && shown ? { treatment, seal, shown, take, steps } : null });
+  }, [form, treatment, seal, shown, take, steps]);
 
   // The tab says what's on screen: the treatment's title on its board, marked ready while the tab is in the
   // background, so a director who looked away learns it's done. A run in flight sets its own (timeline.tsx).
@@ -309,6 +315,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
           finished = true;
           focusTitle.current = true;
           setTreatment(event.treatment);
+          setSeal(event.seal ?? null);
+          setSaveOnOpen(false);
           // A board opened from the brief gets its history entry; a rework replaces the board in place.
           if (!onBoardEntry()) {
             boardSpot.current = null;
@@ -379,15 +387,21 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
       return;
     }
     setTreatment(null);
+    setSeal(null);
     setShown(null);
     setTake(1);
     window.scrollTo({ top: 0 });
     void run({ form: nextForm, picks: {}, nudges: [] });
   };
 
-  /** A featured page's handoff: its pre-built board opens at once, then the rework it asked for runs; or, from a
-   *  page whose board this build doesn't have, the brief is only filled in. */
-  const openFrom = ({ example, open, nudge }: Handoff) => {
+  /**
+   * A handoff from another page. A featured page's: its pre-built board opens at once, then the rework it asked for
+   * runs; or, from a page whose board this build doesn't have, the brief is only filled in. A board itself (a saved or
+   * shared treatment's rework, or Save coming back from sign-in) opens as it is, then reworks or saves.
+   */
+  const openFrom = (handoff: Handoff) => {
+    if (handoff.kind === "board") return openBoard(handoff);
+    const { example, open, nudge } = handoff;
     const brief = formFromBrief(example.brief);
     setForm(brief);
     if (!open) {
@@ -396,6 +410,29 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     }
     pendingNudge.current = nudge ?? null;
     startOver(brief);
+  };
+
+  const openBoard = ({ treatment: handed, seal: handedSeal, nudge, save }: Extract<Handoff, { kind: "board" }>) => {
+    const input: RunInput = { form: formFromBrief(handed.brief), picks: handed.brief.picks ?? {}, nudges: handed.brief.nudges ?? [] };
+    setForm(input.form);
+    setTreatment(handed);
+    setSeal(handedSeal ?? null);
+    setSaveOnOpen(Boolean(save));
+    setSteps(replaySteps(handed));
+    setShown(input);
+    setPending(input);
+    setPhase("done");
+    setTake(1);
+    boardSpot.current = null;
+    window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
+    focusTitle.current = true;
+    setView("board");
+    window.scrollTo({ top: 0 });
+    setStatus(`Opened ${handed.title}.`);
+    if (nudge) {
+      setTake(2);
+      void runLatest.current({ ...input, nudges: [nudge] });
+    }
   };
 
   /** Back to the brief, through the browser's history when the board has its entry, so Back and Forward agree. */
@@ -498,6 +535,11 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
               running={running}
               take={take}
               log={<Timeline steps={steps} />}
+              save={
+                accountsOn && seal ? (
+                  <SaveControl key={`${treatment.id}:${treatment.createdAt}`} treatment={treatment} seal={seal} autoSave={saveOnOpen} />
+                ) : undefined
+              }
               back={
                 <button
                   type="button"

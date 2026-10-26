@@ -6,6 +6,7 @@ import { ModeBadges } from "@/app/studio/parts";
 import { SiteHeader } from "@/app/studio/site-header";
 import { EXAMPLES } from "@/lib/agent/examples";
 import { featuredItem, featuredOffered } from "@/lib/agent/featured";
+import { forBrowser } from "@/lib/agent/redact";
 import { FeaturedBoard } from "./featured-board";
 
 // A featured treatment as a page of its own: built with the site from the pre-built set, so it opens at once, and
@@ -19,7 +20,10 @@ export function generateStaticParams() {
   return EXAMPLES.filter((example) => example.featured).map((example) => ({ slug: example.slug }));
 }
 
-const lookup = (slug: string) => (featuredOffered() ? featuredItem(slug) : undefined);
+const lookup = (slug: string) => {
+  const item = featuredOffered() ? featuredItem(slug) : undefined;
+  return item && { ...item, treatment: forBrowser(item.treatment) };
+};
 
 export async function generateMetadata({ params }: PageProps<"/t/[slug]">): Promise<Metadata> {
   const { slug } = await params;

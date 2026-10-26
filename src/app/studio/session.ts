@@ -9,10 +9,10 @@ export interface RunInput {
   nudges: Nudge[];
 }
 
-/** The studio as it was left: the brief being written, and the last board with what made it. */
+/** The studio as it was left: the brief being written, and the last board with what made it (and its seal, to save it). */
 export interface StudioSession {
   form: FormState;
-  board: { treatment: Treatment; shown: RunInput; take: number; steps: StepEvent[] } | null;
+  board: { treatment: Treatment; seal: string | null; shown: RunInput; take: number; steps: StepEvent[] } | null;
 }
 
 let last: StudioSession = { form: EMPTY_FORM, board: null };

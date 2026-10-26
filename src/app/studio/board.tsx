@@ -247,19 +247,24 @@ function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string
   );
 }
 
-/** The rework bar: the nudges that re-run the plan and the writing, and which take is on screen once there's more than one. */
+/**
+ * The rework bar: the nudges that re-run the plan and the writing, which take is on screen once there's more than one,
+ * and the ways to keep it: Save (in the studio, with accounts set up) and Save as PDF.
+ */
 function Rework({
   nudges,
   onToggle,
   running,
   take,
   note = "Each change re-runs the plan and the writing. Qloo lookups are cached.",
+  save,
 }: {
   nudges: Nudge[];
   onToggle: (nudge: Nudge) => void;
   running: boolean;
   take: number;
   note?: string;
+  save?: ReactNode;
 }) {
   const lingo = useLingo().t;
   return (
@@ -287,13 +292,16 @@ function Rework({
             {lingo.nudges[nudge] !== NUDGE_LABELS[nudge] && <span className="sr-only">: {NUDGE_LABELS[nudge]}</span>}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="ml-auto rounded-full border border-foreground px-4 py-2.5 text-[15px] font-semibold hover:bg-foreground hover:text-background"
-        >
-          Save as PDF
-        </button>
+        <div className="ml-auto flex flex-wrap items-center gap-2.5">
+          {save}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-full border border-foreground px-4 py-2.5 text-[15px] font-semibold hover:bg-foreground hover:text-background"
+          >
+            Save as PDF
+          </button>
+        </div>
       </div>
       <p className="px-3 text-[13px] text-faint">{note}</p>
     </div>
@@ -527,6 +535,7 @@ export function Board({
   back,
   reworkNote,
   own = true,
+  save,
 }: {
   treatment: Treatment;
   /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
@@ -544,6 +553,8 @@ export function Board({
   reworkNote?: string;
   /** The reader's own brief (the studio), or an example someone else briefed: "your films" or "the director's films". */
   own?: boolean;
+  /** Saving to an account, beside Save as PDF: the studio's SaveControl, or a saved treatment's own controls. */
+  save?: ReactNode;
 }) {
   const lingo = useLingo().t;
   const whose = own ? "your" : "the director's";
@@ -598,7 +609,7 @@ export function Board({
       <div className="flex flex-col gap-6 print:break-after-page">
         <Cover ref={cover} t={t} fontId={fontId} suggestion={suggestion} onPickFont={setPicked} />
         <Giving t={t} mock={mock} whose={whose} />
-        <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} note={reworkNote} />
+        <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} note={reworkNote} save={save} />
       </div>
 
       <SectionBar t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} back={back} />

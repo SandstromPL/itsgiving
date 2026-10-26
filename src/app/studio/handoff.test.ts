@@ -21,6 +21,32 @@ describe("parseHandoff", () => {
     expect(parseHandoff(null, "?from=charli-xcx-new-york")).toBeNull();
   });
 
+  it("opens a board handed over whole: a saved treatment's rework, or Save coming back from sign-in", () => {
+    const treatment = { id: "k1", title: "Almost, in Bandra", brief: { city: "Mumbai" }, references: [] };
+    expect(parseHandoff(stored({ board: { treatment, nudge: "darker" } }), "")).toMatchObject({
+      kind: "board",
+      treatment: { title: "Almost, in Bandra" },
+      nudge: "darker",
+      save: false,
+      seal: undefined,
+    });
+    const now = Date.parse("2026-10-27T10:00:00Z");
+    expect(
+      parseHandoff(stored({ board: { treatment, seal: "s3al", save: true, nudge: "louder", at: now - 60_000 } }), "", now),
+    ).toMatchObject({
+      kind: "board",
+      seal: "s3al",
+      save: true,
+      nudge: undefined,
+    });
+    // An abandoned sign-in's board still opens later, but no longer saves itself.
+    expect(parseHandoff(stored({ board: { treatment, save: true, at: now - 16 * 60_000 } }), "", now)).toMatchObject({ save: false });
+    expect(parseHandoff(stored({ board: { treatment, save: true } }), "", now)).toMatchObject({ save: false });
+    // Not a treatment: nothing opens (the server would refuse to save it anyway).
+    expect(parseHandoff(stored({ board: { treatment: { title: "x" } } }), "")).toBeNull();
+    expect(parseHandoff(stored({ board: { treatment: "<b>hi</b>", save: true } }), "")).toBeNull();
+  });
+
   it("hands off featured examples only, and shrugs off junk", () => {
     expect(parseHandoff(stored({ from: "frank-ocean-forgotten" }), "")).toBeNull();
     expect(parseHandoff(null, "?fill=nope")).toBeNull();
