@@ -62,7 +62,7 @@ const QLOO = [
 /** The run, in order. Qloo's steps show their calls on a receipt slip; the model's two steps speak in its serif. */
 const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] = [
   {
-    title: "Find the names",
+    title: "Find the names in Qloo",
     text: "The artist, the films and the shoot city become Qloo entries. A name that could mean two titles is asked about, never guessed. Musicians Qloo files under people are found there, and an artist it doesn't have can be read through stand-in artists with a similar audience.",
     qloo: ["/search", "/entities"],
   },
@@ -72,17 +72,17 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
     qloo: ["/v2/insights, taste tags", "/v2/insights, demographics"],
   },
   {
-    title: "Meet your taste",
+    title: "Compare with your taste",
     text: "Add the films you love and Qloo compares them with the audience. What you share becomes the spine of the treatment: your voice, their taste.",
     qloo: ["/v2/analysis/compare"],
   },
   {
-    title: "Find where they are",
+    title: "Map where the fans are",
     text: "Qloo's heatmap scores the shoot city tile by tile for this audience, and itsgiving names the three strongest areas.",
     qloo: ["/v2/insights, heatmap", "/search, areas nearby"],
   },
   {
-    title: "Plan",
+    title: "Plan the creative direction",
     text: "A model picks the direction: the tone from Qloo's tags, a few style words, and which area to base the shoot in. It can only choose what Qloo returned.",
     model: "The model chooses, from Qloo's list.",
   },
@@ -92,7 +92,7 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
     qloo: ["/v2/tags, style words", "/v2/insights, films", "/v2/insights, brands", "/v2/insights, places"],
   },
   {
-    title: "Write",
+    title: "Write the treatment",
     text: "The model writes the treatment and may cite only what Qloo returned. Every film, brand and place keeps its receipt: its rank for this audience, and its affinity.",
     model: "The model writes, citing only Qloo's picks.",
   },

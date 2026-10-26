@@ -1,12 +1,16 @@
 import { defaultSleep, type FetchLike } from "./qloo";
 
-// The Movie Database, used for one thing: turning a director's public TMDB list into IMDb IDs, which Qloo looks up
-// exactly (/entities with external.imdb.ids), so an imported film never needs the ambiguity picker. Server-side only:
-// the key never reaches the browser. Checked against developer.themoviedb.org on 2026-10-25: list details are
-// GET /3/list/{id} (paged), IMDb IDs come from GET /3/{movie|tv}/{id}/external_ids, the limit is about 40 requests a
-// second, and a read access token goes in a Bearer header while a v3 API key goes in the api_key query parameter.
+// The Movie Database, used for two things. It turns a director's public TMDB list into IMDb IDs, which Qloo looks up
+// exactly (/entities with external.imdb.ids), so an imported film never needs the ambiguity picker. And it gives a
+// reference film's still: Qloo's image of a film is its poster, whose own lettering fights a treatment's title.
+// Server-side only: the key never reaches the browser. Checked against developer.themoviedb.org on 2026-10-25: list
+// details are GET /3/list/{id} (paged), IMDb IDs come from GET /3/{movie|tv}/{id}/external_ids, the limit is about 40
+// requests a second, and a read access token goes in a Bearer header while a v3 API key goes in the api_key query
+// parameter. GET /3/find/{imdb_id}?external_source=imdb_id gives a film's backdrop_path (live, 2026-10-26: film frames
+// without lettering, e.g. Darlings, Riceboy Sleeps), served from image.tmdb.org/t/p/{size}{path}.
 
 export const TMDB_BASE_URL = "https://api.themoviedb.org";
+export const TMDB_IMAGE_URL = "https://image.tmdb.org/t/p";
 
 export interface TmdbConfig {
   apiKey?: string;
@@ -155,5 +159,18 @@ export class TmdbClient {
   async imdbId(item: TmdbListItem, signal?: AbortSignal): Promise<string | undefined> {
     const data = await this.get<{ imdb_id?: string | null }>(`/3/${item.kind}/${item.tmdbId}/external_ids`, {}, signal);
     return data.imdb_id && /^tt\d{7,10}$/.test(data.imdb_id) ? data.imdb_id : undefined;
+  }
+
+  /** A film's (or series') backdrop by its IMDb ID, as a 1280 px image URL, if TMDB has one. */
+  async backdrop(imdbId: string, signal?: AbortSignal): Promise<string | undefined> {
+    if (!/^tt\d{7,10}$/.test(imdbId)) return undefined;
+    type Found = { backdrop_path?: string | null };
+    const data = await this.get<{ movie_results?: Found[]; tv_results?: Found[] }>(
+      `/3/find/${imdbId}`,
+      { external_source: "imdb_id" },
+      signal,
+    );
+    const path = (data.movie_results?.[0] ?? data.tv_results?.[0])?.backdrop_path;
+    return path && /^\/[\w-]+\.(jpg|png|webp)$/.test(path) ? `${TMDB_IMAGE_URL}/w1280${path}` : undefined;
   }
 }

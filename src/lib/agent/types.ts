@@ -81,6 +81,11 @@ export interface Pick<Note extends string> {
   qloo: QlooEvidence;
   /** LLM interpretation. */
   notes: Record<Note, string>;
+  /**
+   * A reference film's still, without lettering (TMDB's backdrop), for the cover and its card: Qloo's own image of a
+   * film is its poster. Missing on treatments built before 2026-10-26, in mock mode, and where TMDB has none.
+   */
+  still?: string;
 }
 
 export interface TonePick {

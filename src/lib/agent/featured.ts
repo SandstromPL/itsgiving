@@ -5,7 +5,7 @@ import { qlooConfigFromEnv } from "../qloo";
 import { distanceM } from "../tools/heatmap";
 import { briefKey, briefSchema, normalizeBrief } from "./brief";
 import { EXAMPLES } from "./examples";
-import { FORMATS, audiencePhrase, subjectPhrase, treatmentWho } from "./options";
+import { FORMATS, audiencePhrase, coverStill, isIdentityTag, subjectPhrase, tagLabel, treatmentWho } from "./options";
 import type { QlooEvidence, ShootBase, Treatment } from "./types";
 
 // Featured treatments: the examples pre-built by `npm run featured` (scripts/featured.ts), so judges and
@@ -77,8 +77,8 @@ export function featuredCovers(items: FeaturedItem[] = loadFeatured()): Featured
     logline: t.logline,
     line: `${FORMATS[t.brief.format]} ${subjectPhrase(treatmentWho(t).artists, treatmentWho(t).films, t.brief.format)} / ${t.brief.city}`,
     palette: t.palette.map((c) => c.hex),
-    still: t.references.find((r) => r.entity.image && !r.entity.image.startsWith("/mock/"))?.entity.image,
-    tone: t.tone[0]?.tag.name,
+    still: coverStill(t),
+    tone: t.tone.find((tone) => !isIdentityTag(tone.tag.name))?.tag.name,
   }));
 }
 
@@ -154,7 +154,10 @@ export function featuredRun(items: FeaturedItem[] = loadFeatured()): FeaturedRun
     audience: audiencePhrase(t.subjects),
     city: t.brief.city,
     mock: t.mock.qloo,
-    tones: t.tone.slice(0, 5).map((tone) => ({ name: tone.tag.name, shared: tone.source === "overlap" })),
+    tones: t.tone
+      .filter((tone) => !isIdentityTag(tone.tag.name))
+      .slice(0, 5)
+      .map((tone) => ({ name: tagLabel(tone.tag.name), shared: tone.source === "overlap" })),
     leans: t.audience.leans[0],
     base,
     receipts,

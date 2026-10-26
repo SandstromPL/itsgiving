@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
+import { tagLabel } from "@/lib/agent/options";
 import type { QlooEvidence, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { ProducedBy } from "@/lib/llm/generate";
@@ -60,8 +61,9 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
       {qloo === "mock" ? (
         <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>
       ) : (
-        // Phones keep the header to two rows; only the mock warnings must show there.
-        <span className="hidden items-center gap-2 rounded-full border border-foreground px-3 py-1.5 whitespace-nowrap sm:inline-flex">
+        // Below laptop width the header keeps to its rows (the switches would drop under the logo at a tablet's 768 px);
+        // only the mock warnings must show there.
+        <span className="hidden items-center gap-2 rounded-full border border-foreground px-3 py-1.5 whitespace-nowrap lg:inline-flex">
           <span aria-hidden className="size-2 rounded-full bg-[#1f8a4c]" />
           Live Qloo data
         </span>
@@ -90,7 +92,7 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
 
 /** Shown in place of the badges until the server has said which data sources are live. */
 export function ModesPending() {
-  return <span className="hidden text-[13px] text-faint sm:inline">Checking data sources…</span>;
+  return <span className="hidden text-[13px] text-faint lg:inline">Checking data sources…</span>;
 }
 
 /** An image from Qloo (or a mock placeholder); plain <img> because hosts vary per entity. */
@@ -154,8 +156,11 @@ export function Receipt({ qloo, mock, className = "" }: { qloo: QlooEvidence; mo
 /** A few of the item's Qloo tags (style notes for films, aesthetics for brands, kind and mood for places). */
 export function QlooTags({ tags, max = 3 }: { tags: string[]; max?: number }) {
   if (tags.length === 0) return null;
-  return <p className="font-mono text-[12px] leading-5 text-faint">{tags.slice(0, max).join(" / ")}</p>;
+  return <p className="font-mono text-[12px] leading-5 text-faint">{tags.slice(0, max).map(tagLabel).join(" / ")}</p>;
 }
+
+/** What each tool's list holds, in words: the tool names themselves are code. */
+const LIST_OF: Record<string, string> = { reference_films: "films", styling_brands: "brands", scout_locations: "places" };
 
 /** "Why" popover: Qloo's evidence on top, itsgiving's interpretation below, never mixed. */
 export function Why({
@@ -197,7 +202,7 @@ export function Why({
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs leading-5 tabular-nums text-[#2b2925]">
               <dt className="text-[#5e5a52]">Rank</dt>
               <dd>
-                {qloo.rank} of {qloo.of} from {qloo.tool}
+                {qloo.rank} of {qloo.of} {LIST_OF[qloo.tool] ?? "picks"} for this audience
               </dd>
               {pct(qloo.affinity) && (
                 <>
@@ -220,7 +225,7 @@ export function Why({
               {qloo.tags.length > 0 && (
                 <>
                   <dt className="text-[#5e5a52]">Tags</dt>
-                  <dd>{qloo.tags.slice(0, 6).join(", ")}</dd>
+                  <dd>{qloo.tags.slice(0, 6).map(tagLabel).join(", ")}</dd>
                 </>
               )}
               {note && (

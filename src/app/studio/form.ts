@@ -78,9 +78,9 @@ export function briefLine(form: FormState): string {
     : `Short film${after.length > 0 ? ` after ${after.join(" and ")}` : ""}, ${where}`;
 }
 
-/** An example brief as a chip: "Frank Ocean, New York" or "after In the Mood for Love, Mumbai". */
+/** An example brief as a chip: "Frank Ocean, New York" or "After In the Mood for Love, Mumbai". */
 export function exampleChip(brief: BriefInput): string {
-  const who = brief.artist ?? (brief.touchstones?.length ? `after ${brief.touchstones[0]}` : "");
+  const who = brief.artist ?? (brief.touchstones?.length ? `After ${brief.touchstones[0]}` : "");
   return [who, brief.city].filter(Boolean).join(", ");
 }
 

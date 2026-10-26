@@ -1,4 +1,5 @@
 import type { AudiencesResponse, QlooAudience, QlooEntity, QlooTag, TagsResponse } from "./types";
+import { excerpt } from "../text";
 import { kindFromUrn, type EntityKind } from "./urns";
 
 // Readers that tolerate the response-shape conflicts across Qloo's docs, and
@@ -168,9 +169,18 @@ function firstExternalId(external: unknown, key: string): string | undefined {
   return isRecord(value) ? str(value.id) : str(value);
 }
 
+/** Names as typed into Qloo's sources, spacing fixed: "Poco Loco Tapas & Bar ,Khar" -> "Poco Loco Tapas & Bar, Khar". */
+function tidyName(name: string): string {
+  return name
+    .replace(/\s+,/g, ",")
+    .replace(/,(?=[^\s\d])/g, ", ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Descriptions are kept short, ending on a sentence or a word (live, "consistently upbe…" read as broken). */
 function truncate(text: string | undefined, max: number): string | undefined {
-  if (!text) return undefined;
-  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+  return text ? excerpt(text, max) : undefined;
 }
 
 function round(value: number | undefined | null): number | undefined | null {
@@ -218,7 +228,7 @@ export function compactEntity(entity: QlooEntity, options: { maxTags?: number; m
 
   const compact: CompactEntity = {
     id: entity.entity_id,
-    name: entity.name,
+    name: tidyName(entity.name),
     kind,
     type,
     year: num(props.release_year) ?? num(props.publication_year),

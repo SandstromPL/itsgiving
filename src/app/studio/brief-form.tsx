@@ -399,7 +399,9 @@ export function BriefForm({
           <span className="flex flex-col gap-0.5">
             <span className="text-[16px] font-bold">{t.makeItYours}</span>
             <span className="text-[13px] text-faint">
-              {isVideo ? "Reference films, stand-in artists, your own films, budget, depth" : "Music, your own films, budget, depth"}
+              {isVideo
+                ? "Reference films, stand-in artists, your taste, budget, thinking"
+                : "Music its audience loves, your taste, budget, thinking"}
             </span>
           </span>
           <span className="flex items-center gap-2.5">
@@ -448,7 +450,7 @@ export function BriefForm({
               {(Object.keys(THINKING) as Thinking[]).map((thinking) => (
                 <label
                   key={thinking}
-                  className={`${option} has-checked:bg-card has-checked:font-bold has-checked:text-foreground has-checked:shadow-[0_1px_2px_rgb(0_0_0/0.12)]`}
+                  className={`${option} has-checked:bg-foreground has-checked:font-bold has-checked:text-background has-checked:hover:text-background`}
                 >
                   <input
                     type="radio"

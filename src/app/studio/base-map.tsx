@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 import { MapCredit, StreetTiles, fixed, mapFrame, type MapFrame } from "./street-map";
@@ -89,18 +89,27 @@ type Side = "above" | "below" | "right" | "left";
 
 /**
  * Each area's name beside its ring, on the first side that stays in the frame and clear of the pins and the
- * names placed before it. Sizes are estimates in SVG units (about a pixel each at desktop width).
+ * names placed before it. Names are HTML at a fixed size, so in SVG units they grow as the map shrinks: `scale` is
+ * screen pixels per SVG unit (1 before the map is measured).
  */
-function placeLabels(rings: { name: string; x: number; y: number; r: number }[], pins: Point[], width: number, height: number): Side[] {
-  const taken: Box[] = pins.map((p) => ({ left: p.x - 10, top: p.y - 10, right: p.x + 10, bottom: p.y + 10 }));
+export function placeLabels(
+  rings: { name: string; x: number; y: number; r: number }[],
+  pins: Point[],
+  width: number,
+  height: number,
+  scale = 1,
+): Side[] {
+  const px = (n: number) => n / scale;
+  const taken: Box[] = pins.map((p) => ({ left: p.x - px(10), top: p.y - px(10), right: p.x + px(10), bottom: p.y + px(10) }));
   return rings.map((ring) => {
-    const w = ring.name.length * 6.6 + 10;
-    const h = 18;
+    const w = px(ring.name.length * 6.6 + 10);
+    const h = px(18);
+    const gap = px(4);
     const boxes: Record<Side, Box> = {
-      above: { left: ring.x - w / 2, right: ring.x + w / 2, top: ring.y - ring.r - 4 - h, bottom: ring.y - ring.r - 4 },
-      below: { left: ring.x - w / 2, right: ring.x + w / 2, top: ring.y + ring.r + 4, bottom: ring.y + ring.r + 4 + h },
-      right: { left: ring.x + ring.r + 4, right: ring.x + ring.r + 4 + w, top: ring.y - h / 2, bottom: ring.y + h / 2 },
-      left: { left: ring.x - ring.r - 4 - w, right: ring.x - ring.r - 4, top: ring.y - h / 2, bottom: ring.y + h / 2 },
+      above: { left: ring.x - w / 2, right: ring.x + w / 2, top: ring.y - ring.r - gap - h, bottom: ring.y - ring.r - gap },
+      below: { left: ring.x - w / 2, right: ring.x + w / 2, top: ring.y + ring.r + gap, bottom: ring.y + ring.r + gap + h },
+      right: { left: ring.x + ring.r + gap, right: ring.x + ring.r + gap + w, top: ring.y - h / 2, bottom: ring.y + h / 2 },
+      left: { left: ring.x - ring.r - gap - w, right: ring.x - ring.r - gap, top: ring.y - h / 2, bottom: ring.y + h / 2 },
     };
     const fits = (b: Box) =>
       b.left >= 0 &&
@@ -145,6 +154,16 @@ function HeatMap({
 }) {
   const f = frame(map, pins);
   const tone = mock ? "var(--tape)" : "var(--accent)";
+  // Screen pixels per SVG unit, once the map is on screen: where the names fit depends on it.
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setScale(el.clientWidth / f.width || 1));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [f.width]);
   // A square's edges, with a thin gap of map between neighbours.
   const square = (tile: { lat: number; lon: number }) => {
     const left = f.x(tile.lon - map.cell.lon / 2);
@@ -161,7 +180,7 @@ function HeatMap({
     .map((a) => ({ area: a, name: a.name, x: f.x(a.lon), y: f.y(a.lat), r: f.metres(a.radius_m, a.lat) }));
   const spots = pins.map((p) => ({ x: f.x(p.lon), y: f.y(p.lat) }));
   const placed = placePins(spots);
-  const sides = placeLabels(rings, placed, f.width, f.height);
+  const sides = placeLabels(rings, placed, f.width, f.height, scale);
   const chosen = base.areas.find((a) => a.ref === base.chosen);
   const summary =
     `${mock ? "Synthetic heatmap" : "Qloo heatmap"} of ${city} for this audience: strongest around ${base.areas.map((a) => a.name).join(", then ")}.` +
@@ -175,6 +194,7 @@ function HeatMap({
         {audience} across {city}: the brighter a square, the stronger this audience is there.
       </p>
       <div
+        ref={box}
         className="relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b]"
         style={{
           aspectRatio: `${f.width} / ${f.height}`,
@@ -240,8 +260,9 @@ function HeatMap({
         })}
         {pins.map((p, i) => {
           const on = active !== undefined && p.n === active + 1;
-          // The name goes on whichever side of the pin has room.
-          const left = placed[i].x / f.width > 0.62;
+          // The name goes on the pin's roomier side, and a long one is cut short there rather than by the frame.
+          const x = (placed[i].x / f.width) * 100;
+          const left = x > 50;
           return (
             <Fragment key={p.n}>
               <span
@@ -259,8 +280,12 @@ function HeatMap({
               {on && (
                 <span
                   aria-hidden
-                  className="absolute z-10 rounded-md bg-[#f2f0ea] px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-[#121211]"
-                  style={{ ...at(placed[i]), transform: left ? "translate(calc(-100% - 20px), -50%)" : "translate(20px, -50%)" }}
+                  className="absolute z-10 truncate rounded-md bg-[#f2f0ea] px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-[#121211]"
+                  style={{
+                    ...at(placed[i]),
+                    transform: left ? "translate(calc(-100% - 20px), -50%)" : "translate(20px, -50%)",
+                    maxWidth: `calc(${fixed(left ? x : 100 - x)}% - 28px)`,
+                  }}
                 >
                   {p.name}
                 </span>

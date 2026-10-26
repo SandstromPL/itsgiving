@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { FeaturedCover, FeaturedRun } from "@/lib/agent/featured";
+import { tmdbSize } from "@/lib/agent/options";
 import { ShootBaseBlock } from "./base-map";
 import { briefLine, splitTitles, type FormState } from "./form";
 import { useLingo } from "./lingo";
@@ -154,7 +155,9 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
                 style={{ background: darkOf(cover.palette) }}
               >
                 <span className="relative isolate flex aspect-[4/5] w-full flex-col justify-end gap-3.5 p-5">
-                  {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 -z-10 size-full opacity-60" />}
+                  {cover.still && (
+                    <Still src={tmdbSize(cover.still, "w780")} alt="" className="absolute inset-0 -z-10 size-full opacity-60" />
+                  )}
                   <span
                     aria-hidden
                     className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,rgb(10_9_8/0.88)_0%,rgb(10_9_8/0.25)_62%,rgb(10_9_8/0.45)_100%)]"
@@ -248,7 +251,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
   const evidence = run.mock ? "text-tape" : "text-tungsten";
   const steps: { title: string; text: string; show: ReactNode }[] = [
     {
-      title: "Read the fans",
+      title: "Read the audience",
       text: `Qloo reads what ${run.subject}'s audience over-indexes on: moods, genres, and the age and gender it leans to. It describes a group, never one person.`,
       show: (
         <div className="flex flex-col gap-3.5 rounded-[26px] border border-line bg-card p-6">
@@ -272,7 +275,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
       ),
     },
     {
-      title: "Find where they are",
+      title: "Map where the fans are",
       text: `A heatmap of ${run.city} shows where those fans cluster. The strongest area becomes the shoot base, so the locations stay close together and the crew moves less.`,
       show: <ShootBaseBlock base={run.base} city={run.city} audience={run.audience} mock={run.mock} compact />,
     },
@@ -303,7 +306,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
       ),
     },
     {
-      title: "Write it",
+      title: "Write the treatment",
       text: `${run.writtenBy} writes the treatment around that evidence: ${run.qlooCalls} Qloo calls and ${run.modelCalls} model calls.`,
       show: (
         <Link href={`/t/${run.slug}`} className="surface-dark grain flex flex-col gap-4 rounded-[26px] bg-background p-6 sm:p-8">
@@ -346,8 +349,8 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
 }
 
 const STEPS = [
-  ["Read the fans", "Qloo shows what the audience of an artist or a film over-indexes on, and where it meets your own taste."],
-  ["Find where they are", "A heatmap of the city picks the neighbourhood to base the shoot in."],
+  ["Read the audience", "Qloo shows what the audience of an artist or a film over-indexes on, and where it meets your own taste."],
+  ["Map where the fans are", "A heatmap of the city picks the neighbourhood to base the shoot in."],
   ["Plan and write", "The model turns that evidence into a concept, beats, wardrobe and locations."],
   ["Bring receipts", "Every film, brand and place shows why Qloo picked it, kept apart from the writing."],
 ] as const;

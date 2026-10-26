@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getLlm, LlmError, type LlmDeps } from "../llm";
 import { getQlooClient, type QlooClient } from "../qloo";
+import { TmdbClient, tmdbConfigFromEnv } from "../tmdb";
 import { briefKey, type Brief } from "./brief";
 import { loadFeatured, type FeaturedItem } from "./featured";
 import { TIMING, runPipeline } from "./pipeline";
@@ -10,6 +11,8 @@ import { RateLimiter, TtlCache } from "./guards";
 export interface TreatmentService {
   qloo: QlooClient;
   llm: LlmDeps;
+  /** The reference films' stills. */
+  tmdb?: TmdbClient;
   cache: TtlCache<Treatment>;
   limiter: RateLimiter;
   /** Whole-run budget. Unset, the brief's thinking depth sets it (TIMING), under the route's maxDuration. */
@@ -24,6 +27,7 @@ export function getTreatmentService(): TreatmentService {
   shared ??= {
     qloo: getQlooClient(),
     llm: getLlm(),
+    tmdb: new TmdbClient(tmdbConfigFromEnv()),
     cache: new TtlCache<Treatment>(200, 24 * 60 * 60 * 1000),
     // Cached briefs skip this; it only meters fresh runs.
     limiter: new RateLimiter(6, 60 * 1000),
@@ -90,7 +94,7 @@ export async function streamTreatment(
     if (signal.aborted) reject(signal.reason);
     signal.addEventListener("abort", () => reject(signal.reason), { once: true });
   });
-  const pipeline = runPipeline(brief, { qloo: service.qloo, llm: service.llm }, emit, {
+  const pipeline = runPipeline(brief, { qloo: service.qloo, llm: service.llm, tmdb: service.tmdb }, emit, {
     id: key,
     signal,
     deadline: started + runMs,

@@ -112,7 +112,7 @@ export function MapCredit({ under = false }: { under?: boolean }) {
       target="_blank"
       rel="noreferrer"
       className={`text-[11px] leading-none text-dim hover:text-foreground ${
-        under ? "" : "absolute right-1.5 bottom-1.5 z-20 rounded-[4px] bg-frame/85 px-1.5 py-[3px] print:bg-transparent"
+        under ? "" : "absolute right-1.5 bottom-1.5 z-20 rounded-[4px] bg-frame/85 px-1.5 py-[6.5px] print:bg-transparent"
       }`}
     >
       © OpenStreetMap contributors

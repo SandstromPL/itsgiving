@@ -43,7 +43,7 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
         onToggleNudge={rework}
         running={false}
         take={1}
-        log={<Timeline steps={replaySteps(treatment, "Built when the site was deployed: these are the calls that made it.")} />}
+        log={<Timeline steps={replaySteps(treatment, "Built when the site was deployed: these are the calls that made it.", false)} />}
         back={
           <Link
             href="/#now-showing"
@@ -55,6 +55,7 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
           </Link>
         }
         reworkNote="Built ahead of time. A change opens it in the studio, which re-runs the plan and the writing with it."
+        own={false}
       />
       <StartYourOwn />
     </div>

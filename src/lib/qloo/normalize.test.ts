@@ -113,3 +113,10 @@ describe("compactEntity", () => {
     expect(compactEntity({ name: "A", entity_id: "1" }).affinity).toBeUndefined();
   });
 });
+
+describe("compactEntity names", () => {
+  it("tidies the spacing around commas, and leaves numbers alone", () => {
+    expect(compactEntity({ name: "Poco Loco Tapas & Bar ,Khar", entity_id: "1" }).name).toBe("Poco Loco Tapas & Bar, Khar");
+    expect(compactEntity({ name: "Cafe 1,000  Steps", entity_id: "2" }).name).toBe("Cafe 1,000 Steps");
+  });
+});

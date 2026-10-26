@@ -114,3 +114,24 @@ describe("TmdbClient", () => {
     await expect(new TmdbClient({ baseUrl: "https://tmdb.test" }).list("9", 25)).rejects.toMatchObject({ status: 503 });
   });
 });
+
+describe("TmdbClient.backdrop", () => {
+  it("finds a film's backdrop by IMDb ID, as a 1280 px image", async () => {
+    const { client, requests } = fakeTmdb({
+      "/3/find/tt14152140": { movie_results: [{ backdrop_path: "/uBDbyoufp7TGaDDVTHOCxl3dz8p.jpg" }], tv_results: [] },
+    });
+    await expect(client.backdrop("tt14152140")).resolves.toBe("https://image.tmdb.org/t/p/w1280/uBDbyoufp7TGaDDVTHOCxl3dz8p.jpg");
+    expect(new URL(requests[0].url).searchParams.get("external_source")).toBe("imdb_id");
+  });
+
+  it("has none for a film TMDB lacks or keeps no backdrop for, and never asks about a malformed ID", async () => {
+    const { client, requests } = fakeTmdb({
+      "/3/find/tt0000001": { movie_results: [], tv_results: [] },
+      "/3/find/tt0000002": { movie_results: [{ backdrop_path: null }] },
+    });
+    await expect(client.backdrop("tt0000001")).resolves.toBeUndefined();
+    await expect(client.backdrop("tt0000002")).resolves.toBeUndefined();
+    await expect(client.backdrop("nm0000123")).resolves.toBeUndefined();
+    expect(requests).toHaveLength(2);
+  });
+});

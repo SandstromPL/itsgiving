@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { Cooldowns, DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
-import { QlooClient, createQlooClient, type FetchLike } from "../qloo";
+import { QlooClient, createQlooClient, type CompactEntity, type FetchLike } from "../qloo";
 import { MemoryCache } from "../qloo/cache";
 import { mockEntityId } from "../qloo/mock/catalog";
 import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache } from "./guards";
 import { distanceM } from "../tools/heatmap";
-import { NONE_PICK, excerpt, subjectPhrase } from "./options";
-import { clipSentences, closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
+import type { TmdbClient } from "../tmdb";
+import { NONE_PICK, coverStill, excerpt, isIdentityTag, subjectPhrase, tagLabel, tmdbSize } from "./options";
+import { clipSentences, closestTags, filmStills, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { describeBrief, planSchema } from "./plan";
 import { cachedTreatment, streamTreatment, type TreatmentService } from "./service";
 import type { AgentEvent, StepEvent } from "./types";
@@ -703,5 +704,51 @@ describe("director taste import", () => {
     expect(briefKey(brief({ ...base, director_imdb_ids: ["tt0114369", "tt0246578", "tt0114369"] }), modes)).toBe(key);
     expect(key).not.toBe(briefKey(brief(base), modes));
     expect(briefSchema.safeParse({ ...base, director_imdb_ids: ["nm0000123"] }).success).toBe(false);
+  });
+});
+
+describe("identity tags, tag labels and stills", () => {
+  it("keeps tags that name who people are out of tone and evidence", () => {
+    for (const name of ["lesbian", "LGBT", "LGBTQ+ Themes", "Queer", "gay", "Christianity", "depression"]) {
+      expect(isIdentityTag(name), name).toBe(true);
+    }
+    for (const name of ["dark comedy", "black comedy", "Bollywood", "Confessional", "teenager", "female protagonist", "R&B", "Christmas"]) {
+      expect(isIdentityTag(name), name).toBe(false);
+    }
+    expect(closestTags("queer", [{ id: "urn:tag:keyword:qloo:queer", name: "Queer" }])).toEqual([]);
+  });
+
+  it("puts all-lowercase tags in title case and leaves capitalized ones alone", () => {
+    expect(tagLabel("new york city")).toBe("New York City");
+    expect(tagLabel("coming of age")).toBe("Coming of Age");
+    expect(tagLabel("synth-driven")).toBe("Synth-driven");
+    expect(tagLabel("Quirkily Humorous")).toBe("Quirkily Humorous");
+    expect(tagLabel("R&B")).toBe("R&B");
+  });
+
+  it("sizes TMDB images and takes the cover's still from the first reference with one", () => {
+    expect(tmdbSize("https://image.tmdb.org/t/p/w1280/a.jpg", "w780")).toBe("https://image.tmdb.org/t/p/w780/a.jpg");
+    expect(coverStill({ references: [{}, { still: "s2" }, { still: "s3" }] })).toBe("s2");
+    expect(coverStill({ references: [{}] })).toBeUndefined();
+  });
+
+  it("gets stills for the films TMDB knows, and goes without on its failures", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const tmdb = {
+      configured: true,
+      backdrop: async (imdb: string) => {
+        if (imdb === "tt2") throw new Error("down");
+        return imdb === "tt1" ? "still-1" : undefined;
+      },
+    } as unknown as TmdbClient;
+    const films = [
+      { id: "A", name: "A", external: { imdb: "tt1" } },
+      { id: "B", name: "B", external: { imdb: "tt2" } },
+      { id: "C", name: "C" },
+    ] as CompactEntity[];
+    expect([...(await filmStills(films, tmdb))]).toEqual([["A", "still-1"]]);
+    expect(warn).toHaveBeenCalledOnce();
+    expect((await filmStills(films, undefined)).size).toBe(0);
+    warn.mockRestore();
   });
 });

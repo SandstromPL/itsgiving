@@ -19,7 +19,8 @@ interface Lines {
   done: string;
   back: string;
   giving: string;
-  shared: string;
+  /** A tone tag the director's own films share: "your" in the studio, "the director's" on an example. */
+  shared: (whose: string) => string;
   failTitle: string;
   rateTitle: string;
   titleWindow: string;
@@ -33,6 +34,8 @@ interface Lines {
   makeItYours: string;
   tryOne: string;
   watchItWork: string;
+  /** The 404's heading, and the line under it. */
+  notFound: { title: string; line: string };
 }
 
 const GENZ: Lines = {
@@ -46,7 +49,7 @@ const GENZ: Lines = {
   done: "ate. no crumbs.",
   back: "we're so back",
   giving: "it's giving",
-  shared: "same energy as your taste",
+  shared: (whose) => `same energy as ${whose} taste`,
   failTitle: "it's so over",
   rateTitle: "touch grass, then try again",
   titleWindow: "pick your fighter",
@@ -59,6 +62,7 @@ const GENZ: Lines = {
   makeItYours: "Make it yours",
   tryOne: "Try one",
   watchItWork: "Watch it work",
+  notFound: { title: "this page is giving… nothing", line: "Page not found. The link may be old, or the treatment was never saved." },
 };
 
 const PLAIN: Lines = {
@@ -72,7 +76,7 @@ const PLAIN: Lines = {
   done: "Treatment ready",
   back: "Back on track",
   giving: "Tone",
-  shared: "shared with your taste",
+  shared: (whose) => `shared with ${whose} taste`,
   failTitle: "The treatment didn't finish",
   rateTitle: "Too many requests",
   titleWindow: "Title typeface",
@@ -85,6 +89,7 @@ const PLAIN: Lines = {
   makeItYours: "More options",
   tryOne: "Examples",
   watchItWork: "How it works",
+  notFound: { title: "Page not found", line: "The link may be old, or the treatment was never saved." },
 };
 
 const STORAGE_KEY = "itsgiving:unc";

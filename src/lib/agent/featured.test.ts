@@ -171,15 +171,19 @@ describe("featured examples", () => {
     ]);
   });
 
-  it("turns a featured treatment into a small cover for its poster", () => {
-    const [cover] = featuredCovers([{ slug: "prateek-kuhad-mumbai", treatment: fakeTreatment(EXAMPLES[0].brief) }]);
+  it("turns a featured treatment into a small cover for its poster, with a film's still but never its poster", () => {
+    const t = fakeTreatment(EXAMPLES[0].brief);
+    // Qloo's image of a film is its poster, whose own lettering would fight the title: no still, no picture.
+    expect(featuredCovers([{ slug: "prateek-kuhad-mumbai", treatment: t }])[0].still).toBeUndefined();
+    t.references[0] = { ...t.references[0], still: "https://image.tmdb.org/t/p/w1280/mimi.jpg" };
+    const [cover] = featuredCovers([{ slug: "prateek-kuhad-mumbai", treatment: t }]);
     expect(cover).toEqual({
       slug: "prateek-kuhad-mumbai",
       title: "Almost, Every Evening",
       logline: "Two people keep almost meeting.",
       line: "Music video for Prateek Kuhad / Mumbai",
       palette: ["#0A0908"],
-      still: "https://img.example/mimi.jpg",
+      still: "https://image.tmdb.org/t/p/w1280/mimi.jpg",
       tone: "Introspective",
     });
   });

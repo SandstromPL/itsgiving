@@ -41,7 +41,7 @@ describe("the brief's taste field", () => {
   it("names an example brief for its chip", () => {
     expect(exampleChip({ artist: "Frank Ocean", touchstones: ["Forgotten"], city: "New York" })).toBe("Frank Ocean, New York");
     expect(exampleChip({ format: "short_film", touchstones: ["In the Mood for Love"], city: "Mumbai" })).toBe(
-      "after In the Mood for Love, Mumbai",
+      "After In the Mood for Love, Mumbai",
     );
   });
 });

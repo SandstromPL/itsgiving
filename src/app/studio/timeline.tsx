@@ -45,7 +45,7 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
   const cached = calls.filter((c) => c.cached).length;
   return (
     <details className="group mt-1.5">
-      <summary className="cursor-pointer font-mono text-[12px] text-tungsten marker:text-edge hover:text-foreground">
+      <summary className="cursor-pointer py-1 font-mono text-[12px] text-tungsten marker:text-edge hover:text-foreground">
         {calls.length} Qloo {calls.length === 1 ? "call" : "calls"}
         {cached > 0 ? `, ${cached} cached` : ""}
       </summary>
@@ -75,7 +75,7 @@ function LlmLine({ trace }: { trace: LlmTrace }) {
       <p className="flex flex-wrap items-center gap-x-2 text-dim">
         {trace.producedBy.mock ? <Tape>Mock LLM</Tape> : <span className="font-semibold text-foreground">{trace.producedBy.model}</span>}
         {trace.producedBy.reasoning && <span>{thinkingName(trace.producedBy.reasoning)}</span>}
-        {trace.attempts.some((a) => a.outcome === "repaired") && <span>fixed its JSON on a retry</span>}
+        {trace.attempts.some((a) => a.outcome === "repaired") && <span>needed a second try</span>}
       </p>
       {tried.length > 0 && (
         <p className="text-faint">
@@ -102,9 +102,9 @@ export function Timeline({ steps, size = "credits" }: { steps: StepEvent[]; size
     >
       {!stage && (
         <div>
-          <h4 id="agent-heading" className="type-head text-[1.4rem] leading-none">
+          <h3 id="agent-heading" className="type-head text-[1.4rem] leading-none">
             Run log
-          </h4>
+          </h3>
           <p className="mt-1.5 text-[13px] leading-5 text-faint">
             Code makes every Qloo call. The model only plans and writes, citing what Qloo returned.
           </p>
@@ -147,13 +147,15 @@ export function Timeline({ steps, size = "credits" }: { steps: StepEvent[]; size
  * Timeline rows for a treatment that wasn't built just now: the calls and models that originally made it, from the
  * cache or the featured set.
  */
-export function replaySteps(t: Treatment, summary = "Replayed from cache: no new calls this time."): StepEvent[] {
+export function replaySteps(t: Treatment, note = "Replayed from cache: no new calls this time.", own = true): StepEvent[] {
   return STEP_ORDER.flatMap((id): StepEvent[] => {
     const qloo = t.qloo.steps[id];
     const llm = t.llm.find((trace) => trace.step === id);
     if (!qloo?.length && !llm) return [];
-    return [{ type: "step", id, status: "done", label: STEP_LABELS[id], summary, qloo, llm }];
-  });
+    // An example was briefed by someone else, so its "your taste" was theirs.
+    const label = id === "overlap" && !own ? "Compare with the director's taste" : STEP_LABELS[id];
+    return [{ type: "step", id, status: "done", label, qloo, llm }];
+  }).map((step, i) => (i === 0 ? { ...step, summary: note } : step)); // the note once, at the top
 }
 
 const STRIP_TONE: Record<StepStatus | "pending", string> = {

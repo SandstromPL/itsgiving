@@ -1,11 +1,12 @@
 import { describeKind, generateJson, type LlmDeps, type LlmResult, type Reasoning } from "../llm";
-import type { CompactEntity, CompactTag, Provenance, QlooClient } from "../qloo";
+import { defaultSleep, type CompactEntity, type CompactTag, type Provenance, type QlooClient } from "../qloo";
+import type { TmdbClient } from "../tmdb";
 import type { HeatArea, HeatGrid } from "../tools/heatmap";
 import { runTool } from "../tools/registry";
 import { VENUE_KIND_VALUES, normalizeName } from "../tools/shared";
 import type { ToolResult } from "../tools/types";
 import { pickKey, priceLevelMax, type Brief } from "./brief";
-import { NONE_PICK, STAND_IN_LIMIT, STEP_LABELS, joinNames, type Thinking } from "./options";
+import { NONE_PICK, STAND_IN_LIMIT, STEP_LABELS, isIdentityTag, joinNames, type Thinking } from "./options";
 import {
   DEEP_CUT_CEILING,
   SYSTEM_PROMPT,
@@ -44,6 +45,8 @@ import { mockDraft, normalizeDraft, refScrubber, writePrompt, writeSchema, type 
 export interface PipelineDeps {
   qloo: QlooClient;
   llm: LlmDeps;
+  /** For the reference films' stills; without it (or its key) the board shows Qloo's posters on the cards only. */
+  tmdb?: TmdbClient;
   now?: () => Date;
 }
 
@@ -149,11 +152,34 @@ function names(entities: CompactEntity[]): string[] {
 const UNSAFE_TAG = /adult|erotic|sex|strip|nsfw/i;
 
 /**
+ * Stills for the reference films the writer may cite, keyed by entity ID: TMDB's backdrop of each film it knows by IMDb
+ * ID. A film without one keeps Qloo's poster on its card, and a failure only costs the stills, never the treatment.
+ */
+export async function filmStills(films: CompactEntity[], tmdb: TmdbClient | undefined, signal?: AbortSignal): Promise<Map<string, string>> {
+  const stills = new Map<string, string>();
+  if (!tmdb?.configured) return stills;
+  let failed = 0;
+  await Promise.all(
+    films.map(async (film) => {
+      if (!film.external?.imdb) return;
+      try {
+        const still = await tmdb.backdrop(film.external.imdb, signal);
+        if (still) stills.set(film.id, still);
+      } catch {
+        failed++;
+      }
+    }),
+  );
+  if (failed > 0) console.warn(JSON.stringify({ evt: "tmdb_stills", failed, of: films.length }));
+  return stills;
+}
+
+/**
  * Semantic tag search drifts ("intimate" -> "Adult only"), so prefer the tags
  * whose name contains the word (or vice versa), and fall back to the top hit.
  */
 export function closestTags(word: string, tags: CompactTag[], max = 2): CompactTag[] {
-  const safe = tags.filter((t) => t.id.startsWith("urn:tag:") && !UNSAFE_TAG.test(`${t.id} ${t.name}`));
+  const safe = tags.filter((t) => t.id.startsWith("urn:tag:") && !UNSAFE_TAG.test(`${t.id} ${t.name}`) && !isIdentityTag(t.name));
   const wanted = normalizeName(word);
   const close = safe.filter((t) => {
     const name = normalizeName(t.name);
@@ -449,7 +475,8 @@ export async function runPipeline(
   const heatMap = heat.data?.map;
   if (heat.status === "error") notes.push(`The heatmap failed (${heat.summary}), so locations were scouted across the city.`);
   endHeatmap(heat.status === "ok" ? "done" : heat.status === "error" ? "error" : "warning", heat.summary);
-  const tasteTags = audience.data?.taste_tags ?? [];
+  // Tags that name who people are (LGBT, a religion, a health condition) never become tone or evidence: see isIdentityTag.
+  const tasteTags = (audience.data?.taste_tags ?? []).filter((tag) => !isIdentityTag(tag.name));
   const leans = (audience.data?.demographics ?? []).map((d) =>
     subjects.length > 1 ? `${entityNames.get(d.entity_id) ?? "audience"}: ${d.leans}` : d.leans,
   );
@@ -459,7 +486,7 @@ export async function runPipeline(
 
   let overlap: CompactTag[] = [];
   if (endOverlap && shared) {
-    overlap = shared.data?.shared_traits ?? [];
+    overlap = (shared.data?.shared_traits ?? []).filter((tag) => !isIdentityTag(tag.name));
     endOverlap(shared.status === "ok" ? "done" : "warning", shared.summary);
   } else {
     emit({
@@ -776,6 +803,15 @@ export async function runPipeline(
     base: run.base?.held ? run.base.area : undefined,
     names: entityNames,
   };
+  // The reference films' stills come from TMDB while the writer works, so they cost no time.
+  const pendingStills =
+    deps.qloo.mode === "mock"
+      ? Promise.resolve(new Map<string, string>())
+      : filmStills(
+          writeContext.references.map((r) => r.item),
+          deps.tmdb,
+          signal,
+        );
   const draft = await llm(
     "write",
     STEP_LABELS.write,
@@ -806,9 +842,13 @@ export async function runPipeline(
       ...[...writeContext.references, ...writeContext.brands, ...writeContext.places].map((r) => [r.ref, r.item.name] as const),
     ]),
   );
+  // After a fast write the stills may still be out: wait a moment at most, then go without.
+  const none = () => new Map<string, string>();
+  const stills = await Promise.race([pendingStills, defaultSleep(1_500, signal).then(none, none)]);
 
   const treatment = assemble({
     scrub,
+    stills,
     id: options.id,
     brief,
     draft,
@@ -838,6 +878,8 @@ export async function runPipeline(
 interface AssembleInput {
   /** Swaps refs the model leaked into prose for the names they stand for. */
   scrub: (text: string) => string;
+  /** Reference films' stills by entity ID (filmStills). */
+  stills: Map<string, string>;
   id: string;
   brief: Brief;
   draft: Draft;
@@ -890,7 +932,10 @@ function assemble(input: AssembleInput): Treatment {
       });
 
   // The schema only enforces minimums; the maximums the prompt asked for are applied here.
-  const references = cite(ctx.references, run.references.items, "reference_films", draft.references, ["why", "borrow"], 6);
+  const references = cite(ctx.references, run.references.items, "reference_films", draft.references, ["why", "borrow"], 6).map((r) => {
+    const still = input.stills.get(r.entity.id);
+    return still ? { ...r, still } : r;
+  });
   const wardrobe = cite(ctx.brands, run.brands.items, "styling_brands", draft.wardrobe, ["look"], 4);
   const locations = cite(ctx.places, run.places.items, "scout_locations", draft.locations, ["scene"], 4);
   const cited = new Set([...references, ...wardrobe, ...locations].map((p) => p.entity.id));

@@ -136,21 +136,29 @@
 }
 
 /* Bricolage at full weight with tight tracking carries the hierarchy; headlines are lowercase by choice, not by CSS. */
+/* Headings wrap in even lines: no last line of one word ("producers", "places"). */
 @utility type-poster {
   font-weight: 800;
   letter-spacing: -0.055em;
   line-height: 0.88;
+  text-wrap: balance;
 }
 
 @utility type-head {
   font-weight: 800;
   letter-spacing: -0.035em;
+  text-wrap: balance;
 }
 
 /* Qloo evidence: mono with tabular figures, like a receipt. */
 @utility type-evidence {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+/* Room for a scrollbar on every page, so the header doesn't shift between a short page (the 404) and a long one. */
+html {
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -197,6 +205,13 @@ body {
   margin: 0;
   width: min(27rem, calc(100vw - 2rem));
   max-height: calc(100vh - 7rem);
+}
+/* Open, it's a column: the bar and Done stay put while the faces between them scroll. Clip, not hidden: focusing the
+   chosen face would otherwise scroll the window itself and lift its bar out of view. */
+[popover].window:popover-open {
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
 }
 @media (max-width: 40rem) {
   [popover].window {

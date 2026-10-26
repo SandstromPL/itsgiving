@@ -19,7 +19,7 @@ export function SiteFooter() {
             )}
             <Link
               href="/about"
-              className="font-semibold text-foreground underline decoration-line underline-offset-4 hover:decoration-foreground"
+              className="inline-block py-0.5 font-semibold text-foreground underline decoration-line underline-offset-4 hover:decoration-foreground"
             >
               About itsgiving
             </Link>
@@ -27,7 +27,7 @@ export function SiteFooter() {
           </span>
         </div>
         <p className="text-[13px] leading-5 text-faint">
-          Maps © OpenStreetMap contributors. This product uses the TMDB API but is not endorsed or certified by TMDB.
+          Maps © OpenStreetMap contributors. Film stills from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.
         </p>
       </div>
     </footer>

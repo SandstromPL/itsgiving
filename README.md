@@ -47,7 +47,9 @@ fast and cheap, and within the free fallback models' limits.
 3. **Read the audience** (`read_audience`), **map where the fans are** (`audience_heatmap`) and, when the director
    lists films, **compare** their taste with the audience (`taste_overlap`). The calls run at once. The heatmap scores
    every tile of the city for the audience; itsgiving groups the hottest tenth into the three strongest areas, 2 km in
-   radius, and names each after the neighbourhoods Qloo lists around its centre.
+   radius, and names each after the neighbourhoods Qloo lists around its centre. Tags that name who people are
+   (sexual orientation, gender identity, religion, ethnicity, health, party politics) are dropped here: Qloo has some
+   as film themes, but a treatment never describes its audience by who they are.
 4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, how deep the cuts go, a few plain
    style words for wardrobe and ambience, and which of the strongest areas to base the shoot in. Tags and areas are
    shown to it as short refs (`T1`, `A1`, ...) and the output schema only accepts those refs, so it cannot invent a
@@ -69,7 +71,9 @@ fast and cheap, and within the free fallback models' limits.
    (`R1`, `B1`, `L1`); refs not returned by a tool fail validation. Code maps refs back to Qloo items and attaches each
    item's evidence (rank within its call, affinity, popularity, the input entities that drove it) and the model that
    wrote it. A ref that slips into the prose is swapped for its name, and lighting or shot notes sent as objects are
-   flattened, so neither costs a repair call.
+   flattened, so neither costs a repair call. While the model writes, TMDB gives each reference film's still (its
+   backdrop, by IMDb ID): the cover and the reference cards show film frames, not posters, whose own lettering would
+   fight the treatment's title.
 
 Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
 
@@ -248,7 +252,7 @@ All server-side only.
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `LLM_TIMEOUT_MS` | Per-call timeout for calls that don't set their own (default 20000); treatment steps use `TIMING` |
 | `ITSGIVING_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
-| `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list. IMDb links work without it |
+| `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list and for the reference films' stills. IMDb links work without it; without stills, covers show the palette alone |
 
 ### API routes
 
@@ -307,8 +311,8 @@ All server-side only.
 ## Credits
 
 - Taste data: [Qloo](https://www.qloo.com/)'s Insights API.
-- Imported film lists: [TMDB](https://www.themoviedb.org/). This product uses the TMDB API but is not endorsed or
-  certified by TMDB.
+- Imported film lists and film stills: [TMDB](https://www.themoviedb.org/). This product uses the TMDB API but is not
+  endorsed or certified by TMDB.
 - Street maps under the heatmap: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, from
   OpenStreetMap's standard tiles under its [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 

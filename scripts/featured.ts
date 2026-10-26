@@ -19,6 +19,7 @@ import { TIMING, runPipeline } from "../src/lib/agent/pipeline";
 import type { Treatment } from "../src/lib/agent/types";
 import { Cooldowns, DailyBudget, createProviders, llmConfigFromEnv, type LlmConfig } from "../src/lib/llm";
 import { createQlooClient, qlooConfigFromEnv } from "../src/lib/qloo";
+import { TmdbClient, tmdbConfigFromEnv } from "../src/lib/tmdb";
 
 for (const file of [".env.local", ".env"]) {
   try {
@@ -44,7 +45,7 @@ function problemWith(t: Treatment, wantDeepSeek: boolean): string | null {
   return null;
 }
 
-async function build(example: Example, llmConfig: LlmConfig, qloo: ReturnType<typeof createQlooClient>) {
+async function build(example: Example, llmConfig: LlmConfig, qloo: ReturnType<typeof createQlooClient>, tmdb: TmdbClient) {
   const brief = normalizeBrief(briefSchema.parse({ ...example.brief, thinking: "deep" }));
   let last = "no attempt finished";
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
@@ -58,7 +59,7 @@ async function build(example: Example, llmConfig: LlmConfig, qloo: ReturnType<ty
       cooldowns: new Cooldowns(),
     };
     try {
-      const outcome = await runPipeline(brief, { qloo, llm }, () => {}, {
+      const outcome = await runPipeline(brief, { qloo, llm, tmdb }, () => {}, {
         id: `featured-${example.slug}`,
         signal: AbortSignal.timeout(TIMING.deep.runMs),
         deadline: started + TIMING.deep.runMs,
@@ -116,7 +117,9 @@ async function main() {
 
   console.log(`Featured treatments: building ${targets.length} with deep thinking…`);
   const qloo = createQlooClient({ ...qlooConfig, cacheDir: undefined });
-  const built = await inPool(targets, PARALLEL, (example) => build(example, llmConfig, qloo));
+  // The reference films' stills; without TMDB_API_KEY the covers go without.
+  const tmdb = new TmdbClient(tmdbConfigFromEnv());
+  const built = await inPool(targets, PARALLEL, (example) => build(example, llmConfig, qloo, tmdb));
 
   const items: FeaturedItem[] = [];
   let missing = 0;

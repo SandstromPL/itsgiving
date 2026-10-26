@@ -7,9 +7,13 @@ import {
   NUDGES,
   NUDGE_LABELS,
   audiencePhrase,
+  coverStill,
   excerpt,
+  isIdentityTag,
   joinNames,
   subjectPhrase,
+  tagLabel,
+  tmdbSize,
   treatmentWho,
   type Nudge,
 } from "@/lib/agent/options";
@@ -42,14 +46,34 @@ const SECTIONS = [
 const prose = "font-serif text-[1.25rem] leading-[1.38]";
 const card = "rounded-[26px] border border-line bg-card";
 
+/**
+ * A grid of n cards with no hole in its last row: two columns, three from xl when the count allows, and one card (the
+ * first or the last) spanning two where the count is odd for the columns. A spanning card's picture goes widescreen.
+ */
+function fill(n: number, at: "first" | "last"): { grid: string; span: (i: number) => string; wide: (i: number) => string } {
+  // Four (or seven) cards sit better as pairs than as a row of three with one left over.
+  const three = n % 3 !== 1;
+  const sm = n % 2 === 1 ? "sm:col-span-2" : "";
+  const xl = !three ? "" : n % 3 === 2 ? "xl:col-span-2" : sm ? "xl:col-span-1" : "";
+  const wide = [sm && "sm:aspect-[2.39/1]", xl === "xl:col-span-2" ? "xl:aspect-[2.39/1]" : xl && "xl:aspect-video"]
+    .filter(Boolean)
+    .join(" ");
+  const target = at === "first" ? 0 : n - 1;
+  return {
+    grid: three ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2",
+    span: (i) => (i === target ? `${sm} ${xl}`.trim() : ""),
+    wide: (i) => (i === target ? wide : ""),
+  };
+}
+
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="flex flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         {/* The section bar's jump lands on the heading, so the room it leaves for the sticky bar is the heading's. */}
-        <h3 id={id} className="type-head scroll-mt-24 text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
+        <h2 id={id} className="type-head scroll-mt-24 text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
           {title}
-        </h3>
+        </h2>
         {note && <p className="max-w-[60ch] text-[15px] leading-6 text-faint">{note}</p>}
       </div>
       {children}
@@ -76,7 +100,7 @@ function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boole
               : `border border-dashed border-slip-edge bg-slip ${mock ? "text-[#a3195b]" : "text-[#855000]"}`
           }`}
         >
-          {tag.name}
+          {tagLabel(tag.name)}
         </li>
       ))}
     </ul>
@@ -105,8 +129,8 @@ function Cover({
   suggestion: { id: string; why: string };
   onPickFont: (id: string) => void;
 }) {
-  // Mock placeholders carry their own "not Qloo data" text, which would fight the title.
-  const still = t.references.find((r) => r.entity.image && !r.entity.image.startsWith("/mock/"))?.entity.image;
+  // A reference film's still, never its poster (or a mock placeholder): their own lettering would fight the title.
+  const still = coverStill(t);
   const who = treatmentWho(t);
   const subject = subjectPhrase(who.artists, who.films, t.brief.format);
   return (
@@ -138,9 +162,9 @@ function Cover({
         <TitleCardPicker title={t.title} fontId={fontId} suggestion={suggestion} onPick={onPickFont} />
       </div>
       <div className="flex flex-col gap-6">
-        <h2 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
+        <h1 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
           {t.title}
-        </h2>
+        </h1>
         <p className="max-w-[40ch] font-serif text-[clamp(1.4rem,2.4vw,1.9rem)] leading-[1.2] text-pretty italic">{t.logline}</p>
         <ul aria-label="Palette" className="flex flex-wrap gap-2">
           {t.palette.map((c) => (
@@ -155,37 +179,42 @@ function Cover({
   );
 }
 
-/** "it's giving": the tone tags Qloo found, with the ones shared with the director's taste highlighted. */
-function Giving({ t, mock }: { t: Treatment; mock: boolean }) {
+/** The treatment's tone tags, without any that name who people are (isIdentityTag): older builds can carry them. */
+const toneOf = (t: Treatment) => t.tone.filter((tone) => !isIdentityTag(tone.tag.name));
+
+/**
+ * "it's giving": the tone tags Qloo found, with the ones the director's own films share highlighted. `whose` says
+ * whose films: "your" in the studio, "the director's" on an example someone else briefed.
+ */
+function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string }) {
   const lingo = useLingo().t;
-  if (t.tone.length === 0) return null;
-  const shared = t.tone.some((tone) => tone.source === "overlap");
+  const tone = toneOf(t);
+  if (tone.length === 0) return null;
+  const shared = tone.some((x) => x.source === "overlap");
   return (
     <section aria-labelledby="giving-title" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2.5">
-        <h3 id="giving-title" className="mr-2 font-serif text-[clamp(2.5rem,4.5vw,3.25rem)] leading-none font-normal italic">
+        <h2 id="giving-title" className="mr-2 font-serif text-[clamp(2.5rem,4.5vw,3.25rem)] leading-none font-normal italic">
           {lingo.giving}
-        </h3>
-        {t.tone.map((tone) =>
-          tone.source === "overlap" ? (
-            <span
-              key={tone.tag.id}
-              className="flex items-center gap-2 rounded-full bg-accent px-4 py-2.5 text-[17px] font-bold text-[#121211]"
-            >
-              {tone.tag.name}
-              <span className="text-[13px] font-normal">{lingo.shared}</span>
-            </span>
-          ) : (
-            <span key={tone.tag.id} className="rounded-full border border-line bg-card px-4 py-2.5 text-[17px]">
-              {tone.tag.name}
-            </span>
-          ),
-        )}
+        </h2>
+        {tone.map((x) => (
+          <span
+            key={x.tag.id}
+            className={
+              x.source === "overlap"
+                ? "rounded-full bg-accent px-4 py-2.5 text-[17px] font-bold text-[#121211]"
+                : "rounded-full border border-line bg-card px-4 py-2.5 text-[17px]"
+            }
+          >
+            {tagLabel(x.tag.name)}
+            {x.source === "overlap" && <span className="sr-only"> ({lingo.shared(whose)})</span>}
+          </span>
+        ))}
         {mock && <Tape>Mock data</Tape>}
       </div>
       <p className="text-[15px] text-faint">
         Tone tags from {mock ? "the synthetic mock, not Qloo" : "Qloo"}: what this audience over-indexes on.
-        {shared ? " The highlighted one is shared with the films you love." : ""}
+        {shared ? ` Highlighted: shared with ${whose} films.` : ""}
       </p>
     </section>
   );
@@ -270,6 +299,24 @@ function SectionBar({
   const [stuck, setStuck] = useState(false);
   const [current, setCurrent] = useState<string | null>(null);
   const line = useRef<HTMLSpanElement>(null);
+  // On a narrow screen the tabs scroll sideways: the lit one is kept in view, and a fade marks the side with more.
+  const tabs = useRef<HTMLElement>(null);
+  const [more, setMore] = useState({ before: false, after: false });
+  const measure = () => {
+    const nav = tabs.current;
+    if (!nav) return;
+    const before = nav.scrollLeft > 2;
+    const after = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2;
+    setMore((was) => (was.before === before && was.after === after ? was : { before, after }));
+  };
+  useEffect(() => {
+    const nav = tabs.current;
+    const link = nav?.querySelector<HTMLElement>('[aria-current="location"]');
+    if (!nav || !link || nav.scrollWidth <= nav.clientWidth) return;
+    const offset = link.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    nav.scrollTo({ left: offset - (nav.clientWidth - link.offsetWidth) / 2, behavior: reduce ? "auto" : "smooth" });
+  }, [current]);
 
   useEffect(() => {
     let frame = 0;
@@ -292,14 +339,22 @@ function SectionBar({
       if (!frame) frame = requestAnimationFrame(update);
     };
     schedule();
+    measure();
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
+    window.addEventListener("resize", measure);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
+      window.removeEventListener("resize", measure);
     };
   }, [cover, article]);
+  const edge = (fade: boolean) => (fade ? "transparent" : "#000");
+  const mask =
+    more.before || more.after
+      ? `linear-gradient(to right, ${edge(more.before)}, #000 1.75rem, #000 calc(100% - 1.75rem), ${edge(more.after)})`
+      : undefined;
 
   return (
     <div className="sticky top-0 z-30 bg-background shadow-[0_0_0_100vmax_var(--background)] [clip-path:inset(0_-100vmax)] print:hidden">
@@ -324,7 +379,13 @@ function SectionBar({
             </span>
           )}
         </div>
-        <nav aria-label="Treatment sections" className="quiet-scroll -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto px-1">
+        <nav
+          ref={tabs}
+          aria-label="Treatment sections"
+          onScroll={measure}
+          className="quiet-scroll -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto px-1"
+          style={{ maskImage: mask, WebkitMaskImage: mask }}
+        >
           {SECTIONS.map(([id, label]) => (
             <a
               key={id}
@@ -398,6 +459,7 @@ export function Board({
   log,
   back,
   reworkNote,
+  own = true,
 }: {
   treatment: Treatment;
   /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
@@ -413,8 +475,11 @@ export function Board({
   back: ReactNode;
   /** Under the rework chips: what a change does here. */
   reworkNote?: string;
+  /** The reader's own brief (the studio), or an example someone else briefed: "your films" or "the director's films". */
+  own?: boolean;
 }) {
   const lingo = useLingo().t;
+  const whose = own ? "your" : "the director's";
   const mock = t.mock.qloo;
   const source = mock ? "the synthetic mock, not Qloo" : "Qloo";
   const templated = t.llm.filter((l) => l.producedBy.mock).map((l) => STEP_NAME[l.step].toLowerCase());
@@ -427,6 +492,11 @@ export function Board({
   const article = useRef<HTMLElement>(null);
   // Where the shoot-base map exists, it stays put beside the locations and lights the pin of the one being read.
   const pinned = (t.base?.map?.tiles.length ?? 0) > 0 && t.locations.length > 0;
+  const referenceGrid = fill(t.references.length, "first");
+  const beatGrid = fill(t.beats.length, "last");
+  const placeGrid = fill(t.locations.length, "first");
+  const overlap = t.audience.overlap.filter((tag) => !isIdentityTag(tag.name));
+  const tasteTags = t.audience.taste_tags.filter((tag) => !isIdentityTag(tag.name));
   const [reading, setReading] = useState(0);
   const placeCards = useRef<(HTMLLIElement | null)[]>([]);
   useEffect(() => {
@@ -456,7 +526,7 @@ export function Board({
       )}
       <div className="flex flex-col gap-6">
         <Cover ref={cover} t={t} fontId={fontId} suggestion={suggestion} onPickFont={setPicked} />
-        <Giving t={t} mock={mock} />
+        <Giving t={t} mock={mock} whose={whose} />
         <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} note={reworkNote} />
       </div>
 
@@ -465,15 +535,15 @@ export function Board({
       <Section id="concept" title="Concept">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <p className="max-w-[44ch] font-serif text-[clamp(1.5rem,2.3vw,1.9rem)] leading-[1.32] text-pretty">{t.concept}</p>
-          {t.tone.length > 0 && (
+          {toneOf(t).length > 0 && (
             <div className={`${card} flex flex-col gap-4 p-5`}>
-              <h4 className="text-[14px] font-semibold text-dim">How the tone reads</h4>
+              <h3 className="text-[14px] font-semibold text-dim">How the tone reads</h3>
               <ul className="flex flex-col gap-4">
-                {t.tone.map((tone) => (
+                {toneOf(t).map((tone) => (
                   <li key={tone.tag.id} className="flex flex-col gap-1">
                     <p className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
-                      <span className={`font-mono font-semibold ${evidenceTone(mock)}`}>{tone.tag.name}</span>
-                      <span className="text-faint">{tone.source === "overlap" ? lingo.shared : "audience taste"}</span>
+                      <span className={`font-mono font-semibold ${evidenceTone(mock)}`}>{tagLabel(tone.tag.name)}</span>
+                      <span className="text-faint">{tone.source === "overlap" ? lingo.shared(whose) : "audience taste"}</span>
                     </p>
                     <p className="font-serif text-[1.2rem] leading-snug">{tone.note}</p>
                   </li>
@@ -487,21 +557,25 @@ export function Board({
       <Section
         id="references"
         title="References"
-        note={`Films this audience over-indexes on, ranked by ${source}. itsgiving wrote the notes.`}
+        note={`Films this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the notes.`}
       >
         {t.references.length === 0 ? (
           <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
         ) : (
-          <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {t.references.map((r) => (
-              <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden`}>
-                <Still src={r.entity.image} alt={`Still from ${r.entity.name}`} className="aspect-video w-full" />
+          <ul className={`grid gap-5 ${referenceGrid.grid}`}>
+            {t.references.map((r, i) => (
+              <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden ${referenceGrid.span(i)}`}>
+                <Still
+                  src={r.still ? tmdbSize(r.still, "w780") : r.entity.image}
+                  alt={r.still ? `Still from ${r.entity.name}` : `Poster for ${r.entity.name}`}
+                  className={`aspect-video w-full ${referenceGrid.wide(i)}`}
+                />
                 <div className="flex flex-1 flex-col gap-3.5 p-5">
                   <div className="flex flex-col gap-1">
-                    <h4 className="type-head text-[1.7rem] leading-tight">
+                    <h3 className="type-head text-[1.7rem] leading-tight">
                       {r.entity.name}
                       {r.entity.year && <span className="ml-2 text-[1.1rem] font-normal tracking-normal text-faint">{r.entity.year}</span>}
-                    </h4>
+                    </h3>
                     <QlooTags tags={r.qloo.tags} />
                   </div>
                   <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
@@ -530,13 +604,13 @@ export function Board({
       </Section>
 
       <Section id="beats" title="Beats">
-        <ol className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ol className={`grid gap-4 ${beatGrid.grid}`}>
           {t.beats.map((beat, i) => (
-            <li key={i} className={`${card} flex flex-col gap-2.5 p-5`}>
+            <li key={i} className={`${card} flex flex-col gap-2.5 p-5 ${beatGrid.span(i)}`}>
               <span aria-hidden className="type-poster text-[3.25rem] text-foreground/20">
                 {i + 1}
               </span>
-              <h4 className="type-head text-[1.45rem] leading-tight">{beat.title}</h4>
+              <h3 className="type-head text-[1.45rem] leading-tight">{beat.title}</h3>
               <p className={prose}>{beat.description}</p>
               {beat.reference && <p className="mt-auto pt-1 text-[13px] text-faint">After {beat.reference.name}</p>}
             </li>
@@ -554,16 +628,19 @@ export function Board({
       <Section
         id="wardrobe"
         title="Wardrobe"
-        note={`Brands this audience over-indexes on, ranked by ${source}. itsgiving wrote the looks.`}
+        note={`Brands this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the looks.`}
       >
         {t.wardrobe.length === 0 ? (
           <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
           <ul className="grid gap-5 md:grid-cols-2">
-            {t.wardrobe.map((w) => (
-              <li key={w.entity.id} className={`${card} flex flex-col gap-3.5 p-5`}>
+            {t.wardrobe.map((w, i) => (
+              <li
+                key={w.entity.id}
+                className={`${card} flex flex-col gap-3.5 p-5 ${i === t.wardrobe.length - 1 && i % 2 === 0 ? "md:col-span-2" : ""}`}
+              >
                 <div className="flex flex-col gap-1">
-                  <h4 className="type-head text-[1.7rem] leading-tight">{w.entity.name}</h4>
+                  <h3 className="type-head text-[1.7rem] leading-tight">{w.entity.name}</h3>
                   <QlooTags tags={w.qloo.tags} />
                 </div>
                 <p className={prose}>{w.notes.look}</p>
@@ -603,10 +680,12 @@ export function Board({
           {t.locations.length === 0 ? (
             <p className="text-[15px] text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
           ) : (
-            <ul className={pinned ? "flex flex-col gap-5" : "grid gap-5 sm:grid-cols-2 xl:grid-cols-3"}>
+            <ul className={pinned ? "flex flex-col gap-5" : `grid gap-5 ${placeGrid.grid}`}>
               {t.locations.map((l, i) => {
                 const place = l.entity.place;
-                const where = [place?.kind, place?.neighborhood, place?.price_level ? `price level ${place.price_level} of 4` : undefined]
+                // Mumbai's neighbourhoods come back as ward codes ("H/W Ward"), which say less than the base does.
+                const hood = place?.neighborhood && !/\bward\b/i.test(place.neighborhood) ? place.neighborhood : undefined;
+                const where = [place?.kind, hood, place?.price_level ? `price level ${place.price_level}\u00a0of\u00a04` : undefined]
                   .filter(Boolean)
                   .join(", ");
                 const map =
@@ -620,13 +699,13 @@ export function Board({
                       placeCards.current[i] = el;
                     }}
                     data-place={i}
-                    className={`${card} flex flex-col overflow-hidden ${pinned && reading === i ? "ring-2 ring-foreground" : ""}`}
+                    className={`${card} flex flex-col overflow-hidden ${pinned ? (reading === i ? "ring-2 ring-foreground" : "") : placeGrid.span(i)}`}
                   >
                     <div className="relative">
                       <Still
                         src={l.entity.image}
                         alt={`Photo of ${l.entity.name}`}
-                        className={`${pinned ? "aspect-video" : "aspect-[3/2]"} w-full`}
+                        className={`${pinned ? "aspect-video" : `aspect-[3/2] ${placeGrid.wide(i)}`} w-full`}
                       />
                       <span
                         aria-hidden
@@ -647,7 +726,7 @@ export function Board({
                     </div>
                     <div className="flex flex-1 flex-col gap-3 p-5">
                       <div>
-                        <h4 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h4>
+                        <h3 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h3>
                         {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
                       </div>
                       {place?.ambience && (
@@ -701,7 +780,7 @@ export function Board({
             ] as const
           ).map(([label, lines]) => (
             <div key={label} className={`${card} p-5`}>
-              <h4 className="text-[14px] font-semibold text-dim">{label}</h4>
+              <h3 className="text-[14px] font-semibold text-dim">{label}</h3>
               <ul className="mt-1 flex flex-col divide-y divide-line">
                 {lines.map((line, i) => (
                   <li key={i} className={`py-3 ${prose}`}>
@@ -737,25 +816,25 @@ export function Board({
       >
         <div className={`${card} p-6`}>
           <dl className="grid gap-x-10 gap-y-6 md:grid-cols-[14rem_minmax(0,1fr)]">
-            {t.audience.overlap.length > 0 && (
+            {overlap.length > 0 && (
               <>
-                <dt className="text-[15px] font-semibold">Shared by your films and the audience</dt>
+                <dt className="text-[15px] font-semibold">Shared by {whose} films and the audience</dt>
                 <dd>
-                  <EvidenceChips tags={t.audience.overlap} mock={mock} shared />
+                  <EvidenceChips tags={overlap} mock={mock} shared />
                 </dd>
               </>
             )}
-            <dt className="text-[15px] font-semibold">The audience over-indexes on</dt>
+            <dt className="text-[15px] font-semibold">Themes and genres the audience over-indexes on</dt>
             <dd>
-              {t.audience.taste_tags.length > 0 ? (
-                <EvidenceChips tags={t.audience.taste_tags} mock={mock} />
+              {tasteTags.length > 0 ? (
+                <EvidenceChips tags={tasteTags} mock={mock} />
               ) : (
                 <p className="text-[15px] text-dim">No taste tags came back.</p>
               )}
             </dd>
             {t.audience.leans.length > 0 && (
               <>
-                <dt className="text-[15px] font-semibold">Who over-indexes</dt>
+                <dt className="text-[15px] font-semibold">Age and gender</dt>
                 <dd className={`font-mono text-[13px] leading-6 ${evidenceTone(mock)}`}>{t.audience.leans.join("; ")}</dd>
               </>
             )}
@@ -764,7 +843,7 @@ export function Board({
       </Section>
 
       <Section id="credits" title="Credits">
-        <div className="grid gap-5 xl:grid-cols-2">
+        <div className="grid items-start gap-5 xl:grid-cols-2">
           <div className={`${card} p-6`}>
             <dl className="grid gap-x-8 gap-y-3 text-[15px] leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
               <dt className="text-faint">Built</dt>
@@ -782,11 +861,17 @@ export function Board({
               ))}
               {t.director.length > 0 && (
                 <>
-                  <dt className="text-faint">Your taste</dt>
+                  <dt className="text-faint">{own ? "Your taste" : "Director's taste"}</dt>
                   <dd>
                     {names(t.director.slice(0, 8))}
                     {t.director.length > 8 ? ` and ${t.director.length - 8} more` : ""}
                   </dd>
+                </>
+              )}
+              {t.references.some((r) => r.still) && (
+                <>
+                  <dt className="text-faint">Film stills</dt>
+                  <dd>TMDB</dd>
                 </>
               )}
               <dt className="text-faint">Creative direction</dt>

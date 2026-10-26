@@ -2,6 +2,8 @@
 
 import type { StepId, TreatmentWho } from "./types";
 
+export { excerpt } from "../text";
+
 /** Iterate chips: each one re-runs plan and write with a nudge. */
 export const NUDGES = ["darker", "more_90s", "deeper_cuts", "cheaper_locations"] as const;
 export type Nudge = (typeof NUDGES)[number];
@@ -46,16 +48,42 @@ export const NONE_PICK = "none";
 export const TMDB_NOTICE = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
 
 /**
- * A short excerpt of a longer text: whole sentences when one fits, else whole words and an ellipsis. Never cut
- * mid-word, as a CSS line clamp does ("a quiet dining experi…").
+ * Tags that name who people are rather than what they like: sexual orientation and gender identity, religion,
+ * ethnicity, health, party politics. Qloo has some as film themes ("LGBT", "lesbian"), but "the audience over-indexes
+ * on lesbian" or "it's giving gay" reads as profiling the people in it, so they never become tone or evidence. The
+ * kit's SAFE_USE rules out inferring health or politics from taste.
  */
-export function excerpt(text: string, max: number): string {
-  const clean = text.replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  const end = clean.lastIndexOf(". ", max - 1);
-  if (end > max / 2) return clean.slice(0, end + 1);
-  const space = clean.lastIndexOf(" ", max - 1);
-  return `${clean.slice(0, space > 0 ? space : max - 1).replace(/[,;:]$/, "")}…`;
+const IDENTITY_TAG =
+  /\b(lgbt\w*|lesbian\w*|gay|gays|queer\w*|bisexual\w*|homosexual\w*|transgender\w*|transsexual\w*|non-?binary|same-sex|coming out|sexual orientation|gender identity|muslims?|islam\w*|jewish|jews?|judaism|christians?|christianity|hindus?|hinduism|sikhs?|sikhism|buddhis[mt]s?|catholics?|catholicism|african[- ]americans?|asian[- ]americans?|latin[oax]s?|hispanics?|mental (illness|health)|depression|autis(m|tic)|disabilit(y|ies)|disabled|addiction|alcoholism|suicid\w*|democrats?|republicans?|right-wing|left-wing)\b/i;
+
+export function isIdentityTag(name: string): boolean {
+  return IDENTITY_TAG.test(name);
+}
+
+/** A TMDB image at another of its sizes: covers take w1280, cards w780. */
+export function tmdbSize(url: string, size: "w780" | "w1280"): string {
+  return url.replace(/(image\.tmdb\.org\/t\/p\/)w\d+\//, `$1${size}/`);
+}
+
+/**
+ * A treatment's cover still: the first reference film's still (TMDB's backdrop). Never a poster, whose own lettering
+ * fights the title; with no still the cover is the palette alone.
+ */
+export function coverStill(t: { references: { still?: string }[] }): string | undefined {
+  return t.references.find((r) => r.still)?.still;
+}
+
+const SMALL_WORDS = new Set(["a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"]);
+
+/**
+ * A Qloo tag's name as a chip shows it. Qloo mixes "love", "new york city" and "Quirkily Humorous": an all-lowercase
+ * name is put in title case to match, and anything already capitalized (R&B, LGBT, Quirkily Humorous) is left alone.
+ */
+export function tagLabel(name: string): string {
+  if (name !== name.toLowerCase()) return name;
+  return name.replace(/[a-z][\w'’-]*/g, (word, at: number) =>
+    at > 0 && SMALL_WORDS.has(word) ? word : word[0].toUpperCase() + word.slice(1),
+  );
 }
 
 /** "A", "A and B", "A, B and C". */
@@ -116,7 +144,7 @@ export const STEP_ORDER: StepId[] = [
 
 /** Timeline labels, shared so a treatment replayed from cache shows the same steps the server names. */
 export const STEP_LABELS: Record<StepId, string> = {
-  resolve: "Resolve names in Qloo",
+  resolve: "Find the names in Qloo",
   audience: "Read the audience",
   overlap: "Compare with your taste",
   heatmap: "Map where the fans are",
