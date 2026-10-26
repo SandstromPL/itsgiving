@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { primaryButton } from "@/app/studio/landing";
 import { ModeBadges } from "@/app/studio/parts";
-import { HeaderLink, SiteHeader } from "@/app/studio/site-header";
+import { SiteHeader } from "@/app/studio/site-header";
 import { EXAMPLES } from "@/lib/agent/examples";
 import { featuredItem, featuredOffered } from "@/lib/agent/featured";
 import { FeaturedBoard } from "./featured-board";
@@ -38,17 +38,7 @@ export default async function FeaturedPage({ params }: PageProps<"/t/[slug]">) {
   const item = lookup(slug);
   return (
     <>
-      <SiteHeader
-        links={
-          <>
-            <HeaderLink href="/#now-showing">All examples</HeaderLink>
-            <HeaderLink href="/studio">Studio</HeaderLink>
-            <HeaderLink href="/about">About</HeaderLink>
-          </>
-        }
-        badges={item && <ModeBadges qloo="live" llm="live" treatment={item.treatment} />}
-        unc
-      />
+      <SiteHeader current="examples" badges={item && <ModeBadges qloo="live" llm="live" treatment={item.treatment} />} />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-8 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
         {item ? (
           <FeaturedBoard slug={slug} treatment={item.treatment} />

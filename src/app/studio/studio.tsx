@@ -16,7 +16,7 @@ import { useLingo } from "./lingo";
 import { BackArrow, ModeBadges } from "./parts";
 import { Picker } from "./picker";
 import { studioSession, type RunInput } from "./session";
-import { HeaderLink, SiteHeader } from "./site-header";
+import { SiteHeader } from "./site-header";
 import { StreamError, streamTreatment } from "./stream";
 import { RunStage, Timeline, replaySteps } from "./timeline";
 
@@ -34,6 +34,13 @@ const STALL_MS = 75_000;
  */
 const BOARD_ENTRY = "board";
 const onBoardEntry = () => window.history.state?.itsgiving === BOARD_ENTRY;
+
+/**
+ * The history entry the page is on, by its Navigation API key, or null where the browser has no Navigation API.
+ * Coming back to the entry the studio was left on means Back or Forward; a link to the studio makes a new one.
+ */
+const entryKey = () =>
+  (window as Window & { navigation?: { currentEntry?: { key: string } | null } }).navigation?.currentEntry?.key ?? null;
 
 const STUDIO_TITLE = "Studio: itsgiving";
 
@@ -132,6 +139,9 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   /** Set when the director steps back out of a board, so the brief can focus the way back in. */
   const leftBoard = useRef(false);
   const viewNow = useRef(view);
+  /** Where the page is, and in which history entry: kept when the director leaves for another page. */
+  const spot = useRef<{ y: number; key: string | null }>({ y: 0, key: null });
+  const leftAt = useRef<{ y: number; key: string | null } | null>(null);
   const running = phase === "running";
   const onBoard = treatment !== null && view === "board";
   useReceipts(treatment);
@@ -157,8 +167,16 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   // back itself: the browser's own restoring would land after it, at wherever the entry was first written. Only on
   // this page's entries: the homepage and featured pages keep the browser's own.
   useEffect(() => {
-    const restoring = window.history.scrollRestoration;
     window.history.scrollRestoration = "manual";
+    // Back or Forward from another page lands on this page's entry, which the browser won't restore: this does. The
+    // traversal's own events can't say so, since Next has shown the page again before they fire.
+    const left = leftAt.current;
+    if (left?.key && left.key === entryKey()) window.scrollTo({ top: left.y });
+    spot.current = { y: window.scrollY, key: entryKey() };
+    // Only this page's own scrolling: leaving for "/#now-showing" scrolls the next page before this page lets go.
+    const onScroll = () => {
+      if (window.location.pathname === "/studio") spot.current = { y: window.scrollY, key: entryKey() };
+    };
     const onPop = () => {
       const next = onBoardEntry() ? "board" : "studio";
       if (next === viewNow.current) return;
@@ -168,10 +186,16 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
       }
       setView(next);
     };
+    window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("popstate", onPop);
     return () => {
+      window.removeEventListener("scroll", onScroll);
       window.removeEventListener("popstate", onPop);
-      window.history.scrollRestoration = restoring;
+      leftAt.current = spot.current;
+      // The mode is kept per history entry, and this runs once the next page's entry is current: that page keeps the
+      // browser's own restoring. (Putting back the mode found on arrival leaked "manual": arriving by Back, the
+      // studio's entry still holds it.)
+      window.history.scrollRestoration = "auto";
     };
   }, []);
 
@@ -180,13 +204,14 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     if (view === "board") {
       if (boardSpot.current !== null) window.scrollTo({ top: boardSpot.current });
       boardSpot.current = null;
-      return;
+    } else if (leftBoard.current) {
+      // Back at the brief from a board: the top of the page, with focus on the way back in.
+      leftBoard.current = false;
+      window.scrollTo({ top: 0 });
+      document.getElementById("reopen-board")?.focus({ preventScroll: true });
     }
-    // Back at the brief from a board: the top of the page, with focus on the way back in.
-    if (!leftBoard.current) return;
-    leftBoard.current = false;
-    window.scrollTo({ top: 0 });
-    document.getElementById("reopen-board")?.focus({ preventScroll: true });
+    // A board or the brief can be a new history entry without any scrolling to note it.
+    spot.current = { y: window.scrollY, key: entryKey() };
   }, [view]);
 
   // Leaving the page mid-run shouldn't keep spending model quota and credit. Next keeps a page it leaves (hidden, for
@@ -425,14 +450,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   return (
     <>
       <SiteHeader
-        links={
-          <>
-            <HeaderLink href="/#now-showing">Examples</HeaderLink>
-            <HeaderLink href="/about">About</HeaderLink>
-          </>
-        }
+        current="studio"
         badges={modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={(onBoard && treatment) || undefined} /> : initialBadges}
-        unc
       />
       <p role="status" aria-live="polite" className="sr-only">
         {status}

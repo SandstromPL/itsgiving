@@ -1,7 +1,7 @@
 import { EXAMPLES } from "@/lib/agent/examples";
 import { featuredCovers, featuredItem, featuredOffered, featuredRun, loadFeatured } from "@/lib/agent/featured";
 import { Hero, HowItWorks, HowItWorksSteps, NowShowing, StartYourOwn } from "./studio/landing";
-import { HeaderLink, SiteHeader } from "./studio/site-header";
+import { SiteHeader } from "./studio/site-header";
 import { suggestTitleFont } from "./studio/title-fonts";
 
 /**
@@ -17,16 +17,7 @@ export default function Home() {
   const first = items[0];
   return (
     <>
-      <SiteHeader
-        home
-        links={
-          <>
-            {covers.length > 0 && <HeaderLink href="#now-showing">Examples</HeaderLink>}
-            <HeaderLink href="/studio">Studio</HeaderLink>
-            <HeaderLink href="/about">About</HeaderLink>
-          </>
-        }
-      />
+      <SiteHeader home />
       <main className="flex flex-1 flex-col">
         <Hero cover={covers[0]} fontId={first && suggestTitleFont(first.treatment).id} />
         <NowShowing covers={covers} />

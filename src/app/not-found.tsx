@@ -1,17 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { HeaderLink, SiteHeader } from "./studio/site-header";
+import { SiteHeader } from "./studio/site-header";
+
+export const metadata: Metadata = { title: "Page not found: itsgiving" };
 
 export default function NotFound() {
   return (
     <>
-      <SiteHeader
-        links={
-          <>
-            <HeaderLink href="/studio">Studio</HeaderLink>
-            <HeaderLink href="/about">About</HeaderLink>
-          </>
-        }
-      />
+      <SiteHeader />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col justify-center gap-6 px-4 py-24 sm:px-8">
         <span className="-rotate-3 self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-[#121211]">404</span>
         <h1 className="type-poster max-w-[14ch] text-[clamp(3.5rem,8vw,7rem)]">this page is giving… nothing</h1>

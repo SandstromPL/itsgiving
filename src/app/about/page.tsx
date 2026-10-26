@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { StartYourOwn } from "../studio/landing";
-import { HeaderLink, SiteHeader } from "../studio/site-header";
+import { SiteHeader } from "../studio/site-header";
 
 // About: who itsgiving is for (first, as Paritosh asked), what it is, what Qloo is, and how one uses the other. Static,
 // like the homepage. Qloo's facts come from research/qloo-company-and-judges.md, each dated there.
@@ -111,14 +111,7 @@ const lead = "max-w-[60ch] text-[1.2rem] leading-[1.55] text-dim";
 export default function About() {
   return (
     <>
-      <SiteHeader
-        links={
-          <>
-            <HeaderLink href="/#now-showing">Examples</HeaderLink>
-            <HeaderLink href="/studio">Studio</HeaderLink>
-          </>
-        }
-      />
+      <SiteHeader current="about" />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-24 px-4 pt-10 pb-20 sm:px-8 sm:pt-14">
         <section aria-labelledby="who-heading" className="flex flex-col gap-10">
           <div className="flex flex-col gap-6">

@@ -113,7 +113,22 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  if (covers.length === 0) return null;
+  // Without featured treatments (a server without keys), the header's Examples link still needs somewhere to land.
+  if (covers.length === 0) {
+    return (
+      <section id="now-showing" aria-labelledby="featured-heading" className="mx-auto w-full max-w-[80rem] px-4 py-12 sm:px-8">
+        <div className="flex flex-col gap-3 rounded-[28px] border border-line bg-card p-8">
+          <h2 id="featured-heading" className="type-head text-[clamp(1.75rem,3vw,2.25rem)] leading-none">
+            {t.nowShowing}
+          </h2>
+          <p className="max-w-[60ch] text-[1.05rem] leading-[1.55] text-dim">
+            Featured treatments are built from live Qloo data when the site is deployed with its keys, and this server has none. The studio
+            still builds treatments.
+          </p>
+        </div>
+      </section>
+    );
+  }
   return (
     <section id="now-showing" ref={strip} aria-labelledby="featured-heading" className="surface-dark grain relative isolate bg-background">
       <span aria-hidden data-on={lit || undefined} className="beam print:hidden" />

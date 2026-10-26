@@ -110,7 +110,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   change.
 - **About** (`/about`) says who itsgiving is for first (music-video directors, short-film makers, and the labels,
   managers and producers who commission them), then what it is, what Qloo is, and how each step of a run uses Qloo.
-  It's linked next to Studio in every header, and from the footer on phones, where the header's links are hidden.
+- **One header on every page:** Examples, Studio and About, with the current section lit (a featured treatment counts
+  as Examples), then the unc-mode switch and the theme, since both choices carry across pages. Pages add only status
+  badges, live or mock. On phones it takes two rows, and only the mock warnings among the badges show there.
 - **Light or dark,** switched in the header and remembered per browser. Light is the default, and nothing on a page
   changes it.
 

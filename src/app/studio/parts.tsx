@@ -60,7 +60,8 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
       {qloo === "mock" ? (
         <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>
       ) : (
-        <span className="inline-flex items-center gap-2 rounded-full border border-foreground px-3 py-1.5 whitespace-nowrap">
+        // Phones keep the header to two rows; only the mock warnings must show there.
+        <span className="hidden items-center gap-2 rounded-full border border-foreground px-3 py-1.5 whitespace-nowrap sm:inline-flex">
           <span aria-hidden className="size-2 rounded-full bg-[#1f8a4c]" />
           Live Qloo data
         </span>
@@ -89,7 +90,7 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
 
 /** Shown in place of the badges until the server has said which data sources are live. */
 export function ModesPending() {
-  return <span className="text-[13px] text-faint">Checking data sources…</span>;
+  return <span className="hidden text-[13px] text-faint sm:inline">Checking data sources…</span>;
 }
 
 /** An image from Qloo (or a mock placeholder); plain <img> because hosts vary per entity. */

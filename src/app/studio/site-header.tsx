@@ -6,34 +6,32 @@ import { Wordmark } from "./eggs";
 import { UncSwitch } from "./lingo";
 import { ThemeSwitch } from "./theme";
 
-/** A plain link in the header: Studio, Examples. */
-export function HeaderLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} className="rounded-full px-3 py-2 text-[15px] font-semibold text-dim hover:bg-card hover:text-foreground">
-      {children}
-    </Link>
-  );
-}
+/** The site's sections, the same in every header. The examples live on the homepage; a featured treatment is one. */
+const NAV = [
+  { id: "examples", href: "/#now-showing", label: "Examples" },
+  { id: "studio", href: "/studio", label: "Studio" },
+  { id: "about", href: "/about", label: "About" },
+] as const;
+
+export type Section = (typeof NAV)[number]["id"];
 
 /**
- * The header on every page. It scrolls away with the page; a board has its own sticky section bar. Each page brings
- * its own links and badges: the homepage's badges would make it render per request, and a featured page's must not.
- * On phones the wordmark and the unc switch share the first row and the badges and the theme the second; the links
- * stay off, since every page carries its own ways on (the hero's buttons, the way back above a board, the closing
- * call) and three rows would push the page down.
+ * The header on every page: the wordmark, the same three links with the current section lit, the plain-copy switch
+ * (its choice carries across pages, so it's on every one) and the theme. Pages add only status badges, live or mock.
+ * Each page names its section rather than the header reading the URL: with Cache Components a pathname read can
+ * suspend on a route's fallback shell, and a featured treatment's page must stay static. It scrolls away with the
+ * page; a board has its own sticky section bar. On phones it takes two rows: the wordmark and the unc switch, then
+ * the links and the theme. Badges wrap below only when they warn (mock data); "Live Qloo data" stays off phones.
  */
 export function SiteHeader({
   home = false,
-  links,
+  current,
   badges,
-  unc = false,
 }: {
   /** On the homepage the wordmark is its tap egg; everywhere else it's the way home. */
   home?: boolean;
-  links?: ReactNode;
+  current?: Section;
   badges?: ReactNode;
-  /** The plain-copy switch, for the pages where the tool talks. */
-  unc?: boolean;
 }) {
   return (
     <header className="border-b border-line/80 print:border-0">
@@ -41,21 +39,33 @@ export function SiteHeader({
         <div className="order-1 sm:mr-2">
           <Wordmark href={home ? undefined : "/"} />
         </div>
-        {links && (
-          <nav aria-label="Site" className="order-4 hidden items-center gap-1 sm:order-2 sm:flex">
-            {links}
-          </nav>
-        )}
-        {badges && <div className="order-5 flex flex-wrap items-center gap-2 sm:order-3 sm:ml-auto print:hidden">{badges}</div>}
-        {unc && (
-          <div className="order-2 ml-auto sm:order-4 sm:ml-0">
-            <UncSwitch />
-          </div>
-        )}
-        {unc && <span aria-hidden className="order-3 basis-full sm:hidden" />}
-        <div className={`order-6 ml-auto sm:order-5 ${badges || unc ? "sm:ml-0" : ""}`}>
+        <div className={`order-2 ml-auto sm:order-4 ${badges ? "sm:ml-0" : ""} print:hidden`}>
+          <UncSwitch />
+        </div>
+        <span aria-hidden className="order-3 basis-full sm:hidden" />
+        <nav aria-label="Site" className="order-4 -ml-2.5 flex items-center gap-1 sm:order-2 sm:ml-0 print:hidden">
+          {NAV.map((item) => {
+            const here = item.id === current;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                // The examples link points at the homepage's strip, so on a featured treatment it's the current
+                // section rather than the current page.
+                aria-current={here ? (item.id === "examples" ? "true" : "page") : undefined}
+                className={`rounded-full px-2.5 py-2 text-[15px] font-semibold sm:px-3 ${
+                  here ? "bg-foreground text-background" : "text-dim hover:bg-card hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="order-5 ml-auto sm:ml-0 print:hidden">
           <ThemeSwitch />
         </div>
+        {badges && <div className="order-6 flex flex-wrap items-center gap-2 sm:order-3 sm:ml-auto print:hidden">{badges}</div>}
       </div>
     </header>
   );
