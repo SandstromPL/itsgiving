@@ -17,7 +17,7 @@ export interface Bounds {
  * Rounded, so the server and the browser print the same numbers: their Math.log and Math.sin can differ in the last
  * bits, and React would call the difference a hydration mismatch. A hundredth of a pixel is plenty for a map.
  */
-const fixed = (value: number, places = 2) => Math.round(value * 10 ** places) / 10 ** places;
+export const fixed = (value: number, places = 2) => Math.round(value * 10 ** places) / 10 ** places;
 
 /** Web Mercator, in world pixels at `zoom`. */
 function project(lat: number, lon: number, zoom: number) {

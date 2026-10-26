@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Treatment } from "@/lib/agent/types";
 import { useLingo } from "./lingo";
@@ -12,8 +13,11 @@ const KONAMI = ["arrowup", "arrowup", "arrowdown", "arrowdown", "arrowleft", "ar
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
-/** The Konami code toggles the director's cut; Escape leaves it. Keys typed into a field don't count. */
-export function useDirectorsCut(): [boolean, () => void] {
+/**
+ * The Konami code toggles the director's cut; Escape leaves it. Keys typed into a field don't count. While it's on,
+ * `data-cut` on <html> shows the decorations a board keeps for it (`.cut-only` in globals.css).
+ */
+function useDirectorsCut(): [boolean, () => void] {
   const [on, setOn] = useState(false);
   const step = useRef(0);
   useEffect(() => {
@@ -30,12 +34,18 @@ export function useDirectorsCut(): [boolean, () => void] {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (on) root.dataset.cut = "on";
+    else delete root.dataset.cut;
+  }, [on]);
   return [on, () => setOn(false)];
 }
 
-/** Letterbox bars and grain over the whole page, like the board is being projected. */
-export function DirectorsCut({ on, onExit }: { on: boolean; onExit: () => void }) {
+/** Letterbox bars and grain over the whole page, like the board is being projected. On every page (layout.tsx). */
+export function DirectorsCut() {
   const { t } = useLingo();
+  const [on, onExit] = useDirectorsCut();
   if (!on) return null;
   return (
     <div className="print:hidden">
@@ -63,11 +73,26 @@ export function DirectorsCut({ on, onExit }: { on: boolean; onExit: () => void }
 
 const CYCLE = ["it's giving… A24", "it's giving… Wes Anderson", "it's giving… Wong Kar-wai", "it's giving… Bollywood"];
 
+/** A lime cinema camera on an ink tile, like the tab icon (src/app/icon.svg), and the name. */
+function Mark({ name }: { name: string }) {
+  return (
+    <>
+      {/* An ink tile in either room: in the dark one its edge keeps it visible. */}
+      <span aria-hidden className="grid h-[26px] w-[34px] shrink-0 place-items-center rounded-lg bg-[#121211] ring-1 ring-edge/60">
+        <CameraMark height={17} />
+      </span>
+      <span aria-hidden className="text-[27px] leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
+        {name}
+      </span>
+    </>
+  );
+}
+
 /**
- * The wordmark: a lime cinema camera on an ink tile, like the tab icon (src/app/icon.svg), and the name. Each tap also
- * calls `onTap` (on a treatment, that's the way home); five quick taps cycle through what it could be giving.
+ * The wordmark. Away from the homepage it's the way home; on the homepage, five quick taps cycle through what it could
+ * be giving.
  */
-export function Wordmark({ onTap }: { onTap?: () => void }) {
+export function Wordmark({ href }: { href?: string }) {
   const taps = useRef<number[]>([]);
   const [line, setLine] = useState<number | null>(null);
 
@@ -77,8 +102,15 @@ export function Wordmark({ onTap }: { onTap?: () => void }) {
     return () => clearTimeout(timer);
   }, [line]);
 
+  if (href) {
+    return (
+      <Link href={href} aria-label="itsgiving, home" className="flex items-center gap-2.5 rounded-xl">
+        <Mark name="itsgiving" />
+      </Link>
+    );
+  }
+
   const tap = () => {
-    onTap?.();
     const now = Date.now();
     taps.current = [...taps.current.filter((at) => now - at < 2000), now];
     if (taps.current.length >= 5 && line === null) {
@@ -88,19 +120,8 @@ export function Wordmark({ onTap }: { onTap?: () => void }) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={tap}
-      aria-label={onTap ? "itsgiving, home" : "itsgiving"}
-      className="flex items-center gap-2.5 rounded-xl text-left"
-    >
-      {/* An ink tile in either room: in the dark one its edge keeps it visible. */}
-      <span aria-hidden className="grid h-[26px] w-[34px] shrink-0 place-items-center rounded-lg bg-[#121211] ring-1 ring-edge/60">
-        <CameraMark height={17} />
-      </span>
-      <span aria-hidden className="text-[27px] leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
-        {line === null ? "itsgiving" : CYCLE[line]}
-      </span>
+    <button type="button" onClick={tap} aria-label="itsgiving" className="flex items-center gap-2.5 rounded-xl text-left">
+      <Mark name={line === null ? "itsgiving" : CYCLE[line]} />
     </button>
   );
 }
@@ -115,11 +136,16 @@ const NOTE = [
   "type receipts() to list the Qloo calls behind the treatment on screen.",
 ].join("\n");
 
-/** A note in DevTools for whoever opens it, and receipts() to list the Qloo calls behind the board. */
-export function useConsoleNote(treatment: Treatment | null) {
+/** A note in DevTools for whoever opens it, printed once a visit (layout.tsx). */
+export function ConsoleNote() {
   useEffect(() => {
     console.log(`%c${NOTE}`, "font-family: monospace; line-height: 1.5");
   }, []);
+  return null;
+}
+
+/** receipts() in DevTools lists the Qloo calls behind the board on screen. */
+export function useReceipts(treatment: Treatment | null) {
   useEffect(() => {
     const receipts = () => {
       const rows = treatment

@@ -1,0 +1,62 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { Board } from "@/app/studio/board";
+import { useReceipts } from "@/app/studio/eggs";
+import { handOff } from "@/app/studio/handoff";
+import { StartYourOwn } from "@/app/studio/landing";
+import { BackArrow } from "@/app/studio/parts";
+import { Timeline, replaySteps } from "@/app/studio/timeline";
+import type { Nudge } from "@/lib/agent/options";
+import type { Treatment } from "@/lib/agent/types";
+
+/**
+ * A featured treatment's board, read-only: it was built when the site was deployed. A rework chip hands it to the
+ * studio (handoff.tsx), which opens the same board at once and re-runs it there with the change. The way out is a link
+ * to the examples, never history.back(): someone arriving from a shared link has no page of ours behind them.
+ */
+export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Treatment }) {
+  const router = useRouter();
+  useReceipts(treatment);
+  useEffect(() => {
+    router.prefetch("/studio");
+  }, [router]);
+  const rework = (nudge: Nudge) => {
+    handOff(slug, nudge);
+    router.push("/studio");
+  };
+  return (
+    <div className="flex flex-col gap-8">
+      <Link
+        href="/#now-showing"
+        className="-mb-2 flex min-h-11 items-center gap-2 self-start rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card print:hidden"
+      >
+        <BackArrow />
+        All examples
+      </Link>
+      <Board
+        treatment={treatment}
+        state="current"
+        nudges={[]}
+        onToggleNudge={rework}
+        running={false}
+        take={1}
+        log={<Timeline steps={replaySteps(treatment, "Built when the site was deployed: these are the calls that made it.")} />}
+        back={
+          <Link
+            href="/#now-showing"
+            aria-label="All examples"
+            title="All examples"
+            className="-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card"
+          >
+            <BackArrow />
+          </Link>
+        }
+        reworkNote="Built ahead of time. A change opens it in the studio, which re-runs the plan and the writing with it."
+      />
+      <StartYourOwn />
+    </div>
+  );
+}

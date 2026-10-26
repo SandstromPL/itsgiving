@@ -1,12 +1,12 @@
 import { Fragment } from "react";
-import { joinNames } from "@/lib/agent/options";
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
-import { MapCredit, StreetTiles, mapFrame, type MapFrame } from "./street-map";
+import { MapCredit, StreetTiles, fixed, mapFrame, type MapFrame } from "./street-map";
 
 // The shoot base: Qloo's heatmap around the strongest areas for this audience, on the city's streets, with the
 // areas as rings, the one the planner chose, and the scouted locations as numbered pins. Squares, rings and leader
 // lines are SVG and scale with the map; names and numbers are HTML on top, so they stay legible at any width.
+// One drawing everywhere: a treatment's board and the homepage's "How it works" both use ShootBaseBlock.
 
 /** The frame's longer side in SVG units; about a pixel each on a desktop screen. */
 const W = 600;
@@ -34,15 +34,6 @@ export function locationPins(t: Treatment): Pin[] {
  * sequential scale.
  */
 export const heatAlpha = (heat: number) => (heat < 0.15 ? 0 : Math.round(820 * heat ** 2) / 1000);
-
-/** "Prateek Kuhad's audience", or the audience for the films a short is after: who the heatmap is of. */
-function audienceOf(t: Treatment): string {
-  const artists = t.subjects.filter((s) => s.kind === "artist").map((s) => s.name);
-  const others = t.subjects.filter((s) => s.kind !== "artist").map((s) => s.name);
-  if (artists.length === 1 && others.length === 0) return `${artists[0]}'s audience`;
-  const who = [...artists, ...others];
-  return who.length > 0 ? `the audience for ${joinNames(who)}` : "this audience";
-}
 
 /** The map's frame: the grid's bounds, grown to keep every pin inside. */
 function frame(map: HeatGrid, pins: Pin[]): MapFrame {
@@ -75,9 +66,10 @@ function placePins(spots: Point[]): Point[] {
   for (const spot of spots) {
     let at = spot;
     for (let ring = 1; ring <= 4 && placed.some((p) => near(p, at, PIN_GAP)); ring++) {
+      // Rounded like the frame, so the server and the browser place a nudged pin on the same spot.
       const options = Array.from({ length: 8 }, (_, k) => ({
-        x: spot.x + Math.cos((k * Math.PI) / 4 - Math.PI / 2) * PIN_GAP * ring,
-        y: spot.y + Math.sin((k * Math.PI) / 4 - Math.PI / 2) * PIN_GAP * ring,
+        x: fixed(spot.x + Math.cos((k * Math.PI) / 4 - Math.PI / 2) * PIN_GAP * ring),
+        y: fixed(spot.y + Math.sin((k * Math.PI) / 4 - Math.PI / 2) * PIN_GAP * ring),
       }));
       at = options.find((o) => !placed.some((p) => near(p, o, PIN_GAP))) ?? at;
     }
@@ -299,31 +291,43 @@ function HeatMap({
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 
+/**
+ * The shoot base and its map. Takes the parts rather than a whole treatment, so the homepage can draw a featured run's
+ * base exactly as its board does. With no pins (the homepage lists no locations) the numbers and their legend drop out.
+ */
 export function ShootBaseBlock({
-  t,
+  base,
+  pins = [],
+  city,
+  audience,
   mock,
   active,
   compact = false,
 }: {
-  t: Treatment;
+  base?: ShootBase;
+  /** The scouted places, numbered as on the location cards. */
+  pins?: Pin[];
+  city: string;
+  /** Whose heatmap it is, as a phrase: "Prateek Kuhad's audience" (audiencePhrase in options.ts). */
+  audience: string;
   mock: boolean;
   /** The location being read, highlighted on the map. */
   active?: number;
-  /** Pinned beside the location cards: the map with a short header instead of the side panel. */
+  /** Beside the location cards, or on the homepage: the map with a short header instead of the side panel. */
   compact?: boolean;
 }) {
-  const base = t.base;
   const chosen = base?.areas.find((a) => a.ref === base.chosen) ?? base?.areas[0];
   if (!base || !chosen) return null;
-  const pins = locationPins(t);
   const others = base.areas.filter((a) => a.ref !== chosen.ref);
   const evidence = mock ? "text-tape" : "text-tungsten";
   const km = `${chosen.radius_m / 1000} km`;
+  const locations = pins.length > 0 ? "Every location" : "Every location in the treatment";
   const share = (
     <span className={`rounded-md px-1.5 py-0.5 font-bold text-[#121211] ${mock ? "bg-[#ffd6ea]" : "bg-accent"}`}>
       {percent(chosen.share)}
     </span>
   );
+  const map = base.map && base.map.tiles.length > 0 && base.map;
   if (compact) {
     return (
       <div className="surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6">
@@ -333,25 +337,14 @@ export function ShootBaseBlock({
             <p className="type-poster mt-1.5 text-[clamp(2rem,3.2vw,2.75rem)]">{chosen.name}</p>
           </div>
           <p className="text-[14px] leading-6">
-            {share} of this audience&apos;s strongest spots in {t.brief.city}
+            {share} of this audience&apos;s strongest spots in {city}
           </p>
         </div>
-        {base.map && base.map.tiles.length > 0 && (
-          <HeatMap
-            base={base}
-            map={base.map}
-            pins={pins}
-            city={t.brief.city}
-            audience={audienceOf(t)}
-            mock={mock}
-            active={active}
-            compact
-          />
-        )}
+        {map && <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} active={active} compact />}
         <p className="text-sm leading-6 text-dim">
           {base.held
-            ? `Every location is within ${km} of ${chosen.name}, so the unit can stay in one area.`
-            : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${t.brief.city}.`}
+            ? `${locations} is within ${km} of ${chosen.name}, so the unit can stay in one area.`
+            : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${city}.`}
           {others.length > 0 && ` Also strong: ${others.map((a) => `${a.name} (${percent(a.share)})`).join(", ")}.`}
         </p>
       </div>
@@ -359,8 +352,8 @@ export function ShootBaseBlock({
   }
   return (
     <div className="surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem]">
-      {base.map && base.map.tiles.length > 0 ? (
-        <HeatMap base={base} map={base.map} pins={pins} city={t.brief.city} audience={audienceOf(t)} mock={mock} />
+      {map ? (
+        <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} />
       ) : (
         <p className="text-sm text-dim">The heatmap itself didn&apos;t come back with this treatment.</p>
       )}
@@ -369,12 +362,12 @@ export function ShootBaseBlock({
         <p className="type-poster mt-2 text-[clamp(2.4rem,4vw,3.25rem)]">{chosen.name}</p>
         {chosen.district && <p className="mt-2 text-[15px] text-dim">{chosen.district}</p>}
         <p className="mt-4 text-[15px] leading-6">
-          {share} of this audience&apos;s strongest spots in {t.brief.city}
+          {share} of this audience&apos;s strongest spots in {city}
         </p>
         <p className="mt-3 text-sm leading-6 text-dim">
           {base.held
             ? `${mock ? "The mock's" : "Qloo's"} heatmap puts this audience here. Every location below is within ${km}, so the unit can stay in one area.`
-            : `Too few places matched within ${km} of ${chosen.name}, so the locations below come from across ${t.brief.city}.`}
+            : `Too few places matched within ${km} of ${chosen.name}, so the locations below come from across ${city}.`}
         </p>
         {chosen.near.length > 0 && <p className="mt-3 text-xs leading-5 text-dim">Around it: {chosen.near.join(", ")}.</p>}
         {others.length > 0 && (

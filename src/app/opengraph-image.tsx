@@ -29,7 +29,7 @@ function mix(a: string, b: string, share: number): string {
     .join("")}`;
 }
 
-/** The poster's colour, as on the landing: the palette's darkest, mixed toward ink. */
+/** The poster's colour, as on the homepage's posters: the palette's darkest, mixed toward ink. */
 function posterColour(palette: string[]): string {
   const luminance = (hex: string) => {
     const n = Number.parseInt(hex.slice(1, 7), 16);

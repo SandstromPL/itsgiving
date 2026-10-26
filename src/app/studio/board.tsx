@@ -1,19 +1,19 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
-import { BUDGETS, FORMATS, NUDGES, NUDGE_LABELS, subjectPhrase, type Nudge } from "@/lib/agent/options";
+import { BUDGETS, FORMATS, NUDGES, NUDGE_LABELS, audiencePhrase, subjectPhrase, type Nudge } from "@/lib/agent/options";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
-import { ShootBaseBlock } from "./base-map";
+import { ShootBaseBlock, locationPins } from "./base-map";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
-import { BackArrow, QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
+import { QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
 import { TitleCardPicker } from "./title-card";
 import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
 
-/** The treatment's sections, in reading order, for the index under the cover. */
+/** The treatment's sections, in reading order, for the section bar under the cover. */
 const SECTIONS = [
   ["concept", "Concept"],
   ["references", "References"],
@@ -32,7 +32,7 @@ const card = "rounded-[26px] border border-line bg-card";
 
 function Section({ id, title, note, children }: { id: string; title: string; note?: string; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="flex scroll-mt-40 flex-col gap-6">
+    <section aria-labelledby={id} className="flex scroll-mt-24 flex-col gap-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <h3 id={id} className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
           {title}
@@ -172,17 +172,19 @@ function Giving({ t, mock }: { t: Treatment; mock: boolean }) {
   );
 }
 
-/** The rework bar: a slate with the take number, and the nudges that re-run the plan and the writing. */
+/** The rework bar: the nudges that re-run the plan and the writing, and which take is on screen once there's more than one. */
 function Rework({
   nudges,
   onToggle,
   running,
   take,
+  note = "Each change re-runs the plan and the writing. Qloo lookups are cached.",
 }: {
   nudges: Nudge[];
   onToggle: (nudge: Nudge) => void;
   running: boolean;
   take: number;
+  note?: string;
 }) {
   const lingo = useLingo().t;
   return (
@@ -192,13 +194,11 @@ function Rework({
         aria-label="Rework this treatment"
         className="flex flex-wrap items-center gap-2.5 rounded-[28px] border border-line bg-card p-3"
       >
-        <span className="w-[96px] shrink-0 overflow-hidden rounded-lg border-2 border-foreground bg-card">
-          <span
-            aria-hidden
-            className="block h-4 border-b-2 border-foreground bg-[repeating-linear-gradient(-45deg,var(--foreground)_0_9px,var(--card)_9px_18px)]"
-          />
-          <span className="block px-2 py-1 font-mono text-[13px] font-semibold">{lingo.take(take)}</span>
-        </span>
+        {take > 1 && (
+          <span className="shrink-0 rounded-full border-2 border-foreground px-3.5 py-2 font-mono text-[13px] font-semibold">
+            {lingo.take(take)}
+          </span>
+        )}
         {NUDGES.map((nudge) => (
           <button
             key={nudge}
@@ -220,40 +220,24 @@ function Rework({
           Save as PDF
         </button>
       </div>
-      <p className="px-3 text-[13px] text-faint">Each change re-runs the plan and the writing. Qloo lookups are cached.</p>
+      <p className="px-3 text-[13px] text-faint">{note}</p>
     </div>
   );
 }
 
-function SectionIndex() {
-  return (
-    <nav aria-label="Treatment sections" className="print:hidden">
-      <ul className="flex gap-1 overflow-x-auto rounded-full border border-line bg-card/90 p-1.5 backdrop-blur">
-        {SECTIONS.map(([id, label]) => (
-          <li key={id} className="shrink-0">
-            <a href={`#${id}`} className="block rounded-full px-3.5 py-2 text-[14px] text-dim hover:bg-field hover:text-foreground">
-              {label}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
 /**
- * The clapperboard: once the cover scrolls away, the way home, the title (in its title-card face), the take and the
- * city ride along at the top, with the sections to jump to, the one being read lit up, and a film strip that fills
- * as the reader goes down the board. Inert while hidden, so the keyboard never lands on it unseen.
+ * One sticky bar under the cover: the sections to jump to, the one being read lit, and a thin line that fills as the
+ * reader goes down the board. Once the cover has scrolled away, the way back and the title join it on the left (inert
+ * until then, so the keyboard never lands on them unseen). Its background runs to the window's edges.
  */
-function Slate({
+function SectionBar({
   t,
   fontId,
   take,
   running,
   cover,
   article,
-  onHome,
+  back,
 }: {
   t: Treatment;
   fontId: string;
@@ -261,28 +245,28 @@ function Slate({
   running: boolean;
   cover: RefObject<HTMLElement | null>;
   article: RefObject<HTMLElement | null>;
-  onHome: () => void;
+  back: ReactNode;
 }) {
   const lingo = useLingo().t;
-  const [shown, setShown] = useState(false);
+  const [stuck, setStuck] = useState(false);
   const [current, setCurrent] = useState<string | null>(null);
-  const strip = useRef<HTMLSpanElement>(null);
+  const line = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     let frame = 0;
     const update = () => {
       frame = 0;
-      setShown((cover.current?.getBoundingClientRect().bottom ?? 1) < 0);
+      setStuck((cover.current?.getBoundingClientRect().bottom ?? 1) < 0);
       let reading: string | null = null;
       for (const [id] of SECTIONS) {
         const heading = document.getElementById(id);
-        if (heading && heading.getBoundingClientRect().top <= 160) reading = id;
+        if (heading && heading.getBoundingClientRect().top <= 120) reading = id;
       }
       setCurrent(reading);
       const box = article.current?.getBoundingClientRect();
-      if (box && strip.current) {
+      if (box && line.current) {
         const progress = Math.min(1, Math.max(0, -box.top / Math.max(1, box.height - window.innerHeight)));
-        strip.current.style.transform = `scaleX(${progress})`;
+        line.current.style.transform = `scaleX(${progress})`;
       }
     };
     const schedule = () => {
@@ -299,64 +283,49 @@ function Slate({
   }, [cover, article]);
 
   return (
-    <div
-      inert={!shown}
-      className={`fixed inset-x-0 top-0 z-30 transition-[translate,opacity] duration-200 print:hidden ${
-        shown ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
-      }`}
-    >
-      <div className="surface-dark bg-background shadow-[0_1px_0_var(--line)]">
-        <div className="mx-auto flex w-full max-w-[80rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-8">
-          <button
-            type="button"
-            onClick={onHome}
-            aria-label="Home"
-            title="Home"
-            className="-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card"
-          >
-            <BackArrow />
-          </button>
-          <span
-            aria-hidden
-            className="h-7 w-11 shrink-0 rounded-[4px] border border-foreground bg-[repeating-linear-gradient(135deg,var(--foreground)_0_7px,var(--background)_7px_14px)]"
-          />
-          <span className="min-w-0 truncate leading-tight" style={titleStyle(titleFont(fontId), "1.65rem")}>
+    <div className="sticky top-0 z-30 bg-background shadow-[0_0_0_100vmax_var(--background)] [clip-path:inset(0_-100vmax)] print:hidden">
+      <div className="flex items-center gap-3 py-2">
+        <div
+          inert={!stuck}
+          className={`flex min-w-0 shrink items-center gap-2.5 transition-opacity duration-200 ${stuck ? "opacity-100" : "opacity-0"}`}
+        >
+          {back}
+          <span className="hidden min-w-0 truncate leading-tight sm:block" style={titleStyle(titleFont(fontId), "1.45rem")}>
             {t.title}
           </span>
-          <span className="shrink-0 rounded-md border border-edge px-2 py-0.5 font-mono text-[12px] text-dim">{lingo.take(take)}</span>
-          <span className="hidden shrink-0 font-mono text-[12px] text-dim sm:inline">{t.brief.city}</span>
-          {running && (
-            <span className="flex shrink-0 items-center gap-2 text-[13px] font-semibold">
-              <span aria-hidden className="size-2 rounded-full bg-accent motion-safe:animate-pulse" />
-              {lingo.cookingAgain}
+          {take > 1 && (
+            <span className="hidden shrink-0 rounded-md border border-edge px-2 py-0.5 font-mono text-[12px] text-dim sm:inline">
+              {lingo.take(take)}
             </span>
           )}
-          <nav
-            aria-label="Treatment sections, while reading"
-            className="quiet-scroll -mx-1 flex max-w-full gap-1 overflow-x-auto px-1 lg:ml-auto"
-          >
-            {SECTIONS.map(([id, label]) => (
-              <a
-                key={id}
-                href={`#${id}`}
-                aria-current={current === id ? "location" : undefined}
-                className="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold whitespace-nowrap text-dim hover:text-foreground aria-[current=location]:bg-accent aria-[current=location]:text-[#121211]"
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
+          {running && (
+            <span className="flex shrink-0 items-center gap-2 text-[13px] font-semibold">
+              <span aria-hidden className="size-2 rounded-full bg-foreground motion-safe:animate-pulse" />
+              <span className="hidden sm:inline">{lingo.cookingAgain}</span>
+            </span>
+          )}
         </div>
-        <div aria-hidden className="relative h-2 overflow-hidden bg-[#2a2926]">
-          <span ref={strip} className="absolute inset-0 origin-left bg-accent" style={{ transform: "scaleX(0)" }} />
-          <span className="absolute inset-0 bg-[repeating-linear-gradient(90deg,transparent_0_12px,#121211_12px_16px)]" />
-        </div>
+        <nav aria-label="Treatment sections" className="quiet-scroll -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto px-1">
+          {SECTIONS.map(([id, label]) => (
+            <a
+              key={id}
+              href={`#${id}`}
+              aria-current={current === id ? "location" : undefined}
+              className="shrink-0 rounded-full px-3 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim hover:text-foreground aria-[current=location]:bg-foreground aria-[current=location]:text-background"
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+      </div>
+      <div aria-hidden className="h-0.5 bg-line">
+        <span ref={line} className="block h-full origin-left bg-foreground" style={{ transform: "scaleX(0)" }} />
       </div>
     </div>
   );
 }
 
-/** A strip of film under the beats, edge-printed with the house stock and the beat numbers. */
+/** A strip of film under the beats, edge-printed with the house stock and the beat numbers. Director's cut only. */
 function FilmEdge({ count }: { count: number }) {
   const holes = "mx-2.5 h-2.5 rounded-[3px] bg-[repeating-linear-gradient(90deg,#f2f0ea_0_14px,transparent_14px_26px)]";
   return (
@@ -370,7 +339,7 @@ function FilmEdge({ count }: { count: number }) {
   );
 }
 
-/** Halfway down the board, an interval card, the way a Hindi film breaks for chai. */
+/** Halfway down the board, an interval card, the way a Hindi film breaks for chai. Director's cut only. */
 function Interval() {
   const lingo = useLingo().t;
   return (
@@ -389,11 +358,14 @@ function Interval() {
   );
 }
 
-/** A digicam's date stamp, 'YY MM DD, for the day the treatment was built. */
+/**
+ * A digicam's date stamp, 'YY MM DD, for the day the treatment was built. In UTC, so a board rendered on the server
+ * (a featured page) reads the same in every visitor's browser.
+ */
 function dateStamp(iso: string): string {
   const d = new Date(iso);
   const two = (n: number) => String(n).padStart(2, "0");
-  return `'${two(d.getFullYear() % 100)} ${two(d.getMonth() + 1)} ${two(d.getDate())}`;
+  return `'${two(d.getUTCFullYear() % 100)} ${two(d.getUTCMonth() + 1)} ${two(d.getUTCDate())}`;
 }
 
 export function Board({
@@ -404,7 +376,8 @@ export function Board({
   running,
   take,
   log,
-  onHome,
+  back,
+  reworkNote,
 }: {
   treatment: Treatment;
   /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
@@ -416,8 +389,10 @@ export function Board({
   take: number;
   /** The run log, shown with the credits. */
   log: ReactNode;
-  /** Back to the studio. */
-  onHome: () => void;
+  /** The way back, in the section bar once the cover has scrolled away: to the brief, or to all the examples. */
+  back: ReactNode;
+  /** Under the rework chips: what a change does here. */
+  reworkNote?: string;
 }) {
   const lingo = useLingo().t;
   const mock = t.mock.qloo;
@@ -462,11 +437,10 @@ export function Board({
       <div className="flex flex-col gap-6">
         <Cover ref={cover} t={t} fontId={fontId} suggestion={suggestion} onPickFont={setPicked} />
         <Giving t={t} mock={mock} />
-        <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} />
+        <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} note={reworkNote} />
       </div>
 
-      <SectionIndex />
-      <Slate t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} onHome={onHome} />
+      <SectionBar t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} back={back} />
 
       <Section id="concept" title="Concept">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
@@ -548,10 +522,14 @@ export function Board({
             </li>
           ))}
         </ol>
-        <FilmEdge count={t.beats.length} />
+        <div className="cut-only">
+          <FilmEdge count={t.beats.length} />
+        </div>
       </Section>
 
-      <Interval />
+      <div className="cut-only">
+        <Interval />
+      </div>
 
       <Section
         id="wardrobe"
@@ -591,8 +569,16 @@ export function Board({
         note={`Real places in ${t.brief.city} whose regulars share this audience's taste, found by ${source}. Confirm availability and filming permission with each venue.`}
       >
         <div className={pinned ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "contents"}>
-          <div className={pinned ? "lg:sticky lg:top-24" : ""}>
-            <ShootBaseBlock t={t} mock={mock} active={pinned ? reading : undefined} compact={pinned} />
+          <div className={pinned ? "lg:sticky lg:top-20" : ""}>
+            <ShootBaseBlock
+              base={t.base}
+              pins={locationPins(t)}
+              city={t.brief.city}
+              audience={audiencePhrase(t.subjects)}
+              mock={mock}
+              active={pinned ? reading : undefined}
+              compact={pinned}
+            />
           </div>
           {t.locations.length === 0 ? (
             <p className="text-[15px] text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
@@ -761,7 +747,8 @@ export function Board({
           <div className={`${card} p-6`}>
             <dl className="grid gap-x-8 gap-y-3 text-[15px] leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
               <dt className="text-faint">Built</dt>
-              <dd>{new Date(t.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</dd>
+              {/* A fixed locale and UTC, so a board rendered on the server (a featured page) reads the same everywhere. */}
+              <dd>{new Date(t.createdAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC</dd>
               <dt className="text-faint">Data</dt>
               <dd>
                 {t.qloo.calls} {mock ? "mock " : ""}Qloo requests

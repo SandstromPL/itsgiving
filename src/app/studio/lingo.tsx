@@ -78,7 +78,7 @@ const PLAIN: Lines = {
   footer: "Every pick is backed by Qloo data.",
   nowShowing: "Featured treatments",
   yourPoster: "Your treatment",
-  makeItYours: "References and your taste",
+  makeItYours: "More options",
   tryOne: "Examples",
   watchItWork: "How it works",
 };

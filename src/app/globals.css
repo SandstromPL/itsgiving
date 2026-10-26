@@ -8,10 +8,9 @@
  * Tape pink marks anything mocked; safelight red marks errors. Every text pair passes WCAG AA, on both surfaces.
  *
  * Two rooms share these tokens: the light one (the default), and a dark one chosen in the header (theme.tsx; the
- * script in layout.tsx sets `data-theme` before first paint). The dark room is an auditorium with the house lights
- * still up, a warm charcoal, so the show can still start in it: `--lights` dims either room to the show's near black
- * as the landing's posters come into view, and a projector beam comes on over them (lights.tsx, landing.tsx).
- * Receipts and the popover windows stay on paper.
+ * script in layout.tsx sets `data-theme` before first paint). The page keeps the room its reader chose: nothing on it
+ * changes the theme. The cinema lives in frames that are dark in either room: a treatment's cover, the map, the run
+ * stage, and the homepage's "Now showing" strip with its still projector beam. Receipts and popovers stay on paper.
  */
 :root {
   --light-background: #f2f0ea; /* the room */
@@ -28,7 +27,6 @@
   --light-tape-wash: #ffe3f0;
   --light-safelight: #b42318; /* errors, 6.5:1 on cards */
 
-  /* The dark room: the house lights still up, a warm charcoal, a step above the dark frames inside it. */
   --dark-background: #1b1916;
   --dark-foreground: #f2f0ea; /* 15:1 on the room */
   --dark-card: #25221e;
@@ -43,74 +41,41 @@
   --dark-tape-wash: #3d2130;
   --dark-safelight: #ef6c5d; /* 5.3:1 on cards */
 
-  /* The show: the house lights fully down, near black whichever room it started from. */
-  --show-background: #0b0a09;
-  --show-foreground: #f2f0ea;
-  --show-card: #161513;
-  --show-field: #1e1c1a;
-  --show-track: #262420;
-  --show-line: #2c2a26;
-  --show-edge: #7a7469; /* 3.7:1 on fields */
-  --show-dim: #cfcbc2;
-  --show-faint: #aaa498; /* 6.9:1 on fields */
-  --show-tungsten: #e8b04b;
-  --show-tape: #f2a4c8;
-  --show-tape-wash: #3a1f2c;
-  --show-safelight: #ef6c5d; /* 6.1:1 on cards */
-
-  --theme-background: var(--light-background);
-  --theme-foreground: var(--light-foreground);
-  --theme-card: var(--light-card);
-  --theme-field: var(--light-field);
-  --theme-track: var(--light-track);
-  --theme-line: var(--light-line);
-  --theme-edge: var(--light-edge);
-  --theme-dim: var(--light-dim);
-  --theme-faint: var(--light-faint);
-  --theme-tungsten: var(--light-tungsten);
-  --theme-tape: var(--light-tape);
-  --theme-tape-wash: var(--light-tape-wash);
-  --theme-safelight: var(--light-safelight);
+  --background: var(--light-background);
+  --foreground: var(--light-foreground);
+  --card: var(--light-card);
+  --field: var(--light-field);
+  --track: var(--light-track);
+  --line: var(--light-line);
+  --edge: var(--light-edge);
+  --dim: var(--light-dim);
+  --faint: var(--light-faint);
+  --tungsten: var(--light-tungsten);
+  --tape: var(--light-tape);
+  --tape-wash: var(--light-tape-wash);
+  --safelight: var(--light-safelight);
   color-scheme: light;
-
-  /* 0: house lights up. 1: down, the show. Surfaces fade with it; text flips to the show's ink in one step past the
-     middle (--ink-flip), so it never sits on a background as grey as itself. */
-  --lights: 0;
-  --ink-flip: clamp(0, (var(--lights) - 0.55) * 1000, 1);
-  --background: color-mix(in srgb, var(--show-background) calc(var(--lights) * 100%), var(--theme-background));
-  --foreground: color-mix(in srgb, var(--show-foreground) calc(var(--ink-flip) * 100%), var(--theme-foreground));
-  --card: color-mix(in srgb, var(--show-card) calc(var(--lights) * 100%), var(--theme-card));
-  --field: color-mix(in srgb, var(--show-field) calc(var(--lights) * 100%), var(--theme-field));
-  --track: color-mix(in srgb, var(--show-track) calc(var(--lights) * 100%), var(--theme-track));
-  --line: color-mix(in srgb, var(--show-line) calc(var(--lights) * 100%), var(--theme-line));
-  --edge: color-mix(in srgb, var(--show-edge) calc(var(--lights) * 100%), var(--theme-edge));
-  --dim: color-mix(in srgb, var(--show-dim) calc(var(--ink-flip) * 100%), var(--theme-dim));
-  --faint: color-mix(in srgb, var(--show-faint) calc(var(--ink-flip) * 100%), var(--theme-faint));
-  --tungsten: color-mix(in srgb, var(--show-tungsten) calc(var(--ink-flip) * 100%), var(--theme-tungsten));
-  --tape: color-mix(in srgb, var(--show-tape) calc(var(--ink-flip) * 100%), var(--theme-tape));
-  --tape-wash: color-mix(in srgb, var(--show-tape-wash) calc(var(--lights) * 100%), var(--theme-tape-wash));
-  --safelight: color-mix(in srgb, var(--show-safelight) calc(var(--ink-flip) * 100%), var(--theme-safelight));
   --frame: #121211; /* the projected frame */
   --accent: #e4ff3a; /* the highlighter, always under ink text */
   --slip: #fffdf6; /* receipt paper */
   --slip-edge: #c9c1af;
 }
 
-/* The dark room, chosen in the header. */
+/* The dark room, chosen in the header: a warm charcoal, a step above the dark frames inside it. */
 :root[data-theme="dark"] {
-  --theme-background: var(--dark-background);
-  --theme-foreground: var(--dark-foreground);
-  --theme-card: var(--dark-card);
-  --theme-field: var(--dark-field);
-  --theme-track: var(--dark-track);
-  --theme-line: var(--dark-line);
-  --theme-edge: var(--dark-edge);
-  --theme-dim: var(--dark-dim);
-  --theme-faint: var(--dark-faint);
-  --theme-tungsten: var(--dark-tungsten);
-  --theme-tape: var(--dark-tape);
-  --theme-tape-wash: var(--dark-tape-wash);
-  --theme-safelight: var(--dark-safelight);
+  --background: var(--dark-background);
+  --foreground: var(--dark-foreground);
+  --card: var(--dark-card);
+  --field: var(--dark-field);
+  --track: var(--dark-track);
+  --line: var(--dark-line);
+  --edge: var(--dark-edge);
+  --dim: var(--dark-dim);
+  --faint: var(--dark-faint);
+  --tungsten: var(--dark-tungsten);
+  --tape: var(--dark-tape);
+  --tape-wash: var(--dark-tape-wash);
+  --safelight: var(--dark-safelight);
   --frame: #0a0908;
   color-scheme: dark;
 }
@@ -253,7 +218,8 @@ body {
   background-size: 3px 3px;
 }
 
-/* The one orchestrated moment: the cover's letterbox opens when a treatment lands. */
+/* The one orchestrated moment on each page: a cover's letterbox opens, the homepage's on load, a board's when it
+   lands. Reduced motion skips it (below). */
 @keyframes letterbox-open {
   from {
     clip-path: inset(50% 0 50% 0 round 2rem);
@@ -266,53 +232,42 @@ body {
   animation: letterbox-open 900ms cubic-bezier(0.2, 0.7, 0.1, 1) both;
 }
 
-/* The projector (landing.tsx): once the lights go down, a cone of warm light reaches the posters from above, with
-   dust drifting in it. It sits behind them, starts well above the screen, and fades with --lights, so the dark room,
-   which has no light left to dim, gets its moment too. On a phone it stops after the first posters. */
-.projector {
-  position: absolute;
-  z-index: -1;
-  inset-inline: -8%;
-  top: -60vh;
-  height: min(60vh + 100%, 160vh);
-  pointer-events: none;
-  opacity: var(--lights);
-}
-.projector-dust {
+/*
+ * The projector over "Now showing" (landing.tsx): a soft cone of warm light from above the strip, with a brighter core
+ * and a glow where the lens would be. Gradients only, painted once: no blur filter, nothing tied to scroll. It fades in
+ * once, the first time the strip comes into view, and sits behind the posters so their type stays crisp.
+ */
+.beam {
   position: absolute;
   inset: 0;
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  mask-image: linear-gradient(transparent 15%, #000 40%, #000 75%, transparent);
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 22% 14% at 50% 0%, rgb(255 243 212 / 0.16), transparent 70%),
+    conic-gradient(from 166deg at 50% -14%, transparent 0deg, rgb(255 243 212 / 0.09) 14deg, transparent 28deg),
+    conic-gradient(
+      from 150deg at 50% -14%,
+      transparent 0deg,
+      rgb(255 243 212 / 0.06) 15deg,
+      rgb(255 243 212 / 0.1) 30deg,
+      rgb(255 243 212 / 0.06) 45deg,
+      transparent 60deg
+    );
+  mask-image: linear-gradient(#000 0%, #000 40%, transparent 96%);
+  opacity: 0;
+  transition: opacity 600ms cubic-bezier(0.2, 0.7, 0.1, 1);
 }
-.projector-dust > span {
-  position: absolute;
-  border-radius: 50%;
-  background: #fff3d4;
-  animation: projector-mote ease-in-out infinite alternate;
-}
-@keyframes projector-mote {
-  to {
-    translate: 10px -34px;
-  }
+.beam[data-on] {
+  opacity: 1;
 }
 
-/* Lights down: two letterbox bars close in as the landing's room dims (studio/lights.tsx sets --lights). */
-.letterbox-bar {
-  position: fixed;
-  inset-inline: 0;
-  z-index: 35;
-  height: 2rem;
-  background: #000;
-  pointer-events: none;
-  transform: scaleY(var(--lights));
+/* Decorations kept for the director's cut (eggs.tsx sets data-cut on <html>): the INTERVAL card, the film edge, the
+   clapper. Off by default, so a board reads calmly. */
+.cut-only {
+  display: none;
 }
-.letterbox-bar.top {
-  top: 0;
-  transform-origin: top;
-}
-.letterbox-bar.bottom {
-  bottom: 0;
-  transform-origin: bottom;
+:root[data-cut] .cut-only {
+  display: contents;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -328,20 +283,19 @@ body {
 @media print {
   /* Paper is light: a treatment prints in the light room whatever the screen shows. */
   :root:root {
-    --lights: 0;
-    --theme-background: var(--light-background);
-    --theme-foreground: var(--light-foreground);
-    --theme-card: var(--light-card);
-    --theme-field: var(--light-field);
-    --theme-track: var(--light-track);
-    --theme-line: var(--light-line);
-    --theme-edge: var(--light-edge);
-    --theme-dim: var(--light-dim);
-    --theme-faint: var(--light-faint);
-    --theme-tungsten: var(--light-tungsten);
-    --theme-tape: var(--light-tape);
-    --theme-tape-wash: var(--light-tape-wash);
-    --theme-safelight: var(--light-safelight);
+    --background: var(--light-background);
+    --foreground: var(--light-foreground);
+    --card: var(--light-card);
+    --field: var(--light-field);
+    --track: var(--light-track);
+    --line: var(--light-line);
+    --edge: var(--light-edge);
+    --dim: var(--light-dim);
+    --faint: var(--light-faint);
+    --tungsten: var(--light-tungsten);
+    --tape: var(--light-tape);
+    --tape-wash: var(--light-tape-wash);
+    --safelight: var(--light-safelight);
     --frame: #121211;
     color-scheme: light;
   }

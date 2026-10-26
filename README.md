@@ -78,40 +78,47 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   the Qloo heatmap's shoot base in Mumbai, or a tone tag elsewhere.
 - **unc mode.** The words around the work are Gen Z slang by default. A switch in the header turns them into plain
   English for producers, label people and judges. The treatment, the receipts and the run log read the same in both.
-- **Clapperboard and pinned map.** Once the cover scrolls away, a bar with the title, the take and the city stays at
-  the top, lights up the section being read and fills a film strip as you go. In Locations, the shoot-base map stays
-  put beside the places and lights up the pin of the one in view.
+- **Section bar and pinned map.** Under the cover, one bar lists the sections, lights up the one being read and fills
+  a thin line as you go; once the cover scrolls away, the title and the way back join it. In Locations, the
+  shoot-base map stays put beside the places and lights up the pin of the one in view.
 - **A map you can read.** The heatmap sits on the city's streets (OpenStreetMap, darkened), so the bright squares show
-  where in the city the audience is strongest, around the three strongest areas and the numbered locations.
-- **Ways home.** Home above the cover and in the clapperboard bar, the wordmark, and the browser's Back button all
-  return to the studio at the spot you left; Forward, or "Back to" the treatment's title, opens it again.
+  where in the city the audience is strongest, around the three strongest areas and the numbered locations. The
+  homepage draws a featured run's map with the same component.
+- **Director's cut.** The Konami code letterboxes the page and brings out the board's extras: an INTERVAL card and a
+  film edge under the beats. Escape puts them away.
 
-### The studio
+### Three pages
 
-- **Split screen.** On wide screens the brief stays in reach on the right while the posters scroll by on the left; on
-  phones it comes right after the headline. "Try one" fills it with an example, "your poster" fills in as you type,
-  and the optional references and taste sit in a "Make it yours" drawer.
-- **Lights down.** Scrolling into the posters starts the show: the room dims to near black, two letterbox bars close
-  in, and a projector beam with dust in it comes on over the posters. The dark room starts as a warm charcoal, an
-  auditorium with the house lights still up, so the moment shows there too. Scrolling back brings the lights up. With
-  reduced motion it switches at the halfway point instead of fading.
-- **Watch it work.** One real featured run replayed as you scroll: the audience Qloo read, the city's heatmap, the
-  shoot base, the receipts, then the title.
-- **Light or dark,** switched in the header and remembered per browser. Light is the default.
+- **The homepage** explains and proves, and holds no form: the headline, a finished cover, "Start a treatment" and
+  "See a finished one"; "Now showing", the featured treatments as posters in a dark strip under a still projector
+  beam; and "How it works", one real featured run step by step beside what each step produced. Nothing on it moves
+  or changes as you scroll; the one motion is the cover opening like a letterbox when the page loads.
+- **The studio** (`/studio`) is the tool. The brief asks for an artist (or the films a short is after) and a city; the
+  references, your own films, the budget and the thinking depth wait under "Make it yours", and "your poster" fills in
+  beside it. While a treatment builds, the brief folds into one line and the run takes the page: a countdown, the
+  step it's on, every Qloo call, and the tab's title counting the seconds. Back from a board returns to the brief, and
+  "Back to" the treatment's title opens it again, even after a visit to the homepage.
+- **Featured treatments** (`/t/<slug>`) are pages of their own, built with the site, so Back, reload and links work as
+  anywhere. A rework chip there hands the treatment to the studio, which opens it at once and re-runs it with the
+  change.
+- **Light or dark,** switched in the header and remembered per browser. Light is the default, and nothing on a page
+  changes it.
 
 ### Featured treatments
 
-Four example briefs (`src/lib/agent/examples.ts`) are pre-built with deep thinking, so the home page opens with
-finished treatments and clicking one shows it at once, whatever the live rate limits are doing.
+Four example briefs (`src/lib/agent/examples.ts`) are pre-built with deep thinking, so the homepage opens with
+finished treatments and each one's page shows it at once, whatever the live rate limits are doing.
 
 - `npm run featured` builds them from live Qloo and DeepSeek. A run only counts if every Qloo call worked, no step fell
   back to the template, and DeepSeek wrote it (when its key is set). Each brief gets two tries, and a failed rebuild
   keeps the previous treatment.
 - They are written to `.cache/featured/featured.json`, which is gitignored, because Qloo data is never committed. Each
   deploy builds its own set: `prebuild` runs `npm run featured -- --if-missing` before `next build`. Without live keys it
-  skips, and the examples stay plain buttons that run live.
-- The treatment API answers a featured brief like a cache hit that never expires. A server running on mocks ignores
-  them. `outputFileTracingIncludes` puts the file in the route's server bundle.
+  skips: the homepage then shows no posters, and the featured pages offer their briefs to the studio instead.
+- The homepage and the featured pages (`/t/<slug>`) are built from the file, and the treatment API answers a featured
+  brief like a cache hit that never expires, so the studio reopens one at once. A server running on mocks ignores them,
+  and a featured page then offers to fill its brief into the studio. `outputFileTracingIncludes` puts the file in each
+  of those routes' server bundles.
 
 ### What live Qloo taught the design (2026-10-25)
 

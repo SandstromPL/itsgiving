@@ -51,6 +51,18 @@ export function subjectPhrase(artists: string[], touchstones: string[]): string 
     .join(", ");
 }
 
+/**
+ * Whose taste a heatmap shows: "Prateek Kuhad's audience", or "the audience for Frank Ocean and Forgotten (2017)".
+ * Films carry their year, since so many titles are shared.
+ */
+export function audiencePhrase(subjects: { name: string; kind?: string; year?: number }[]): string {
+  const artists = subjects.filter((s) => s.kind === "artist").map((s) => s.name);
+  const others = subjects.filter((s) => s.kind !== "artist").map((s) => (s.year ? `${s.name} (${s.year})` : s.name));
+  if (artists.length === 1 && others.length === 0) return `${artists[0]}'s audience`;
+  const who = [...artists, ...others];
+  return who.length > 0 ? `the audience for ${joinNames(who)}` : "this audience";
+}
+
 /** The pipeline's steps in the order they run (overlap and re-plan are often skipped). */
 export const STEP_ORDER: StepId[] = [
   "resolve",

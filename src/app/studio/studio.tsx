@@ -1,35 +1,26 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { EXAMPLES, type Example } from "@/lib/agent/examples";
-import type { FeaturedCover, FeaturedReplay } from "@/lib/agent/featured";
-import { STEP_LABELS, STEP_ORDER, type Nudge } from "@/lib/agent/options";
+import { EXAMPLES } from "@/lib/agent/examples";
+import { THINKING, type Nudge } from "@/lib/agent/options";
 import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
 import { Board } from "./board";
 import { BriefForm } from "./brief-form";
-import { DirectorsCut, Wordmark, useConsoleNote, useDirectorsCut } from "./eggs";
-import { EMPTY_FORM, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
-import { Hero, HowItWorks, NowShowing } from "./landing";
-import { LetterboxBars, useLightsDown } from "./lights";
-import { LingoProvider, UncSwitch, useLingo } from "./lingo";
+import { useReceipts } from "./eggs";
+import { briefLine, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
+import { HandoffReader, type Handoff } from "./handoff";
+import { YourPoster } from "./landing";
+import { useLingo } from "./lingo";
 import { BackArrow, ModeBadges } from "./parts";
 import { Picker } from "./picker";
-import { Replay } from "./replay";
+import { studioSession, type RunInput } from "./session";
+import { HeaderLink, SiteHeader } from "./site-header";
 import { StreamError, streamTreatment } from "./stream";
-import { ThemeSwitch } from "./theme";
-import { RunStage, Timeline } from "./timeline";
+import { RunStage, Timeline, replaySteps } from "./timeline";
 
 type Phase = "idle" | "running" | "needs_input" | "done" | "error";
-
-/** One request's inputs: kept so iterate chips and the picker re-run the brief behind the board, not the live form. */
-interface RunInput {
-  form: FormState;
-  picks: Record<string, string>;
-  nudges: Nudge[];
-}
 
 /**
  * The server reports progress at least every few seconds, even while a model thinks (TIMING and TICK_MS
@@ -39,22 +30,12 @@ const STALL_MS = 75_000;
 
 /**
  * A board gets its own history entry (same URL, this marker in its state), so the browser's Back button returns
- * to the studio and Forward reopens the board. Next.js keeps its own fields alongside it.
+ * to the brief and Forward reopens the board. Next.js keeps its own fields alongside it.
  */
 const BOARD_ENTRY = "board";
 const onBoardEntry = () => window.history.state?.itsgiving === BOARD_ENTRY;
 
-/** Timeline rows for a treatment replayed from cache: the calls and models that originally made it. */
-function replaySteps(t: Treatment): StepEvent[] {
-  return STEP_ORDER.flatMap((id): StepEvent[] => {
-    const qloo = t.qloo.steps[id];
-    const llm = t.llm.find((trace) => trace.step === id);
-    if (!qloo?.length && !llm) return [];
-    return [
-      { type: "step", id, status: "done", label: STEP_LABELS[id], summary: "Replayed from cache: no new calls this time.", qloo, llm },
-    ];
-  });
-}
+const STUDIO_TITLE = "Studio: itsgiving";
 
 const stopRunningSteps = (summary: string) => (steps: StepEvent[]) =>
   steps.map((s): StepEvent => (s.status === "running" ? { ...s, status: "error", summary } : s));
@@ -109,35 +90,26 @@ function FailCard({ problem, onRetry }: { problem: string; onRetry?: () => void 
   );
 }
 
-interface StudioProps {
-  initialBadges: ReactNode;
-  featured: FeaturedCover[];
-  /** One featured run to replay on the landing; none on a server without live data. */
-  replay?: FeaturedReplay;
-}
-
 /** Briefs offered as "Try one" chips: the ones without a pre-built treatment, so they run live. */
 const TRY = EXAMPLES.filter((example) => !example.featured);
 
-export function Studio(props: StudioProps) {
-  return (
-    <LingoProvider>
-      <StudioScreen {...props} />
-    </LingoProvider>
-  );
-}
-
-function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
+/**
+ * The studio, the tool on its own page (/studio): the brief, then the run, then the board it builds, in place. Featured
+ * treatments live on their own pages (/t/<slug>); their rework chips hand off here (handoff.tsx).
+ */
+export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const { t: lingo } = useLingo();
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [steps, setSteps] = useState<StepEvent[]>([]);
-  const [treatment, setTreatment] = useState<Treatment | null>(null);
-  /** The board, or the studio around it: a treatment stays in memory when the director steps back out. */
+  // Back in the studio during the same visit: the brief and the last board are as they were left (session.ts).
+  const [saved] = useState(studioSession.read);
+  const [form, setForm] = useState<FormState>(saved.form);
+  const [phase, setPhase] = useState<Phase>(saved.board ? "done" : "idle");
+  const [steps, setSteps] = useState<StepEvent[]>(saved.board?.steps ?? []);
+  const [treatment, setTreatment] = useState<Treatment | null>(saved.board?.treatment ?? null);
+  /** The board, or the brief around it: a treatment stays in memory when the director steps back out. */
   const [view, setView] = useState<"studio" | "board">("studio");
   /** The run in flight (or last attempted), and the run that produced the board. */
-  const [pending, setPending] = useState<RunInput | null>(null);
-  const [shown, setShown] = useState<RunInput | null>(null);
+  const [pending, setPending] = useState<RunInput | null>(saved.board?.shown ?? null);
+  const [shown, setShown] = useState<RunInput | null>(saved.board?.shown ?? null);
   const [question, setQuestion] = useState<{ message: string; items: Ambiguity[] } | null>(null);
   const [formProblem, setFormProblem] = useState<FormProblem | null>(null);
   const [runProblem, setRunProblem] = useState<string | null>(null);
@@ -145,39 +117,55 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   const [status, setStatus] = useState("");
   const [startedAt, setStartedAt] = useState(0);
   /** Which take of the brief is on the board: 1, then one more per rework. */
-  const [take, setTake] = useState(1);
-  const [briefOpen, setBriefOpen] = useState(false);
+  const [take, setTake] = useState(saved.board?.take ?? 1);
   const [toast, setToast] = useState<{ title: string; line: string } | null>(null);
   const active = useRef<AbortController | null>(null);
   const stopActive = useRef<() => void>(() => {});
   const focusTitle = useRef(false);
   const failedBefore = useRef(false);
-  const briefPanel = useRef<HTMLDivElement>(null);
-  const posters = useRef<HTMLElement>(null);
-  /**
-   * Where the director was in the studio when the board opened, to return them there: the scroll, and for a poster,
-   * the poster and where it sat on screen.
-   */
-  const landing = useRef<{ scroll: number; slug?: string; offset?: number } | null>(null);
+  /** A rework a featured page asked for, run once its board has opened. */
+  const pendingNudge = useRef<Nudge | null>(null);
+  /** The latest run(), for the rework one run starts as it lands; kept current after each render. */
+  const runLatest = useRef<(input: RunInput) => Promise<void>>(async () => {});
   /** Where they were on the board when they stepped out, for Forward; null when the board should open at its top. */
   const boardSpot = useRef<number | null>(null);
+  /** Set when the director steps back out of a board, so the brief can focus the way back in. */
+  const leftBoard = useRef(false);
   const viewNow = useRef(view);
-  const [cut, exitCut] = useDirectorsCut();
   const running = phase === "running";
   const onBoard = treatment !== null && view === "board";
-  useConsoleNote(treatment);
-  useLightsDown(posters, !onBoard);
+  useReceipts(treatment);
 
-  // Back and Forward move between the studio and the board, each kept where the director left it. The page puts
-  // them back itself: the browser's own restoring would land after it, at wherever the entry was first written.
+  // The visit remembers the studio as it was left.
+  useEffect(() => {
+    studioSession.write({ form, board: treatment && shown ? { treatment, shown, take, steps } : null });
+  }, [form, treatment, shown, take, steps]);
+
+  // The tab says what's on screen: the treatment's title on its board, marked ready while the tab is in the
+  // background, so a director who looked away learns it's done. A run in flight sets its own (timeline.tsx).
+  useEffect(() => {
+    if (running) return;
+    const show = () => {
+      document.title = onBoard && treatment ? `${document.hidden ? "Ready: " : ""}${treatment.title}: itsgiving` : STUDIO_TITLE;
+    };
+    show();
+    document.addEventListener("visibilitychange", show);
+    return () => document.removeEventListener("visibilitychange", show);
+  }, [running, onBoard, treatment]);
+
+  // Back and Forward move between the brief and the board, each kept where the director left it. The page puts them
+  // back itself: the browser's own restoring would land after it, at wherever the entry was first written. Only on
+  // this page's entries: the homepage and featured pages keep the browser's own.
   useEffect(() => {
     const restoring = window.history.scrollRestoration;
     window.history.scrollRestoration = "manual";
     const onPop = () => {
       const next = onBoardEntry() ? "board" : "studio";
       if (next === viewNow.current) return;
-      if (next === "board") landing.current = { scroll: window.scrollY };
-      else boardSpot.current = window.scrollY;
+      if (next === "studio") {
+        boardSpot.current = window.scrollY;
+        leftBoard.current = true;
+      }
       setView(next);
     };
     window.addEventListener("popstate", onPop);
@@ -194,19 +182,16 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
       boardSpot.current = null;
       return;
     }
-    // Back in the studio: the same spot on the page, and focus on the poster that was opened (or the way back in). A
-    // poster goes back to where it sat on screen, since what's above it may have grown meanwhile: the brief it filled
-    // can open its drawer, and the way back to the board appears over the headline.
-    if (!landing.current) return;
-    const { scroll, slug, offset } = landing.current;
-    landing.current = null;
-    const poster = slug ? document.querySelector<HTMLElement>(`[data-slug="${slug}"]`) : null;
-    window.scrollTo({ top: poster && offset !== undefined ? poster.getBoundingClientRect().top + window.scrollY - offset : scroll });
-    (poster ?? document.getElementById("reopen-board"))?.focus({ preventScroll: true });
+    // Back at the brief from a board: the top of the page, with focus on the way back in.
+    if (!leftBoard.current) return;
+    leftBoard.current = false;
+    window.scrollTo({ top: 0 });
+    document.getElementById("reopen-board")?.focus({ preventScroll: true });
   }, [view]);
 
-  // Leaving the page mid-run shouldn't keep spending model quota and credit.
-  useEffect(() => () => active.current?.abort(), []);
+  // Leaving the page mid-run shouldn't keep spending model quota and credit. Next keeps a page it leaves (hidden, for
+  // Back), so this stops the run as Stop does: coming back finds it stopped, not failed.
+  useEffect(() => () => stopActive.current(), []);
 
   // Move focus to the treatment's title once it renders, new or reopened (it also scrolls it into view).
   useEffect(() => {
@@ -220,13 +205,6 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
     const timer = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(timer);
   }, [toast]);
-
-  // "New brief" opens the form above the board and puts the cursor in it.
-  useEffect(() => {
-    if (!briefOpen) return;
-    briefPanel.current?.scrollIntoView({ block: "start" });
-    briefPanel.current?.querySelector<HTMLInputElement>("input:not([type=radio])")?.focus();
-  }, [briefOpen]);
 
   const run = async (input: RunInput) => {
     active.current?.abort();
@@ -258,7 +236,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
 
     const fail = (message: string) => {
       failedBefore.current = true;
-      landing.current = null;
+      pendingNudge.current = null;
       setRunProblem(message);
       setPhase("error");
       setSteps(stopRunningSteps("Stopped before it finished."));
@@ -288,20 +266,18 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
           setPhase("needs_input");
           setStatus(`itsgiving needs your choice. ${event.message}`);
           break;
-        case "treatment":
+        case "treatment": {
           finished = true;
           focusTitle.current = true;
           setTreatment(event.treatment);
-          // A board opened from the studio gets its history entry; a rework replaces the board in place.
+          // A board opened from the brief gets its history entry; a rework replaces the board in place.
           if (!onBoardEntry()) {
-            landing.current ??= { scroll: window.scrollY };
             boardSpot.current = null;
             window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
           }
           setView("board");
           setShown(input);
           setPhase("done");
-          setBriefOpen(false);
           if (event.cached) setSteps(replaySteps(event.treatment));
           else
             setToast({
@@ -310,7 +286,15 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
             });
           failedBefore.current = false;
           setStatus(`Treatment ready: ${event.treatment.title}.`);
+          // A rework asked for by a featured page runs once its board is open, as take 2.
+          const nudge = pendingNudge.current;
+          if (nudge) {
+            pendingNudge.current = null;
+            setTake((n) => n + 1);
+            void runLatest.current({ ...input, nudges: [nudge] });
+          }
           break;
+        }
         case "error":
           finished = true;
           fail(event.message);
@@ -326,6 +310,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
     } catch (err) {
       if (active.current !== controller) return;
       if (stopped) {
+        pendingNudge.current = null;
         setPhase(treatment ? "done" : "idle");
         setSteps(stopRunningSteps("Stopped."));
         setStatus("Stopped.");
@@ -341,6 +326,10 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
     }
   };
 
+  useEffect(() => {
+    runLatest.current = run;
+  });
+
   /** A new brief starts clean, but only once it is valid: a typo must not wipe the board. */
   const startOver = (nextForm: FormState) => {
     const invalid = validateForm(nextForm);
@@ -352,32 +341,35 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
     setTreatment(null);
     setShown(null);
     setTake(1);
-    setBriefOpen(false);
+    window.scrollTo({ top: 0 });
     void run({ form: nextForm, picks: {}, nudges: [] });
   };
 
-  /** A featured poster: its brief runs (a pre-built one answers at once), and Back returns to this poster. */
-  const openFeatured = (example: Example) => {
+  /** A featured page's handoff: its pre-built board opens at once, then the rework it asked for runs; or, from a
+   *  page whose board this build doesn't have, the brief is only filled in. */
+  const openFrom = ({ example, open, nudge }: Handoff) => {
     const brief = formFromBrief(example.brief);
-    const poster = document.querySelector<HTMLElement>(`[data-slug="${example.slug}"]`);
-    landing.current = { scroll: window.scrollY, slug: example.slug, offset: poster?.getBoundingClientRect().top };
     setForm(brief);
+    if (!open) {
+      setStatus(`Filled the brief with ${example.title}. ${example.detail}`);
+      return;
+    }
+    pendingNudge.current = nudge ?? null;
     startOver(brief);
-    window.scrollTo({ top: 0 });
   };
 
-  /** Back to the studio, through the browser's history when the board has its entry, so Back and Forward agree. */
+  /** Back to the brief, through the browser's history when the board has its entry, so Back and Forward agree. */
   const leaveBoard = () => {
     if (onBoardEntry()) {
       window.history.back();
     } else {
       boardSpot.current = window.scrollY;
+      leftBoard.current = true;
       setView("studio");
     }
   };
 
   const reopenBoard = () => {
-    landing.current = { scroll: window.scrollY };
     boardSpot.current = null;
     window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
     focusTitle.current = true;
@@ -386,7 +378,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   };
 
   /** A "Try one" chip fills the brief without running it, so the director sees what it holds first. */
-  const fillExample = (example: Example) => {
+  const fillExample = (example: (typeof TRY)[number]) => {
     setForm(formFromBrief(example.brief));
     setFormProblem(null);
     setStatus(`Filled the brief with ${example.title}. ${example.detail}`);
@@ -410,18 +402,6 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   const nudgesShown = running && pending ? pending.nudges : (shown?.nudges ?? []);
   const boardState = running ? "updating" : phase === "error" ? "previous" : "current";
 
-  const brief = (
-    <BriefForm
-      form={form}
-      onChange={setForm}
-      onSubmit={() => startOver(form)}
-      onStop={() => stopActive.current()}
-      running={running}
-      problem={formProblem}
-      examples={TRY}
-      onExample={fillExample}
-    />
-  );
   const picker = question && phase === "needs_input" && (
     <Picker
       key={question.items.map((i) => i.key).join("|")}
@@ -433,42 +413,19 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   );
 
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      {/* On phones: the wordmark and the switch on one row, the badges and the theme under them. The header scrolls
-          away: the landing keeps its brief in reach, and a treatment has its clapperboard bar. */}
-      <header className="border-b border-line/80 print:border-0">
-        <div className="mx-auto flex min-h-[4.5rem] w-full max-w-[80rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-8">
-          <div className="flex min-w-0 items-center gap-5">
-            <h1>
-              <Wordmark onTap={onBoard ? leaveBoard : undefined} />
-            </h1>
-            <p className="hidden text-[14px] text-faint xl:block">Treatments grounded in what the audience loves</p>
-          </div>
-          <div className="sm:order-3">
-            <UncSwitch />
-          </div>
-          <div className="order-3 flex w-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:w-auto print:hidden">
-            {onBoard && (
-              <button
-                type="button"
-                aria-expanded={briefOpen}
-                onClick={() => setBriefOpen((open) => !open)}
-                className="min-h-11 rounded-full px-4 text-[15px] font-semibold hover:bg-card"
-              >
-                {briefOpen ? "Hide brief" : "New brief"}
-              </button>
-            )}
-            {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={(onBoard && treatment) || undefined} /> : initialBadges}
-            <ThemeSwitch />
-          </div>
-        </div>
-      </header>
+    <>
+      <SiteHeader
+        links={<HeaderLink href="/#now-showing">Examples</HeaderLink>}
+        badges={modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={(onBoard && treatment) || undefined} /> : initialBadges}
+        unc
+      />
       <p role="status" aria-live="polite" className="sr-only">
         {status}
       </p>
+      <HandoffReader onOpen={openFrom} />
 
-      <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-16 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
-        {treatment && view === "board" ? (
+      <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-10 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
+        {onBoard ? (
           <div className="flex flex-col gap-8">
             <button
               type="button"
@@ -476,13 +433,8 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
               className="-mb-2 flex min-h-11 items-center gap-2 self-start rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card print:hidden"
             >
               <BackArrow />
-              Home
+              Back to the brief
             </button>
-            {briefOpen && (
-              <div ref={briefPanel} className="w-full max-w-[34rem] scroll-mt-28 print:hidden">
-                {brief}
-              </div>
-            )}
             {phase === "error" && runProblem && <FailCard problem={runProblem} onRetry={retry} />}
             {running && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-foreground bg-card py-2 pr-2 pl-5 sm:rounded-full print:hidden">
@@ -507,77 +459,86 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
               running={running}
               take={take}
               log={<Timeline steps={steps} />}
-              onHome={leaveBoard}
+              back={
+                <button
+                  type="button"
+                  onClick={leaveBoard}
+                  aria-label="Back to the brief"
+                  title="Back to the brief"
+                  className="-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card"
+                >
+                  <BackArrow />
+                </button>
+              }
             />
           </div>
+        ) : running && pending ? (
+          // While it builds, the brief folds into one line and the run takes the page.
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-line bg-card py-2 pr-2 pl-5 sm:rounded-full">
+              <span className="font-bold">{briefLine(pending.form)}</span>
+              <span className="text-[15px] text-dim">{THINKING[pending.form.thinking].label} thinking</span>
+              <button
+                type="button"
+                onClick={() => stopActive.current()}
+                className="ml-auto min-h-10 rounded-full border border-foreground px-4 text-sm font-semibold"
+              >
+                Stop
+              </button>
+            </div>
+            <RunStage steps={steps} startedAt={startedAt} thinking={pending.form.thinking} />
+          </div>
         ) : (
-          <>
-            {/* A split studio: on wide screens the brief stays in reach on the right while the posters scroll by on
-                the left; on phones it comes straight after the headline. */}
-            <section aria-label="Studio" className="grid items-start gap-x-10 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,27rem)]">
-              <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-                {running ? (
-                  <RunStage steps={steps} startedAt={startedAt} thinking={pending?.form.thinking ?? "deep"} />
-                ) : picker ? (
-                  picker
-                ) : phase === "error" && runProblem ? (
-                  <div className="flex flex-col gap-5">
-                    <FailCard problem={runProblem} onRetry={retry} />
-                    {steps.length > 0 && (
-                      <div className="rounded-[28px] border border-line bg-card p-5 sm:p-6">
-                        <Timeline steps={steps} size="stage" />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-6">
-                    {treatment && (
-                      <button
-                        id="reopen-board"
-                        type="button"
-                        onClick={reopenBoard}
-                        className="flex min-h-11 max-w-full items-center self-start rounded-full bg-foreground px-5 py-2 text-[15px] font-bold text-background hover:opacity-90"
-                      >
-                        <span className="truncate">Back to {treatment.title}</span>
-                      </button>
-                    )}
-                    <Hero />
+          <div className="flex flex-col gap-8">
+            {treatment && (
+              <button
+                id="reopen-board"
+                type="button"
+                onClick={reopenBoard}
+                className="flex min-h-11 max-w-full items-center self-start rounded-full bg-foreground px-5 py-2 text-[15px] font-bold text-background hover:opacity-90"
+              >
+                <span className="truncate">Back to {treatment.title}</span>
+              </button>
+            )}
+            {picker}
+            {phase === "error" && runProblem && (
+              <div className="flex flex-col gap-5">
+                <FailCard problem={runProblem} onRetry={retry} />
+                {steps.length > 0 && (
+                  <div className="rounded-[28px] border border-line bg-card p-5 sm:p-6">
+                    <Timeline steps={steps} size="stage" />
                   </div>
                 )}
               </div>
-              {/* Above the posters, so the projector's beam passes behind the brief, not over it (on phones the beam
-                  reaches up to it). */}
-              <div className="relative z-10 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-stretch">
-                <div className="quiet-scroll lg:sticky lg:top-12 lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:rounded-[28px]">
-                  {brief}
+            )}
+            <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,36rem)_minmax(0,19rem)] lg:justify-center lg:gap-16">
+              <div className="flex min-w-0 flex-col gap-7">
+                <div className="flex flex-col gap-3">
+                  <h1 className="type-poster text-[clamp(3rem,6vw,4.75rem)]">new treatment</h1>
+                  <p className="max-w-[40ch] text-[1.15rem] leading-[1.5] text-dim">
+                    An artist and a city are enough to start. Everything else is optional.
+                  </p>
                 </div>
+                <BriefForm
+                  form={form}
+                  onChange={setForm}
+                  onSubmit={() => startOver(form)}
+                  onStop={() => stopActive.current()}
+                  running={running}
+                  problem={formProblem}
+                  examples={TRY}
+                  onExample={fillExample}
+                />
               </div>
-              <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-                <NowShowing ref={posters} examples={EXAMPLES} covers={featured} form={form} running={running} onTry={openFeatured} />
+              <div className="hidden lg:sticky lg:top-8 lg:block">
+                <YourPoster form={form} />
               </div>
-            </section>
-            {replay ? <Replay replay={replay} /> : <HowItWorks />}
-            <LetterboxBars />
-          </>
+            </div>
+          </div>
         )}
       </main>
 
-      <footer className="mx-auto w-full max-w-[80rem] px-4 pb-10 sm:px-8 print:hidden">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t border-line pt-6 text-[15px] text-dim">
-          <span className="font-bold text-foreground">{lingo.footer}</span>
-          <span className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-            {process.env.NODE_ENV !== "production" && (
-              <Link href="/playground" className="text-[14px] text-faint underline decoration-line underline-offset-4 hover:text-dim">
-                Tool playground (development)
-              </Link>
-            )}
-            <span>Built on Qloo&apos;s taste graph. itsgiving, 2026.</span>
-          </span>
-        </div>
-      </footer>
-
       <Toast toast={toast} />
-      <DirectorsCut on={cut} onExit={exitCut} />
-    </div>
+    </>
   );
 }

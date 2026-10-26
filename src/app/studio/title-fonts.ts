@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import type { Treatment } from "@/lib/agent/types";
 
-// The title card's faces and how one is suggested: plain data and functions, shared by the cover's picker and
-// the landing page's replay, so neither needs the other's component code.
+// The title card's faces and how one is suggested: plain data and functions, shared by the cover's picker, the
+// homepage (built on the server) and its "How it works", so none needs another's component code.
 
 /**
  * Cinematic faces for a treatment's title card, each a free Google font standing in for a film look (see

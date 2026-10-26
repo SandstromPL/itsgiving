@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { STEP_LABELS, STEP_ORDER, THINKING, type Thinking } from "@/lib/agent/options";
-import type { LlmTrace, StepEvent, StepStatus } from "@/lib/agent/types";
+import type { LlmTrace, StepEvent, StepStatus, Treatment } from "@/lib/agent/types";
 import { describeKind } from "@/lib/llm/types";
 import type { Provenance } from "@/lib/qloo/client";
 import { useLingo } from "./lingo";
@@ -143,6 +143,19 @@ export function Timeline({ steps, size = "credits" }: { steps: StepEvent[]; size
   );
 }
 
+/**
+ * Timeline rows for a treatment that wasn't built just now: the calls and models that originally made it, from the
+ * cache or the featured set.
+ */
+export function replaySteps(t: Treatment, summary = "Replayed from cache: no new calls this time."): StepEvent[] {
+  return STEP_ORDER.flatMap((id): StepEvent[] => {
+    const qloo = t.qloo.steps[id];
+    const llm = t.llm.find((trace) => trace.step === id);
+    if (!qloo?.length && !llm) return [];
+    return [{ type: "step", id, status: "done", label: STEP_LABELS[id], summary, qloo, llm }];
+  });
+}
+
 const STRIP_TONE: Record<StepStatus | "pending", string> = {
   pending: "bg-line",
   running: "bg-foreground motion-safe:animate-pulse",
@@ -181,22 +194,36 @@ function Leader({ elapsed, expected }: { elapsed: number; expected: number }) {
   );
 }
 
-/** The stage while a first treatment is being built: the run itself, step by step, instead of an empty frame. */
+/**
+ * The stage while a first treatment is being built: the run itself, step by step, instead of an empty frame. Past
+ * ten seconds people look away, so it says how long a run usually takes, which step it's on, and keeps the tab's
+ * title counting.
+ */
 export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; startedAt: number; thinking: Thinking }) {
   const elapsed = useElapsed(startedAt);
   const { t } = useLingo();
   const status = (id: (typeof STEP_ORDER)[number]) => steps.find((s) => s.id === id)?.status ?? "pending";
+  const expected = thinking === "deep" ? 40 : 30;
+  const settled = steps.filter((s) => s.status !== "running").length;
+  const current = [...steps].reverse().find((s) => s.status === "running")?.label;
+  useEffect(() => {
+    document.title = `Building… ${elapsed} s`;
+  }, [elapsed]);
   return (
     <div className="flex flex-col gap-5">
       <div className="surface-dark grain flex flex-wrap items-center gap-x-8 gap-y-6 rounded-[2rem] bg-background p-7 sm:p-9">
-        <Leader elapsed={elapsed} expected={thinking === "deep" ? 40 : 30} />
+        <Leader elapsed={elapsed} expected={expected} />
         <div className="min-w-0 flex-[1_1_16rem]">
           <h2 className="type-poster text-[clamp(3rem,6vw,5.25rem)]">{t.cooking}</h2>
           <p className="mt-3 text-[17px] leading-6 text-dim">
-            {THINKING[thinking].hint} Qloo first, then the writer.{" "}
+            {THINKING[thinking].hint} Qloo first, then the writer: usually about {expected} s.{" "}
             <span aria-hidden className="font-mono text-foreground">
               {elapsed} s
             </span>
+          </p>
+          <p className="mt-2 text-[15px] font-semibold">
+            Step {Math.min(STEP_ORDER.length, settled + 1)} of {STEP_ORDER.length}
+            {current ? `: ${current}` : ""}
           </p>
           {elapsed >= 60 && <p className="mt-2 font-serif text-[1.6rem] leading-tight italic">{t.slowBurn}</p>}
         </div>

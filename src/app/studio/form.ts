@@ -65,6 +65,16 @@ export function removeFilm(form: FormState, title: string): FormState {
   };
 }
 
+/** The brief in one line, as the poster and the run's summary read it: "Music video for Frank Ocean, New York". */
+export function briefLine(form: FormState): string {
+  const who = form.artist.trim();
+  const after = splitTitles(form.touchstones);
+  const where = form.city.trim() || "your city";
+  return form.format === "music_video"
+    ? `Music video${who ? ` for ${who}` : ""}, ${where}`
+    : `Short film${after.length > 0 ? ` after ${after.join(" and ")}` : ""}, ${where}`;
+}
+
 /** An example brief as a chip: "Frank Ocean, New York" or "after In the Mood for Love, Mumbai". */
 export function exampleChip(brief: BriefInput): string {
   const who = brief.artist ?? (brief.touchstones?.length ? `after ${brief.touchstones[0]}` : "");

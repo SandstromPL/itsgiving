@@ -1,8 +1,12 @@
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { llmConfigFromEnv } from "../llm/config";
+import { qlooConfigFromEnv } from "../qloo";
 import { distanceM } from "../tools/heatmap";
-import { FORMATS, subjectPhrase } from "./options";
-import type { QlooEvidence, Treatment } from "./types";
+import { briefKey, briefSchema, normalizeBrief } from "./brief";
+import { EXAMPLES } from "./examples";
+import { FORMATS, audiencePhrase, subjectPhrase } from "./options";
+import type { QlooEvidence, ShootBase, Treatment } from "./types";
 
 // Featured treatments: the examples pre-built by `npm run featured` (scripts/featured.ts), so judges and
 // first-time visitors see a finished treatment at once, whatever the live rate limits are doing. They
@@ -34,6 +38,14 @@ export interface FeaturedCover {
 }
 
 let memo: { file: string; mtimeMs: number; items: FeaturedItem[] } | undefined;
+
+/**
+ * Featured treatments are live data, so a server running on mocks doesn't offer them: their covers and pages would
+ * promise what a mock run can't deliver. Decided by the keys present at build time, like the pages built from them.
+ */
+export function featuredOffered(): boolean {
+  return qlooConfigFromEnv().mode === "live" && llmConfigFromEnv().mode === "live";
+}
 
 function isItem(value: unknown): value is FeaturedItem {
   const item = value as FeaturedItem;
@@ -73,30 +85,40 @@ export function featuredCovers(items: FeaturedItem[] = loadFeatured()): Featured
   }));
 }
 
+const LIVE = { qloo: "live", llm: "live" };
+
 /**
- * One real run, cut down for the landing's replay: what Qloo said at each step and what came of it. The heatmap is
- * thinned to 2x2 blocks (the replay draws it small), so the page carries a few kilobytes, not the treatment.
+ * A featured example's pre-built treatment, for its own page (/t/<slug>). Only while it still answers the example's
+ * brief, the same match /api/treatment makes, so the page never offers a board the studio can't reopen at once: after
+ * the examples change, a stale build gets the page's stand-in instead.
  */
-export interface FeaturedReplay {
+export function featuredItem(slug: string, items: FeaturedItem[] = loadFeatured()): FeaturedItem | undefined {
+  const example = EXAMPLES.find((e) => e.slug === slug && e.featured);
+  const item = items.find((i) => i.slug === slug);
+  if (!example || !item || item.treatment.mock?.qloo) return undefined;
+  const asked = briefKey(normalizeBrief(briefSchema.parse({ ...example.brief, thinking: "deep" })), LIVE);
+  return briefKey(item.treatment.brief, LIVE) === asked ? item : undefined;
+}
+
+/**
+ * One real run, for the homepage's "How it works": what Qloo said at each step and what came of it, with the shoot
+ * base exactly as the treatment's own board draws it. A treatment keeps only its hottest tiles (a few hundred at
+ * most), so the page carries kilobytes, not the treatment.
+ */
+export interface FeaturedRun {
   slug: string;
   /** "Prateek Kuhad", or "Past Lives and Aftersun" for a short film. */
   subject: string;
+  /** Whose heatmap it is: "Prateek Kuhad's audience". */
+  audience: string;
   city: string;
   mock: boolean;
   tones: { name: string; shared: boolean }[];
   leans?: string;
-  map: {
-    bounds: { south: number; west: number; north: number; east: number };
-    cell: { lat: number; lon: number };
-    tiles: { lat: number; lon: number; heat: number }[];
-  };
-  /** The strongest areas, the chosen base first, and how far locations may sit from it. */
-  areas: { name: string; share: number; lat: number; lon: number; chosen: boolean }[];
-  radiusKm: number;
-  /** False when too few places matched near the base, so locations came from across the city. */
-  held: boolean;
+  base: ShootBase;
   receipts: { kind: "film" | "brand" | "place"; name: string; rank: number; of: number; affinity?: number; km?: number }[];
   title: string;
+  logline: string;
   /** What the title card's suggestion reads: the tone and taste tags, in Qloo's order. */
   tags: string[];
   qlooCalls: number;
@@ -106,30 +128,14 @@ export interface FeaturedReplay {
 
 const round = (n: number, places: number) => Number(n.toFixed(places));
 
-export function featuredReplay(items: FeaturedItem[] = loadFeatured()): FeaturedReplay | undefined {
+export function featuredRun(items: FeaturedItem[] = loadFeatured()): FeaturedRun | undefined {
   const item = items.find(({ treatment: t }) => (t.base?.map?.tiles.length ?? 0) > 0 && (t.base?.areas.length ?? 0) > 0);
   const base = item?.treatment.base;
-  const map = base?.map;
-  if (!item || !base || !map) return undefined;
+  if (!item || !base) return undefined;
   const t = item.treatment;
-  const bounds = map.bounds ?? {
-    south: Math.min(...map.tiles.map((tile) => tile.lat)) - map.cell.lat,
-    north: Math.max(...map.tiles.map((tile) => tile.lat)) + map.cell.lat,
-    west: Math.min(...map.tiles.map((tile) => tile.lon)) - map.cell.lon,
-    east: Math.max(...map.tiles.map((tile) => tile.lon)) + map.cell.lon,
-  };
-  const cell = { lat: map.cell.lat * 2, lon: map.cell.lon * 2 };
-  const blocks = new Map<string, { lat: number; lon: number; heat: number }>();
-  for (const tile of map.tiles) {
-    const row = Math.floor((tile.lat - bounds.south) / cell.lat);
-    const col = Math.floor((tile.lon - bounds.west) / cell.lon);
-    const key = `${row}:${col}`;
-    const heat = Math.max(blocks.get(key)?.heat ?? 0, tile.heat);
-    blocks.set(key, { lat: bounds.south + (row + 0.5) * cell.lat, lon: bounds.west + (col + 0.5) * cell.lon, heat });
-  }
   const chosen = base.areas.find((a) => a.ref === base.chosen) ?? base.areas[0];
 
-  const receipts: FeaturedReplay["receipts"] = [];
+  const receipts: FeaturedRun["receipts"] = [];
   const add = (kind: "film" | "brand" | "place", name: string, qloo: QlooEvidence, km?: number) =>
     receipts.push({ kind, name, rank: qloo.rank, of: qloo.of, affinity: qloo.affinity ?? undefined, km });
   const first = <T extends { qloo: { rank: number } }>(list: T[]) => [...list].sort((a, b) => a.qloo.rank - b.qloo.rank)[0];
@@ -151,26 +157,15 @@ export function featuredReplay(items: FeaturedItem[] = loadFeatured()): Featured
       t.subjects.filter((s) => s.kind === "artist").map((s) => s.name),
       t.subjects.filter((s) => s.kind !== "artist").map((s) => s.name),
     ).replace(/^(for|after) /, ""),
+    audience: audiencePhrase(t.subjects),
     city: t.brief.city,
     mock: t.mock.qloo,
     tones: t.tone.slice(0, 5).map((tone) => ({ name: tone.tag.name, shared: tone.source === "overlap" })),
     leans: t.audience.leans[0],
-    map: {
-      bounds: { south: round(bounds.south, 5), west: round(bounds.west, 5), north: round(bounds.north, 5), east: round(bounds.east, 5) },
-      cell: { lat: round(cell.lat, 6), lon: round(cell.lon, 6) },
-      tiles: [...blocks.values()].map((b) => ({ lat: round(b.lat, 5), lon: round(b.lon, 5), heat: round(b.heat, 2) })),
-    },
-    areas: [chosen, ...base.areas.filter((a) => a !== chosen)].map((a) => ({
-      name: a.name,
-      share: round(a.share, 3),
-      lat: a.lat,
-      lon: a.lon,
-      chosen: a === chosen,
-    })),
-    radiusKm: chosen.radius_m / 1000,
-    held: base.held,
+    base,
     receipts,
     title: t.title,
+    logline: t.logline,
     tags: [...t.tone.map((tone) => tone.tag.name), ...t.audience.taste_tags.map((tag) => tag.name)],
     qlooCalls: t.qloo.calls,
     modelCalls: t.llm.length,

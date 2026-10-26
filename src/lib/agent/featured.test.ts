@@ -8,7 +8,7 @@ import { QlooClient } from "../qloo";
 import { MemoryCache } from "../qloo/cache";
 import { briefKey, briefSchema, normalizeBrief, type BriefInput } from "./brief";
 import { EXAMPLES } from "./examples";
-import { featuredCovers, featuredReplay, loadFeatured, type FeaturedItem } from "./featured";
+import { featuredCovers, featuredItem, featuredRun, loadFeatured, type FeaturedItem } from "./featured";
 import { RateLimiter, TtlCache } from "./guards";
 import { cachedTreatment, type TreatmentService } from "./service";
 import type { Treatment } from "./types";
@@ -77,7 +77,31 @@ describe("featured examples", () => {
     expect(loadFeatured(good).map((i) => i.slug)).toEqual(["prateek-kuhad-mumbai"]);
   });
 
-  it("cuts a featured run with a heatmap down to the landing's replay", () => {
+  it("gives every featured example a short, unique, URL-safe slug for its page", () => {
+    const slugs = EXAMPLES.filter((e) => e.featured).map((e) => e.slug);
+    expect(slugs.length).toBeGreaterThan(0);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    for (const slug of slugs) expect(slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+  });
+
+  it("finds a featured page's treatment only while it still answers the example's brief", () => {
+    const [prateek] = EXAMPLES;
+    const nonFeatured = EXAMPLES.find((e) => !e.featured)!;
+    const item = { slug: prateek.slug, treatment: fakeTreatment(prateek.brief) };
+    expect(featuredItem(prateek.slug, [item])).toBe(item);
+    expect(featuredItem("nope", [item])).toBeUndefined();
+    // Pre-built under a slug that isn't featured: no page for it.
+    expect(featuredItem(nonFeatured.slug, [{ slug: nonFeatured.slug, treatment: fakeTreatment(nonFeatured.brief) }])).toBeUndefined();
+    // Built from a brief the example no longer has (the examples changed since the build): the page's stand-in instead.
+    expect(
+      featuredItem(prateek.slug, [{ slug: prateek.slug, treatment: fakeTreatment({ ...prateek.brief, city: "Delhi" }) }]),
+    ).toBeUndefined();
+    // Never a mock run, whatever its brief.
+    const mock = { ...fakeTreatment(prateek.brief), mock: { qloo: true, llm: false } } as Treatment;
+    expect(featuredItem(prateek.slug, [{ slug: prateek.slug, treatment: mock }])).toBeUndefined();
+  });
+
+  it("explains a featured run with a heatmap on the homepage, its base as the board draws it", () => {
     const qloo = (tool: string, rank: number, of: number, affinity: number) => ({ tool, rank, of, affinity, tags: [], because: [] });
     const run = {
       ...fakeTreatment(EXAMPLES[0].brief),
@@ -122,35 +146,32 @@ describe("featured examples", () => {
     } as unknown as Treatment;
     const plain = { slug: "charli-xcx-new-york", treatment: fakeTreatment(EXAMPLES[1].brief) };
 
-    expect(featuredReplay([plain])).toBeUndefined();
-    const replay = featuredReplay([plain, { slug: "prateek-kuhad-mumbai", treatment: run }]);
-    expect(replay).toMatchObject({
+    expect(featuredRun([plain])).toBeUndefined();
+    const story = featuredRun([plain, { slug: "prateek-kuhad-mumbai", treatment: run }]);
+    expect(story).toMatchObject({
       slug: "prateek-kuhad-mumbai",
       subject: "Prateek Kuhad",
+      audience: "Prateek Kuhad's audience",
       city: "Mumbai",
       leans: "over-indexes 30 to 34, skews female",
-      radiusKm: 2,
-      held: true,
+      title: "Almost, Every Evening",
+      logline: "Two people keep almost meeting.",
       qlooCalls: 21,
       modelCalls: 2,
       writtenBy: "deepseek-flash",
       tags: ["Introspective", "Indie folk"],
     });
-    expect(replay?.areas.map((a) => [a.name, a.chosen])).toEqual([
-      ["Bandra West", true],
-      ["Churchgate", false],
-    ]);
-    // The best-ranked film, brand and place, the place with its distance from the base.
-    expect(replay?.receipts).toEqual([
+    // The same shoot base the board draws, not a cut-down copy.
+    expect(story?.base).toBe(run.base);
+    // The best-ranked film, brand and place, the place with its distance from the chosen base (Bandra West).
+    expect(story?.receipts).toEqual([
       { kind: "film", name: "Darlings (2022)", rank: 2, of: 10, affinity: 0.945 },
       { kind: "brand", name: "Suta", rank: 2, of: 8, affinity: 0.988 },
       { kind: "place", name: "The Bad Cafe", rank: 2, of: 8, affinity: 0.733, km: 0.6 },
     ]);
-    // Three of the four tiles share a 2x2 block, and the hottest of them stands for it.
-    expect(replay?.map.tiles.map((tile) => tile.heat).sort()).toEqual([0.9, 1]);
   });
 
-  it("turns a featured treatment into a small cover for the empty board", () => {
+  it("turns a featured treatment into a small cover for its poster", () => {
     const [cover] = featuredCovers([{ slug: "prateek-kuhad-mumbai", treatment: fakeTreatment(EXAMPLES[0].brief) }]);
     expect(cover).toEqual({
       slug: "prateek-kuhad-mumbai",

@@ -291,26 +291,6 @@ export function BriefForm({
         <p className="text-[13px] text-faint">Nothing personal goes to Qloo</p>
       </div>
 
-      {examples.length > 0 && onExample && (
-        <div className="flex flex-col gap-2">
-          <p className={label}>{t.tryOne}</p>
-          <ul aria-label={t.tryOne} className="flex flex-wrap gap-1.5">
-            {examples.map((example) => (
-              <li key={example.slug}>
-                <button
-                  type="button"
-                  onClick={() => onExample(example)}
-                  title={example.detail}
-                  className="min-h-9 rounded-full border border-edge bg-card px-3.5 text-[14px] font-semibold hover:border-foreground hover:bg-field"
-                >
-                  {exampleChip(example.brief)}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <fieldset>
         <legend className="sr-only">Format</legend>
         <div className={track}>
@@ -351,33 +331,19 @@ export function BriefForm({
 
       {!isVideo && touchstones}
 
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] gap-2.5">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${ids}-city`} className={label}>
-            Shoot city
-          </label>
-          <input
-            id={`${ids}-city`}
-            className={field}
-            value={form.city}
-            onChange={(e) => set("city", e.target.value)}
-            placeholder="e.g. Mumbai"
-            autoComplete="address-level2"
-            {...describe("city")}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${ids}-budget`} className={label}>
-            Budget
-          </label>
-          <select id={`${ids}-budget`} className={field} value={form.budget} onChange={(e) => set("budget", e.target.value as Budget)}>
-            {(Object.keys(BUDGETS) as Budget[]).map((budget) => (
-              <option key={budget} value={budget}>
-                {BUDGETS[budget].label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={`${ids}-city`} className={label}>
+          Shoot city
+        </label>
+        <input
+          id={`${ids}-city`}
+          className={field}
+          value={form.city}
+          onChange={(e) => set("city", e.target.value)}
+          placeholder="e.g. Mumbai"
+          autoComplete="address-level2"
+          {...describe("city")}
+        />
       </div>
       {message("city")}
 
@@ -391,7 +357,9 @@ export function BriefForm({
         >
           <span className="flex flex-col gap-0.5">
             <span className="text-[16px] font-bold">{t.makeItYours}</span>
-            <span className="text-[13px] text-faint">{isVideo ? "Touchstones, your taste, an import" : "Your taste, an import"}</span>
+            <span className="text-[13px] text-faint">
+              {isVideo ? "Reference films, your own films, budget, depth" : "Your own films, budget, depth"}
+            </span>
           </span>
           <span className="flex items-center gap-2.5">
             {extras > 0 && <span className="rounded-full bg-accent px-2.5 py-1 text-[12px] font-bold text-[#121211]">{extras} added</span>}
@@ -414,35 +382,46 @@ export function BriefForm({
         <div id={`${ids}-drawer`} hidden={!open} className="flex flex-col gap-4 border-t border-line p-4">
           {isVideo && touchstones}
           <TasteField form={form} onChange={onChange} describe={describe} message={message} />
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${ids}-budget`} className={label}>
+              Budget
+            </label>
+            <select id={`${ids}-budget`} className={field} value={form.budget} onChange={(e) => set("budget", e.target.value as Budget)}>
+              {(Object.keys(BUDGETS) as Budget[]).map((budget) => (
+                <option key={budget} value={budget}>
+                  {BUDGETS[budget].label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className={`mb-1.5 ${label}`}>Thinking</legend>
+            <div className={track}>
+              {(Object.keys(THINKING) as Thinking[]).map((thinking) => (
+                <label
+                  key={thinking}
+                  className={`${option} has-checked:bg-card has-checked:font-bold has-checked:text-foreground has-checked:shadow-[0_1px_2px_rgb(0_0_0/0.12)]`}
+                >
+                  <input
+                    type="radio"
+                    name="thinking"
+                    value={thinking}
+                    checked={form.thinking === thinking}
+                    onChange={() => set("thinking", thinking)}
+                    aria-describedby={`${ids}-thinking-hint`}
+                    className="sr-only"
+                  />
+                  {t.thinking[thinking]}
+                </label>
+              ))}
+            </div>
+            <p id={`${ids}-thinking-hint`} className={hint}>
+              {THINKING[form.thinking].label} thinking:{" "}
+              {THINKING[form.thinking].hint.charAt(0).toLowerCase() + THINKING[form.thinking].hint.slice(1)}
+            </p>
+          </fieldset>
         </div>
       </div>
-
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className={`mb-1.5 ${label}`}>Thinking</legend>
-        <div className={track}>
-          {(Object.keys(THINKING) as Thinking[]).map((thinking) => (
-            <label
-              key={thinking}
-              className={`${option} has-checked:bg-card has-checked:font-bold has-checked:text-foreground has-checked:shadow-[0_1px_2px_rgb(0_0_0/0.12)]`}
-            >
-              <input
-                type="radio"
-                name="thinking"
-                value={thinking}
-                checked={form.thinking === thinking}
-                onChange={() => set("thinking", thinking)}
-                aria-describedby={`${ids}-thinking-hint`}
-                className="sr-only"
-              />
-              {t.thinking[thinking]}
-            </label>
-          ))}
-        </div>
-        <p id={`${ids}-thinking-hint`} className={hint}>
-          {THINKING[form.thinking].label} thinking:{" "}
-          {THINKING[form.thinking].hint.charAt(0).toLowerCase() + THINKING[form.thinking].hint.slice(1)}
-        </p>
-      </fieldset>
 
       <div className="mt-1 flex gap-2">
         {/* aria-disabled, not disabled: the button keeps focus while the run it started is going. */}
@@ -459,6 +438,26 @@ export function BriefForm({
           </button>
         )}
       </div>
+
+      {examples.length > 0 && onExample && (
+        <div className="flex flex-col gap-2 border-t border-line pt-4">
+          <p className={label}>{t.tryOne}</p>
+          <ul aria-label={t.tryOne} className="flex flex-wrap gap-1.5">
+            {examples.map((example) => (
+              <li key={example.slug}>
+                <button
+                  type="button"
+                  onClick={() => onExample(example)}
+                  title={example.detail}
+                  className="min-h-9 rounded-full border border-edge bg-card px-3.5 text-[14px] font-semibold hover:border-foreground hover:bg-field"
+                >
+                  {exampleChip(example.brief)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </form>
   );
 }

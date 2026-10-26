@@ -1,26 +1,39 @@
-import { Suspense } from "react";
-import { featuredCovers, featuredReplay, loadFeatured } from "@/lib/agent/featured";
-import { llmConfigFromEnv } from "@/lib/llm/config";
-import { qlooConfigFromEnv } from "@/lib/qloo";
-import { LiveModes } from "./studio/live-modes";
-import { ModesPending } from "./studio/parts";
-import { Studio } from "./studio/studio";
+import { EXAMPLES } from "@/lib/agent/examples";
+import { featuredCovers, featuredItem, featuredOffered, featuredRun, loadFeatured } from "@/lib/agent/featured";
+import { Hero, HowItWorks, HowItWorksSteps, NowShowing, StartYourOwn } from "./studio/landing";
+import { HeaderLink, SiteHeader } from "./studio/site-header";
+import { suggestTitleFont } from "./studio/title-fonts";
 
+/**
+ * The pitch: what itsgiving is, the featured treatments, one real run explained, and the way into the studio. It
+ * holds no form and reads nothing per request, so the whole page is built once, featured treatments included. Only
+ * featured treatments whose own page will open are offered (featuredItem).
+ */
 export default function Home() {
-  // Featured treatments are live data, so a server running on mocks doesn't offer them: their covers
-  // would promise what a mock run can't deliver. Read at build time, they become part of the static shell,
-  // as does the one replayed under "Watch it work".
-  const live = qlooConfigFromEnv().mode === "live" && llmConfigFromEnv().mode === "live";
-  const items = live ? loadFeatured() : [];
+  const all = featuredOffered() ? loadFeatured() : [];
+  const items = EXAMPLES.filter((example) => example.featured).flatMap((example) => featuredItem(example.slug, all) ?? []);
+  const covers = featuredCovers(items);
+  const run = featuredRun(items);
+  const first = items[0];
   return (
-    <Studio
-      featured={featuredCovers(items)}
-      replay={featuredReplay(items)}
-      initialBadges={
-        <Suspense fallback={<ModesPending />}>
-          <LiveModes />
-        </Suspense>
-      }
-    />
+    <>
+      <SiteHeader
+        home
+        links={
+          <>
+            {covers.length > 0 && <HeaderLink href="#now-showing">Examples</HeaderLink>}
+            <HeaderLink href="/studio">Studio</HeaderLink>
+          </>
+        }
+      />
+      <main className="flex flex-1 flex-col">
+        <Hero cover={covers[0]} fontId={first && suggestTitleFont(first.treatment).id} />
+        <NowShowing covers={covers} />
+        {run ? <HowItWorks run={run} /> : <HowItWorksSteps />}
+        <div className="mx-auto w-full max-w-[80rem] px-4 pb-20 sm:px-8">
+          <StartYourOwn />
+        </div>
+      </main>
+    </>
   );
 }
