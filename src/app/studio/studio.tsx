@@ -154,8 +154,11 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   const failedBefore = useRef(false);
   const briefPanel = useRef<HTMLDivElement>(null);
   const posters = useRef<HTMLElement>(null);
-  /** Where the director was in the studio when the board opened, and the poster they opened, to return them there. */
-  const landing = useRef<{ scroll: number; slug?: string } | null>(null);
+  /**
+   * Where the director was in the studio when the board opened, to return them there: the scroll, and for a poster,
+   * the poster and where it sat on screen.
+   */
+  const landing = useRef<{ scroll: number; slug?: string; offset?: number } | null>(null);
   /** Where they were on the board when they stepped out, for Forward; null when the board should open at its top. */
   const boardSpot = useRef<number | null>(null);
   const viewNow = useRef(view);
@@ -191,13 +194,15 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
       boardSpot.current = null;
       return;
     }
-    // Back in the studio: the same spot on the page, and focus on the poster that was opened (or the way back in).
+    // Back in the studio: the same spot on the page, and focus on the poster that was opened (or the way back in). A
+    // poster goes back to where it sat on screen, since what's above it may have grown meanwhile: the brief it filled
+    // can open its drawer, and the way back to the board appears over the headline.
     if (!landing.current) return;
-    const { scroll, slug } = landing.current;
+    const { scroll, slug, offset } = landing.current;
     landing.current = null;
-    window.scrollTo({ top: scroll });
-    const target = slug ? document.querySelector<HTMLElement>(`[data-slug="${slug}"]`) : document.getElementById("reopen-board");
-    target?.focus({ preventScroll: true });
+    const poster = slug ? document.querySelector<HTMLElement>(`[data-slug="${slug}"]`) : null;
+    window.scrollTo({ top: poster && offset !== undefined ? poster.getBoundingClientRect().top + window.scrollY - offset : scroll });
+    (poster ?? document.getElementById("reopen-board"))?.focus({ preventScroll: true });
   }, [view]);
 
   // Leaving the page mid-run shouldn't keep spending model quota and credit.
@@ -354,7 +359,8 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   /** A featured poster: its brief runs (a pre-built one answers at once), and Back returns to this poster. */
   const openFeatured = (example: Example) => {
     const brief = formFromBrief(example.brief);
-    landing.current = { scroll: window.scrollY, slug: example.slug };
+    const poster = document.querySelector<HTMLElement>(`[data-slug="${example.slug}"]`);
+    landing.current = { scroll: window.scrollY, slug: example.slug, offset: poster?.getBoundingClientRect().top };
     setForm(brief);
     startOver(brief);
     window.scrollTo({ top: 0 });
