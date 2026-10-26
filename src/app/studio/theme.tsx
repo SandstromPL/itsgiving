@@ -3,25 +3,21 @@
 import { useSyncExternalStore, type ReactNode } from "react";
 import { THEME_KEY } from "./theme-script";
 
-export type ThemeChoice = "system" | "light" | "dark";
+export type ThemeChoice = "light" | "dark";
 
 /**
- * The room's theme, kept where the stylesheet reads it: `data-theme` on <html> (no attribute follows the device).
- * Storage can be missing or blocked; then the choice lasts for the visit.
+ * The room's theme, kept where the stylesheet reads it: `data-theme` on <html>. Light unless the visitor picked dark;
+ * the device's setting doesn't decide it. Storage can be missing or blocked; then the choice lasts for the visit.
  */
 const theme = {
   listeners: new Set<() => void>(),
   read(): ThemeChoice {
-    const value = document.documentElement.dataset.theme;
-    return value === "light" || value === "dark" ? value : "system";
+    return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
   },
   write(choice: ThemeChoice) {
-    const root = document.documentElement;
-    if (choice === "system") delete root.dataset.theme;
-    else root.dataset.theme = choice;
+    document.documentElement.dataset.theme = choice;
     try {
-      if (choice === "system") localStorage.removeItem(THEME_KEY);
-      else localStorage.setItem(THEME_KEY, choice);
+      localStorage.setItem(THEME_KEY, choice);
     } catch {
       // kept for this visit only
     }
@@ -46,16 +42,6 @@ const icon = {
 
 const OPTIONS: { id: ThemeChoice; label: string; glyph: ReactNode }[] = [
   {
-    id: "system",
-    label: "Match your device",
-    glyph: (
-      <svg aria-hidden {...icon}>
-        <rect x="3" y="4" width="18" height="12" rx="2" />
-        <path d="M8 20h8M12 16v4" />
-      </svg>
-    ),
-  },
-  {
     id: "light",
     label: "Light",
     glyph: (
@@ -76,10 +62,10 @@ const OPTIONS: { id: ThemeChoice; label: string; glyph: ReactNode }[] = [
   },
 ];
 
-/** System, light or dark: three icon buttons, the chosen one inked in. */
+/** Light or dark: two icon buttons, the chosen one inked in. */
 export function ThemeSwitch() {
-  // The server can't know the choice; the browser reads it once hydrated.
-  const choice = useSyncExternalStore(theme.subscribe, theme.read, () => "system" as const);
+  // The server renders the default; the browser reads a saved choice once hydrated.
+  const choice = useSyncExternalStore(theme.subscribe, theme.read, () => "light" as const);
   return (
     <div role="group" aria-label="Theme" className="flex gap-0.5 rounded-full border border-foreground bg-card p-[3px] print:hidden">
       {OPTIONS.map((option) => (

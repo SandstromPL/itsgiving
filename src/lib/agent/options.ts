@@ -39,7 +39,8 @@ export const IMPORT_LIMIT = 25;
 /** TMDB's required notice, shown wherever an imported TMDB list appears. */
 export const TMDB_NOTICE = "This product uses the TMDB API but is not endorsed or certified by TMDB.";
 
-function joinNames(names: string[]): string {
+/** "A", "A and B", "A, B and C". */
+export function joinNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 

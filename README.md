@@ -81,17 +81,23 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - **Clapperboard and pinned map.** Once the cover scrolls away, a bar with the title, the take and the city stays at
   the top, lights up the section being read and fills a film strip as you go. In Locations, the shoot-base map stays
   put beside the places and lights up the pin of the one in view.
+- **A map you can read.** The heatmap sits on the city's streets (OpenStreetMap, darkened), so the bright squares show
+  where in the city the audience is strongest, around the three strongest areas and the numbered locations.
+- **Ways home.** Home above the cover and in the clapperboard bar, the wordmark, and the browser's Back button all
+  return to the studio at the spot you left; Forward, or "Back to" the treatment's title, opens it again.
 
 ### The studio
 
 - **Split screen.** On wide screens the brief stays in reach on the right while the posters scroll by on the left; on
   phones it comes right after the headline. "Try one" fills it with an example, "your poster" fills in as you type,
   and the optional references and taste sit in a "Make it yours" drawer.
-- **Lights down.** Scrolling into the posters dims the room and closes in two letterbox bars; scrolling back brings
-  the lights up. With reduced motion it switches at the halfway point instead of fading.
+- **Lights down.** Scrolling into the posters starts the show: the room dims to near black, two letterbox bars close
+  in, and a projector beam with dust in it comes on over the posters. The dark room starts as a warm charcoal, an
+  auditorium with the house lights still up, so the moment shows there too. Scrolling back brings the lights up. With
+  reduced motion it switches at the halfway point instead of fading.
 - **Watch it work.** One real featured run replayed as you scroll: the audience Qloo read, the city's heatmap, the
   shoot base, the receipts, then the title.
-- **Light, dark or your device's choice,** switched in the header and remembered per browser.
+- **Light or dark,** switched in the header and remembered per browser. Light is the default.
 
 ### Featured treatments
 
@@ -278,6 +284,8 @@ All server-side only.
 - Taste data: [Qloo](https://www.qloo.com/)'s Insights API.
 - Imported film lists: [TMDB](https://www.themoviedb.org/). This product uses the TMDB API but is not endorsed or
   certified by TMDB.
+- Street maps under the heatmap: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, from
+  OpenStreetMap's standard tiles under its [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 
 ## License
 

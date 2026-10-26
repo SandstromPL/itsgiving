@@ -1,14 +1,15 @@
 import { Fragment } from "react";
+import { joinNames } from "@/lib/agent/options";
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
+import { MapCredit, StreetTiles, mapFrame, type MapFrame } from "./street-map";
 
-// The shoot base: Qloo's heatmap around the strongest areas for this audience, the areas as rings, the one
-// the planner chose, and the scouted locations as numbered pins. Squares, rings and leader lines are SVG and
-// scale with the map; names and numbers are HTML on top, so they stay legible at any width.
+// The shoot base: Qloo's heatmap around the strongest areas for this audience, on the city's streets, with the
+// areas as rings, the one the planner chose, and the scouted locations as numbered pins. Squares, rings and leader
+// lines are SVG and scale with the map; names and numbers are HTML on top, so they stay legible at any width.
 
 /** The frame's longer side in SVG units; about a pixel each on a desktop screen. */
 const W = 600;
-const METRES_PER_DEGREE = 111_320;
 /** Pins closer than this (in SVG units) are nudged apart, each with a leader line to its true spot. */
 const PIN_GAP = 26;
 
@@ -27,11 +28,24 @@ export function locationPins(t: Treatment): Pin[] {
   });
 }
 
-/** Faint for the city's shape, bright where the audience is strongest. */
-const opacity = (heat: number) => 0.07 + 0.93 * heat ** 1.5;
+/**
+ * How much of the highlighter a square gets: none where the audience is weak, and still see-through in the middle
+ * of the range, so the streets show under all but the strongest squares. One hue getting brighter on a dark map: a
+ * sequential scale.
+ */
+export const heatAlpha = (heat: number) => (heat < 0.15 ? 0 : Math.round(820 * heat ** 2) / 1000);
 
-/** An equirectangular frame (fine at city scale) on the grid's bounds, grown to keep every pin inside. */
-function frame(map: HeatGrid, pins: Pin[]) {
+/** "Prateek Kuhad's audience", or the audience for the films a short is after: who the heatmap is of. */
+function audienceOf(t: Treatment): string {
+  const artists = t.subjects.filter((s) => s.kind === "artist").map((s) => s.name);
+  const others = t.subjects.filter((s) => s.kind !== "artist").map((s) => s.name);
+  if (artists.length === 1 && others.length === 0) return `${artists[0]}'s audience`;
+  const who = [...artists, ...others];
+  return who.length > 0 ? `the audience for ${joinNames(who)}` : "this audience";
+}
+
+/** The map's frame: the grid's bounds, grown to keep every pin inside. */
+function frame(map: HeatGrid, pins: Pin[]): MapFrame {
   // Grids saved before bounds were recorded are framed on their own squares.
   let { south, west, north, east } = map.bounds ?? {
     south: Math.min(...map.tiles.map((t) => t.lat)) - map.cell.lat,
@@ -45,15 +59,7 @@ function frame(map: HeatGrid, pins: Pin[]) {
     west = Math.min(west, p.lon - map.cell.lon);
     east = Math.max(east, p.lon + map.cell.lon);
   }
-  const kx = Math.cos((((south + north) / 2) * Math.PI) / 180);
-  const scale = W / Math.max((east - west) * kx, north - south);
-  return {
-    width: (east - west) * kx * scale,
-    height: (north - south) * scale,
-    x: (lon: number) => (lon - west) * kx * scale,
-    y: (lat: number) => (north - lat) * scale,
-    size: (degreesLat: number) => degreesLat * scale,
-  };
+  return mapFrame({ south, west, north, east }, W);
 }
 
 interface Point {
@@ -128,6 +134,7 @@ function HeatMap({
   map,
   pins,
   city,
+  audience,
   mock,
   active,
   compact = false,
@@ -136,6 +143,8 @@ function HeatMap({
   map: HeatGrid;
   pins: Pin[];
   city: string;
+  /** Whose heatmap it is, as a phrase: "Prateek Kuhad's audience". */
+  audience: string;
   mock: boolean;
   /** The location being read (0-based, as on the cards): its pin grows and shows its name. */
   active?: number;
@@ -144,13 +153,20 @@ function HeatMap({
 }) {
   const f = frame(map, pins);
   const tone = mock ? "var(--tape)" : "var(--accent)";
-  const square = f.size(map.cell.lat);
-  const gap = square * 0.09;
+  // A square's edges, with a thin gap of map between neighbours.
+  const square = (tile: { lat: number; lon: number }) => {
+    const left = f.x(tile.lon - map.cell.lon / 2);
+    const right = f.x(tile.lon + map.cell.lon / 2);
+    const top = f.y(tile.lat + map.cell.lat / 2);
+    const bottom = f.y(tile.lat - map.cell.lat / 2);
+    const gap = (right - left) * 0.08;
+    return { x: left + gap, y: top + gap, width: right - left - 2 * gap, height: bottom - top - 2 * gap, rx: (right - left) * 0.14 };
+  };
   const at = (p: Point) => ({ left: `${(p.x / f.width) * 100}%`, top: `${(p.y / f.height) * 100}%` });
   // The chosen area is labelled first, so it gets the best spot.
   const rings = [...base.areas]
     .sort((a, b) => Number(b.ref === base.chosen) - Number(a.ref === base.chosen))
-    .map((a) => ({ area: a, name: a.name, x: f.x(a.lon), y: f.y(a.lat), r: f.size(a.radius_m / METRES_PER_DEGREE) }));
+    .map((a) => ({ area: a, name: a.name, x: f.x(a.lon), y: f.y(a.lat), r: f.metres(a.radius_m, a.lat) }));
   const spots = pins.map((p) => ({ x: f.x(p.lon), y: f.y(p.lat) }));
   const placed = placePins(spots);
   const sides = placeLabels(rings, placed, f.width, f.height);
@@ -162,26 +178,22 @@ function HeatMap({
 
   return (
     <div>
+      <p className="mb-3 max-w-[60ch] text-[14px] leading-5 text-dim">
+        <span className="font-semibold text-foreground">Where the fans are.</span> {mock ? "A synthetic heatmap" : "Qloo's heatmap"} of{" "}
+        {audience} across {city}: the brighter a square, the stronger this audience is there.
+      </p>
       <div
-        className="relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-card"
+        className="relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b]"
         style={{
           aspectRatio: `${f.width} / ${f.height}`,
           maxWidth: compact ? `calc(min(30rem, 100dvh - 24rem) * ${f.width / f.height})` : `${(34 * f.width) / f.height}rem`,
         }}
       >
+        <StreetTiles frame={f} />
         <svg viewBox={`0 0 ${f.width} ${f.height}`} role="img" aria-label={summary} className="absolute inset-0 size-full">
-          {map.tiles.map((tile, i) => (
-            <rect
-              key={i}
-              x={f.x(tile.lon) - square / 2 + gap}
-              y={f.y(tile.lat) - square / 2 + gap}
-              width={square - 2 * gap}
-              height={square - 2 * gap}
-              rx={square * 0.16}
-              fill={tone}
-              fillOpacity={opacity(tile.heat)}
-            />
-          ))}
+          {map.tiles.map((tile, i) =>
+            heatAlpha(tile.heat) > 0 ? <rect key={i} {...square(tile)} fill={tone} fillOpacity={heatAlpha(tile.heat)} /> : null,
+          )}
           {rings.map(({ area, x, y, r }) => (
             <circle
               key={area.ref}
@@ -262,18 +274,23 @@ function HeatMap({
             </Fragment>
           );
         })}
+        <MapCredit />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim">
         <span className="flex items-center gap-1.5">
           Weaker
           <span aria-hidden className="flex gap-0.5">
-            {[0.15, 0.35, 0.6, 0.8, 1].map((heat) => (
-              <span key={heat} className="size-2.5 rounded-[2px]" style={{ background: tone, opacity: opacity(heat) }} />
+            {[0.25, 0.45, 0.65, 0.85, 1].map((heat) => (
+              <span
+                key={heat}
+                className="size-3 rounded-[2px]"
+                style={{ background: `color-mix(in srgb, ${tone} ${Math.round(heatAlpha(heat) * 100)}%, #2b2b2b)` }}
+              />
             ))}
           </span>
           Stronger
         </span>
-        <span>Rings: {base.areas[0]?.radius_m / 1000} km shoot bases; solid is the one chosen</span>
+        <span>Rings: the strongest areas, {base.areas[0]?.radius_m / 1000} km around; solid is the shoot base</span>
         {pins.length > 0 && <span>Numbers: the locations {compact ? "beside the map" : "below"}</span>}
       </div>
     </div>
@@ -320,7 +337,16 @@ export function ShootBaseBlock({
           </p>
         </div>
         {base.map && base.map.tiles.length > 0 && (
-          <HeatMap base={base} map={base.map} pins={pins} city={t.brief.city} mock={mock} active={active} compact />
+          <HeatMap
+            base={base}
+            map={base.map}
+            pins={pins}
+            city={t.brief.city}
+            audience={audienceOf(t)}
+            mock={mock}
+            active={active}
+            compact
+          />
         )}
         <p className="text-sm leading-6 text-dim">
           {base.held
@@ -334,7 +360,7 @@ export function ShootBaseBlock({
   return (
     <div className="surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem]">
       {base.map && base.map.tiles.length > 0 ? (
-        <HeatMap base={base} map={base.map} pins={pins} city={t.brief.city} mock={mock} />
+        <HeatMap base={base} map={base.map} pins={pins} city={t.brief.city} audience={audienceOf(t)} mock={mock} />
       ) : (
         <p className="text-sm text-dim">The heatmap itself didn&apos;t come back with this treatment.</p>
       )}

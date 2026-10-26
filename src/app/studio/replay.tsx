@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FeaturedReplay } from "@/lib/agent/featured";
+import { heatAlpha } from "./base-map";
 import { useLingo } from "./lingo";
+import { MapCredit, StreetTiles, mapFrame } from "./street-map";
 import { suggestTitleFontFrom, titleFont, titleStyle } from "./title-fonts";
 
 // "Watch it work": one real featured run replayed as the visitor scrolls. A stage stays pinned beside five steps and
@@ -24,42 +26,43 @@ function useWide(): boolean {
 }
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
-/** Faint for the city's shape, bright where the audience is strongest, as on a treatment's map. */
-const opacity = (heat: number) => 0.07 + 0.93 * heat ** 1.5;
 
+/** The city's streets with the audience's heat on them, as on a treatment's map, and the areas once picked. */
 function ReplayMap({ replay, pins }: { replay: FeaturedReplay; pins: boolean }) {
   const { bounds, cell, tiles } = replay.map;
-  const kx = Math.cos((((bounds.south + bounds.north) / 2) * Math.PI) / 180);
-  const scale = 300 / Math.max((bounds.east - bounds.west) * kx, bounds.north - bounds.south);
-  const width = (bounds.east - bounds.west) * kx * scale;
-  const height = (bounds.north - bounds.south) * scale;
-  const x = (lon: number) => (lon - bounds.west) * kx * scale;
-  const y = (lat: number) => (bounds.north - lat) * scale;
-  const w = cell.lon * kx * scale;
-  const h = cell.lat * scale;
+  const f = mapFrame(bounds, 300, 300);
+  const { width, height } = f;
   const tone = replay.mock ? "var(--tape)" : "var(--accent)";
   return (
-    <div className="relative mx-auto w-full max-w-[18rem]" style={{ aspectRatio: `${width} / ${height}` }}>
+    <div className="relative mx-auto w-full max-w-[18rem] rounded-xl bg-[#2b2b2b]" style={{ aspectRatio: `${width} / ${height}` }}>
+      <StreetTiles frame={f} />
       <svg viewBox={`0 0 ${width} ${height}`} aria-hidden className="absolute inset-0 size-full">
-        {tiles.map((tile, i) => (
-          <rect
-            key={i}
-            x={x(tile.lon) - w * 0.42}
-            y={y(tile.lat) - h * 0.42}
-            width={w * 0.84}
-            height={h * 0.84}
-            rx={w * 0.15}
-            fill={tone}
-            fillOpacity={opacity(tile.heat)}
-          />
-        ))}
+        {tiles.map((tile, i) => {
+          const left = f.x(tile.lon - cell.lon / 2);
+          const right = f.x(tile.lon + cell.lon / 2);
+          const top = f.y(tile.lat + cell.lat / 2);
+          const bottom = f.y(tile.lat - cell.lat / 2);
+          const gap = (right - left) * 0.08;
+          return heatAlpha(tile.heat) > 0 ? (
+            <rect
+              key={i}
+              x={left + gap}
+              y={top + gap}
+              width={right - left - 2 * gap}
+              height={bottom - top - 2 * gap}
+              rx={(right - left) * 0.14}
+              fill={tone}
+              fillOpacity={heatAlpha(tile.heat)}
+            />
+          ) : null;
+        })}
       </svg>
       {replay.areas.map((area) => (
         <span
           key={area.name}
           aria-hidden
           className={`absolute flex -translate-x-[7px] -translate-y-1/2 items-center gap-1.5 whitespace-nowrap transition-opacity duration-500 ${pins ? "opacity-100" : "opacity-0"}`}
-          style={{ left: `${(x(area.lon) / width) * 100}%`, top: `${(y(area.lat) / height) * 100}%` }}
+          style={{ left: `${(f.x(area.lon) / width) * 100}%`, top: `${(f.y(area.lat) / height) * 100}%` }}
         >
           <span
             className={
@@ -110,8 +113,11 @@ function Stage({ replay, step }: { replay: FeaturedReplay; step: number }) {
 
       <div className="grid min-h-0 flex-1 items-start gap-5 sm:grid-cols-2">
         <div className={`flex flex-col gap-2 transition-opacity duration-500 ${seen(2)}`}>
-          <p className="font-mono text-[12px] text-dim">{replay.city}, tile by tile</p>
+          <p className="font-mono text-[12px] text-dim">where the fans are in {replay.city}</p>
           <ReplayMap replay={replay} pins={step >= 3} />
+          <span className="mx-auto flex w-full max-w-[18rem] justify-end">
+            <MapCredit under />
+          </span>
         </div>
         <ul
           className={`flex flex-col gap-2.5 transition duration-500 ${step >= 4 ? "translate-y-0 opacity-100" : "translate-y-3 opacity-[0.12]"}`}

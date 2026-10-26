@@ -7,7 +7,7 @@ import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { ShootBaseBlock } from "./base-map";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
-import { QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
+import { BackArrow, QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
 import { TitleCardPicker } from "./title-card";
 import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
 
@@ -242,9 +242,9 @@ function SectionIndex() {
 }
 
 /**
- * The clapperboard: once the cover scrolls away, the title (in its title-card face), the take and the city ride
- * along at the top, with the sections to jump to, the one being read lit up, and a film strip that fills as the
- * reader goes down the board. Inert while hidden, so the keyboard never lands on it unseen.
+ * The clapperboard: once the cover scrolls away, the way home, the title (in its title-card face), the take and the
+ * city ride along at the top, with the sections to jump to, the one being read lit up, and a film strip that fills
+ * as the reader goes down the board. Inert while hidden, so the keyboard never lands on it unseen.
  */
 function Slate({
   t,
@@ -253,6 +253,7 @@ function Slate({
   running,
   cover,
   article,
+  onHome,
 }: {
   t: Treatment;
   fontId: string;
@@ -260,6 +261,7 @@ function Slate({
   running: boolean;
   cover: RefObject<HTMLElement | null>;
   article: RefObject<HTMLElement | null>;
+  onHome: () => void;
 }) {
   const lingo = useLingo().t;
   const [shown, setShown] = useState(false);
@@ -305,6 +307,15 @@ function Slate({
     >
       <div className="surface-dark bg-background shadow-[0_1px_0_var(--line)]">
         <div className="mx-auto flex w-full max-w-[80rem] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 sm:px-8">
+          <button
+            type="button"
+            onClick={onHome}
+            aria-label="Home"
+            title="Home"
+            className="-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card"
+          >
+            <BackArrow />
+          </button>
           <span
             aria-hidden
             className="h-7 w-11 shrink-0 rounded-[4px] border border-foreground bg-[repeating-linear-gradient(135deg,var(--foreground)_0_7px,var(--background)_7px_14px)]"
@@ -393,6 +404,7 @@ export function Board({
   running,
   take,
   log,
+  onHome,
 }: {
   treatment: Treatment;
   /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
@@ -404,6 +416,8 @@ export function Board({
   take: number;
   /** The run log, shown with the credits. */
   log: ReactNode;
+  /** Back to the studio. */
+  onHome: () => void;
 }) {
   const lingo = useLingo().t;
   const mock = t.mock.qloo;
@@ -452,7 +466,7 @@ export function Board({
       </div>
 
       <SectionIndex />
-      <Slate t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} />
+      <Slate t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} onHome={onHome} />
 
       <Section id="concept" title="Concept">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">

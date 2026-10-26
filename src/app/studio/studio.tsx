@@ -15,7 +15,7 @@ import { EMPTY_FORM, formFromBrief, toBrief, validateForm, type FormProblem, typ
 import { Hero, HowItWorks, NowShowing } from "./landing";
 import { LetterboxBars, useLightsDown } from "./lights";
 import { LingoProvider, UncSwitch, useLingo } from "./lingo";
-import { ModeBadges } from "./parts";
+import { BackArrow, ModeBadges } from "./parts";
 import { Picker } from "./picker";
 import { Replay } from "./replay";
 import { StreamError, streamTreatment } from "./stream";
@@ -36,6 +36,13 @@ interface RunInput {
  * in pipeline.ts), so this much silence means the connection is gone.
  */
 const STALL_MS = 75_000;
+
+/**
+ * A board gets its own history entry (same URL, this marker in its state), so the browser's Back button returns
+ * to the studio and Forward reopens the board. Next.js keeps its own fields alongside it.
+ */
+const BOARD_ENTRY = "board";
+const onBoardEntry = () => window.history.state?.itsgiving === BOARD_ENTRY;
 
 /** Timeline rows for a treatment replayed from cache: the calls and models that originally made it. */
 function replaySteps(t: Treatment): StepEvent[] {
@@ -126,6 +133,8 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [steps, setSteps] = useState<StepEvent[]>([]);
   const [treatment, setTreatment] = useState<Treatment | null>(null);
+  /** The board, or the studio around it: a treatment stays in memory when the director steps back out. */
+  const [view, setView] = useState<"studio" | "board">("studio");
   /** The run in flight (or last attempted), and the run that produced the board. */
   const [pending, setPending] = useState<RunInput | null>(null);
   const [shown, setShown] = useState<RunInput | null>(null);
@@ -145,20 +154,61 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
   const failedBefore = useRef(false);
   const briefPanel = useRef<HTMLDivElement>(null);
   const posters = useRef<HTMLElement>(null);
+  /** Where the director was in the studio when the board opened, and the poster they opened, to return them there. */
+  const landing = useRef<{ scroll: number; slug?: string } | null>(null);
+  /** Where they were on the board when they stepped out, for Forward; null when the board should open at its top. */
+  const boardSpot = useRef<number | null>(null);
+  const viewNow = useRef(view);
   const [cut, exitCut] = useDirectorsCut();
   const running = phase === "running";
+  const onBoard = treatment !== null && view === "board";
   useConsoleNote(treatment);
-  useLightsDown(posters, !treatment);
+  useLightsDown(posters, !onBoard);
+
+  // Back and Forward move between the studio and the board, each kept where the director left it. The page puts
+  // them back itself: the browser's own restoring would land after it, at wherever the entry was first written.
+  useEffect(() => {
+    const restoring = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    const onPop = () => {
+      const next = onBoardEntry() ? "board" : "studio";
+      if (next === viewNow.current) return;
+      if (next === "board") landing.current = { scroll: window.scrollY };
+      else boardSpot.current = window.scrollY;
+      setView(next);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.history.scrollRestoration = restoring;
+    };
+  }, []);
+
+  useEffect(() => {
+    viewNow.current = view;
+    if (view === "board") {
+      if (boardSpot.current !== null) window.scrollTo({ top: boardSpot.current });
+      boardSpot.current = null;
+      return;
+    }
+    // Back in the studio: the same spot on the page, and focus on the poster that was opened (or the way back in).
+    if (!landing.current) return;
+    const { scroll, slug } = landing.current;
+    landing.current = null;
+    window.scrollTo({ top: scroll });
+    const target = slug ? document.querySelector<HTMLElement>(`[data-slug="${slug}"]`) : document.getElementById("reopen-board");
+    target?.focus({ preventScroll: true });
+  }, [view]);
 
   // Leaving the page mid-run shouldn't keep spending model quota and credit.
   useEffect(() => () => active.current?.abort(), []);
 
-  // Move focus to the new treatment's title once it renders (it also scrolls it into view).
+  // Move focus to the treatment's title once it renders, new or reopened (it also scrolls it into view).
   useEffect(() => {
-    if (!treatment || !focusTitle.current) return;
+    if (!treatment || view !== "board" || !focusTitle.current) return;
     focusTitle.current = false;
     document.getElementById("treatment-title")?.focus();
-  }, [treatment]);
+  }, [treatment, view]);
 
   useEffect(() => {
     if (!toast) return;
@@ -203,6 +253,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
 
     const fail = (message: string) => {
       failedBefore.current = true;
+      landing.current = null;
       setRunProblem(message);
       setPhase("error");
       setSteps(stopRunningSteps("Stopped before it finished."));
@@ -236,6 +287,13 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
           finished = true;
           focusTitle.current = true;
           setTreatment(event.treatment);
+          // A board opened from the studio gets its history entry; a rework replaces the board in place.
+          if (!onBoardEntry()) {
+            landing.current ??= { scroll: window.scrollY };
+            boardSpot.current = null;
+            window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
+          }
+          setView("board");
           setShown(input);
           setPhase("done");
           setBriefOpen(false);
@@ -293,9 +351,31 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
     void run({ form: nextForm, picks: {}, nudges: [] });
   };
 
-  const tryExample = (example: FormState) => {
-    setForm(example);
-    startOver(example);
+  /** A featured poster: its brief runs (a pre-built one answers at once), and Back returns to this poster. */
+  const openFeatured = (example: Example) => {
+    const brief = formFromBrief(example.brief);
+    landing.current = { scroll: window.scrollY, slug: example.slug };
+    setForm(brief);
+    startOver(brief);
+    window.scrollTo({ top: 0 });
+  };
+
+  /** Back to the studio, through the browser's history when the board has its entry, so Back and Forward agree. */
+  const leaveBoard = () => {
+    if (onBoardEntry()) {
+      window.history.back();
+    } else {
+      boardSpot.current = window.scrollY;
+      setView("studio");
+    }
+  };
+
+  const reopenBoard = () => {
+    landing.current = { scroll: window.scrollY };
+    boardSpot.current = null;
+    window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
+    focusTitle.current = true;
+    setView("board");
     window.scrollTo({ top: 0 });
   };
 
@@ -354,7 +434,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
         <div className="mx-auto flex min-h-[4.5rem] w-full max-w-[80rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-8">
           <div className="flex min-w-0 items-center gap-5">
             <h1>
-              <Wordmark />
+              <Wordmark onTap={onBoard ? leaveBoard : undefined} />
             </h1>
             <p className="hidden text-[14px] text-faint xl:block">Treatments grounded in what the audience loves</p>
           </div>
@@ -362,7 +442,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
             <UncSwitch />
           </div>
           <div className="order-3 flex w-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:w-auto print:hidden">
-            {treatment && (
+            {onBoard && (
               <button
                 type="button"
                 aria-expanded={briefOpen}
@@ -372,7 +452,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
                 {briefOpen ? "Hide brief" : "New brief"}
               </button>
             )}
-            {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={treatment ?? undefined} /> : initialBadges}
+            {modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={(onBoard && treatment) || undefined} /> : initialBadges}
             <ThemeSwitch />
           </div>
         </div>
@@ -382,8 +462,16 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
       </p>
 
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-16 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
-        {treatment ? (
+        {treatment && view === "board" ? (
           <div className="flex flex-col gap-8">
+            <button
+              type="button"
+              onClick={leaveBoard}
+              className="-mb-2 flex min-h-11 items-center gap-2 self-start rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card print:hidden"
+            >
+              <BackArrow />
+              Home
+            </button>
             {briefOpen && (
               <div ref={briefPanel} className="w-full max-w-[34rem] scroll-mt-28 print:hidden">
                 {brief}
@@ -413,6 +501,7 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
               running={running}
               take={take}
               log={<Timeline steps={steps} />}
+              onHome={leaveBoard}
             />
           </div>
         ) : (
@@ -435,23 +524,30 @@ function StudioScreen({ initialBadges, featured, replay }: StudioProps) {
                     )}
                   </div>
                 ) : (
-                  <Hero />
+                  <div className="flex flex-col gap-6">
+                    {treatment && (
+                      <button
+                        id="reopen-board"
+                        type="button"
+                        onClick={reopenBoard}
+                        className="flex min-h-11 max-w-full items-center self-start rounded-full bg-foreground px-5 py-2 text-[15px] font-bold text-background hover:opacity-90"
+                      >
+                        <span className="truncate">Back to {treatment.title}</span>
+                      </button>
+                    )}
+                    <Hero />
+                  </div>
                 )}
               </div>
-              <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-stretch">
+              {/* Above the posters, so the projector's beam passes behind the brief, not over it (on phones the beam
+                  reaches up to it). */}
+              <div className="relative z-10 min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-stretch">
                 <div className="quiet-scroll lg:sticky lg:top-12 lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto lg:rounded-[28px]">
                   {brief}
                 </div>
               </div>
               <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-                <NowShowing
-                  ref={posters}
-                  examples={EXAMPLES}
-                  covers={featured}
-                  form={form}
-                  running={running}
-                  onTry={(example) => tryExample(formFromBrief(example.brief))}
-                />
+                <NowShowing ref={posters} examples={EXAMPLES} covers={featured} form={form} running={running} onTry={openFeatured} />
               </div>
             </section>
             {replay ? <Replay replay={replay} /> : <HowItWorks />}

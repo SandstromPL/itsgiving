@@ -3,9 +3,10 @@
 import { useEffect, type RefObject } from "react";
 
 /**
- * Lights down: as `target` (the landing's posters) comes up the screen, the room dims toward the dark one and two
- * letterbox bars close in; scrolling back up brings the house lights back. It follows the scroll rather than a
- * clock, and with reduced motion it switches at the halfway point instead of fading.
+ * Lights down: as `target` (the landing's posters) comes up the screen, either room dims to the show's near black,
+ * two letterbox bars close in and the projector comes on over the posters (landing.tsx); scrolling back up brings the
+ * house lights back. It follows the scroll rather than a clock, and with reduced motion it switches at the halfway
+ * point instead of fading.
  */
 export function useLightsDown(target: RefObject<HTMLElement | null>, enabled: boolean) {
   useEffect(() => {

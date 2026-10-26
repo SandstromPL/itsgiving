@@ -1,5 +1,6 @@
 // The theme choice's storage key, and the script that applies a saved choice before first paint (layout.tsx), so a
-// returning visitor never sees the wrong room flash. A plain module: the server layout and the switch both read it.
+// returning visitor who picked dark never sees the light room flash. A plain module: the server layout and the switch
+// both read it.
 
 export const THEME_KEY = "itsgiving:theme";
 

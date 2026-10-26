@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { featuredCovers, loadFeatured, type FeaturedCover } from "@/lib/agent/featured";
 import { llmConfigFromEnv } from "@/lib/llm/config";
 import { qlooConfigFromEnv } from "@/lib/qloo";
+import { CameraMark } from "./studio/mark";
 
 // The card a shared link shows: the promise, and the featured treatments as posters when the server has them.
 
@@ -141,13 +142,13 @@ export default async function Image() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: 42,
-            height: 28,
-            borderRadius: 8,
+            width: 50,
+            height: 38,
+            borderRadius: 10,
             background: "#2a2926",
           }}
         >
-          <div style={{ display: "flex", width: 11, height: 11, borderRadius: 99, background: ACCENT }} />
+          <CameraMark height={25} />
         </div>
         <div style={{ display: "flex", color: "#ffffff", fontSize: 38, letterSpacing: "-0.045em" }}>itsgiving</div>
       </div>

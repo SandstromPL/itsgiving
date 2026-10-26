@@ -83,9 +83,72 @@ function YourPoster({ form, running }: { form: FormState; running: boolean }) {
   );
 }
 
+/** Dust in the beam: a fixed scatter (the same on the server and in the browser), kept inside the cone. */
+const DUST = (() => {
+  let seed = 7;
+  const next = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const motes: { x: number; y: number; size: number; alpha: number; drift: number; delay: number }[] = [];
+  while (motes.length < 46) {
+    const x = next();
+    const y = 0.2 + next() * 0.75;
+    if (Math.abs(x - 0.5) > y / 2 - 0.03) continue;
+    motes.push({ x, y, size: 1.5 + next() * 2, alpha: 0.2 + next() * 0.45, drift: 9 + next() * 14, delay: -next() * 20 });
+  }
+  return motes;
+})();
+
+/**
+ * The projector's beam over "Now showing": a soft cone of warm light from above with a brighter core, and dust
+ * drifting in it (the .projector styles in globals.css). It comes on only as the lights go down, in either room,
+ * and sits behind the posters, so it never washes out their type.
+ */
+function Projector() {
+  const light = (id: string, top: number) => (
+    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stopColor="#fff3d4" stopOpacity={top} />
+      <stop offset="0.6" stopColor="#fff3d4" stopOpacity={top * 0.4} />
+      <stop offset="1" stopColor="#fff3d4" stopOpacity="0" />
+    </linearGradient>
+  );
+  return (
+    <span aria-hidden className="projector print:hidden">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full overflow-visible">
+        <defs>
+          {light("projector-wide", 0.2)}
+          {light("projector-core", 0.24)}
+          <filter id="projector-soft" x="-15%" y="-5%" width="130%" height="110%">
+            <feGaussianBlur stdDeviation="2.2 0.6" />
+          </filter>
+        </defs>
+        <g filter="url(#projector-soft)">
+          <polygon points="50,0 100,100 0,100" fill="url(#projector-wide)" />
+          <polygon points="50,0 76,100 24,100" fill="url(#projector-core)" />
+        </g>
+      </svg>
+      <span className="projector-dust">
+        {DUST.map((mote, i) => (
+          <span
+            key={i}
+            style={{
+              left: `${mote.x * 100}%`,
+              top: `${mote.y * 100}%`,
+              width: mote.size,
+              height: mote.size,
+              opacity: mote.alpha,
+              animationDuration: `${mote.drift}s`,
+              animationDelay: `${mote.delay}s`,
+            }}
+          />
+        ))}
+      </span>
+    </span>
+  );
+}
+
 /**
  * "Now showing": the director's own poster first, then the featured treatments as posters (the cover's colour and
- * still, a sticker, the title and the palette). Featured ones open instantly from the pre-built set.
+ * still, a sticker, the title and the palette). Featured ones open instantly from the pre-built set. When the lights
+ * go down the projector comes on over them, and their stills brighten as if the light had reached them.
  */
 export function NowShowing({
   ref,
@@ -108,7 +171,8 @@ export function NowShowing({
     return cover ? [{ example, cover }] : [];
   });
   return (
-    <section ref={ref} aria-labelledby="featured-heading" className="flex flex-col gap-6">
+    <section ref={ref} aria-labelledby="featured-heading" className="relative isolate flex flex-col gap-6">
+      <Projector />
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <h2 id="featured-heading" className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
           {featured.length > 0 ? t.nowShowing : t.yourPoster}
@@ -123,12 +187,15 @@ export function NowShowing({
           <li key={example.slug}>
             <button
               type="button"
+              data-slug={example.slug}
               onClick={() => onTry(example)}
               className="surface-dark flex w-full flex-col overflow-hidden rounded-[26px] text-left"
               style={{ background: darkOf(cover.palette) }}
             >
               <span className="relative isolate flex aspect-[4/5] w-full flex-col justify-end gap-3.5 p-5">
-                {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 -z-10 size-full opacity-45" />}
+                {cover.still && (
+                  <Still src={cover.still} alt="" className="absolute inset-0 -z-10 size-full opacity-[calc(0.45_+_0.25*var(--lights))]" />
+                )}
                 <span
                   aria-hidden
                   className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,rgb(10_9_8/0.88)_0%,rgb(10_9_8/0.25)_62%,rgb(10_9_8/0.45)_100%)]"
