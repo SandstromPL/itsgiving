@@ -93,7 +93,7 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - **Director's cut.** The Konami code letterboxes the page and brings out the board's extras: an INTERVAL card and a
   film edge under the beats. Escape puts them away.
 
-### Three pages
+### The pages
 
 - **The homepage** explains and proves, and holds no form: the headline, a finished cover, "Start a treatment" and
   "See a finished one"; "Now showing", the featured treatments as posters in a dark strip under a still projector
@@ -108,6 +108,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - **Featured treatments** (`/t/<slug>`) are pages of their own, built with the site, so Back, reload and links work as
   anywhere. A rework chip there hands the treatment to the studio, which opens it at once and re-runs it with the
   change.
+- **About** (`/about`) says who itsgiving is for first (music-video directors, short-film makers, and the labels,
+  managers and producers who commission them), then what it is, what Qloo is, and how each step of a run uses Qloo.
+  It's linked next to Studio in every header, and from the footer on phones, where the header's links are hidden.
 - **Light or dark,** switched in the header and remembered per browser. Light is the default, and nothing on a page
   changes it.
 

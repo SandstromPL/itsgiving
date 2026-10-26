@@ -425,7 +425,12 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   return (
     <>
       <SiteHeader
-        links={<HeaderLink href="/#now-showing">Examples</HeaderLink>}
+        links={
+          <>
+            <HeaderLink href="/#now-showing">Examples</HeaderLink>
+            <HeaderLink href="/about">About</HeaderLink>
+          </>
+        }
         badges={modes ? <ModeBadges qloo={modes.qloo} llm={modes.llm} treatment={(onBoard && treatment) || undefined} /> : initialBadges}
         unc
       />

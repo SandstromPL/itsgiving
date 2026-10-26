@@ -17,6 +17,12 @@ export function SiteFooter() {
                 Tool playground (development)
               </Link>
             )}
+            <Link
+              href="/about"
+              className="font-semibold text-foreground underline decoration-line underline-offset-4 hover:decoration-foreground"
+            >
+              About itsgiving
+            </Link>
             <span>Built on Qloo&apos;s taste graph. itsgiving, 2026.</span>
           </span>
         </div>

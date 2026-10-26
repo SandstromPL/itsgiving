@@ -23,6 +23,7 @@ export default function Home() {
           <>
             {covers.length > 0 && <HeaderLink href="#now-showing">Examples</HeaderLink>}
             <HeaderLink href="/studio">Studio</HeaderLink>
+            <HeaderLink href="/about">About</HeaderLink>
           </>
         }
       />

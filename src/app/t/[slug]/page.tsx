@@ -43,6 +43,7 @@ export default async function FeaturedPage({ params }: PageProps<"/t/[slug]">) {
           <>
             <HeaderLink href="/#now-showing">All examples</HeaderLink>
             <HeaderLink href="/studio">Studio</HeaderLink>
+            <HeaderLink href="/about">About</HeaderLink>
           </>
         }
         badges={item && <ModeBadges qloo="live" llm="live" treatment={item.treatment} />}
