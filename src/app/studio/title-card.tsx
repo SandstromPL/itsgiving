@@ -23,10 +23,12 @@ export function TitleCardPicker({
   const label = (f: TitleFont) => (unc ? f.plain : f.name);
   return (
     <>
+      {/* The surface's ink (light on the dark cover): lime is kept for what Qloo found. A faint ring keeps its edge on a
+          pale frame. */}
       <button
         type="button"
         popoverTarget={id}
-        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-bold text-[#121211] print:hidden"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background ring-1 ring-black/25 print:hidden"
       >
         <svg
           aria-hidden

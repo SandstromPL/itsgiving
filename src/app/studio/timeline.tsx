@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { STEP_LABELS, STEP_ORDER, THINKING, type Thinking } from "@/lib/agent/options";
 import type { LlmTrace, StepEvent, StepStatus, Treatment } from "@/lib/agent/types";
 import { describeKind } from "@/lib/llm/types";
@@ -177,20 +177,21 @@ function useElapsed(startedAt: number): number {
   return Math.max(0, Math.round((now - startedAt) / 1000));
 }
 
-/** A film leader: the sweep fills over the expected run, the number counts down from 5. */
-function Leader({ elapsed, expected }: { elapsed: number; expected: number }) {
-  const progress = Math.min(elapsed / expected, 0.97);
-  const count = Math.max(1, 5 - Math.floor((elapsed / expected) * 5));
+/**
+ * A film leader that follows the run itself: the sweep fills as each step finishes (easing to its new place) and the
+ * number counts the steps still to go. Nothing is estimated, so a long write holds it near the end.
+ */
+function Leader({ settled, total }: { settled: number; total: number }) {
   return (
     <span
       aria-hidden
-      className="relative grid size-[120px] shrink-0 place-items-center rounded-full sm:size-[132px]"
-      style={{ background: `conic-gradient(var(--accent) 0 ${progress * 360}deg, #3a3936 ${progress * 360}deg 360deg)` }}
+      className="leader relative grid size-[120px] shrink-0 place-items-center rounded-full sm:size-[132px]"
+      style={{ "--sweep": `${Math.round((settled / total) * 360)}deg` } as CSSProperties}
     >
       <span className="absolute inset-x-1.5 top-1/2 h-0.5 -translate-y-1/2 bg-[#121211]" />
       <span className="absolute inset-y-1.5 left-1/2 w-0.5 -translate-x-1/2 bg-[#121211]" />
-      <span className="relative grid size-[84px] place-items-center rounded-full border-2 border-foreground bg-background text-[50px] leading-none font-extrabold sm:size-[92px] sm:text-[54px]">
-        {count}
+      <span className="relative grid size-[84px] place-items-center rounded-full border-2 border-foreground bg-background text-[50px] leading-none font-extrabold tabular-nums sm:size-[92px] sm:text-[54px]">
+        {Math.max(1, total - settled)}
       </span>
     </span>
   );
@@ -205,7 +206,6 @@ export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; s
   const elapsed = useElapsed(startedAt);
   const { t } = useLingo();
   const status = (id: (typeof STEP_ORDER)[number]) => steps.find((s) => s.id === id)?.status ?? "pending";
-  const expected = thinking === "deep" ? 40 : 30;
   const settled = steps.filter((s) => s.status !== "running").length;
   const current = [...steps].reverse().find((s) => s.status === "running")?.label;
   useEffect(() => {
@@ -214,7 +214,7 @@ export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; s
   return (
     <div className="flex flex-col gap-5">
       <div className="surface-dark grain flex flex-wrap items-center gap-x-8 gap-y-6 rounded-[2rem] bg-background p-7 sm:p-9">
-        <Leader elapsed={elapsed} expected={expected} />
+        <Leader settled={Math.min(settled, STEP_ORDER.length)} total={STEP_ORDER.length} />
         <div className="min-w-0 flex-[1_1_16rem]">
           <h2 className="type-poster text-[clamp(3rem,6vw,5.25rem)]">{t.cooking}</h2>
           <p className="mt-3 text-[17px] leading-6 text-dim">

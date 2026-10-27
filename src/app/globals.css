@@ -30,6 +30,7 @@
   --light-tape: #a3195b; /* mocked, 6.2:1 on its wash */
   --light-tape-wash: #ffe3f0;
   --light-safelight: #b42318; /* errors, 6.5:1 on cards */
+  --light-safelight-wash: #fff6f4; /* behind a failure: safelight 6.2:1 on it */
 
   --dark-background: #1b1916;
   --dark-foreground: #f2f0ea; /* 15:1 on the room */
@@ -44,6 +45,7 @@
   --dark-tape: #f2a4c8;
   --dark-tape-wash: #3d2130;
   --dark-safelight: #ef6c5d; /* 5.3:1 on cards */
+  --dark-safelight-wash: #3a1d19; /* safelight 5.1:1 on it */
 
   --background: var(--light-background);
   --foreground: var(--light-foreground);
@@ -58,6 +60,7 @@
   --tape: var(--light-tape);
   --tape-wash: var(--light-tape-wash);
   --safelight: var(--light-safelight);
+  --safelight-wash: var(--light-safelight-wash);
   color-scheme: light;
   --frame: #121211; /* the projected frame */
   --accent: #e4ff3a; /* the highlighter, always under ink text */
@@ -80,6 +83,7 @@
   --tape: var(--dark-tape);
   --tape-wash: var(--dark-tape-wash);
   --safelight: var(--dark-safelight);
+  --safelight-wash: var(--dark-safelight-wash);
   --frame: #0a0908;
   color-scheme: dark;
 }
@@ -125,6 +129,7 @@
   --color-tape: var(--tape);
   --color-tape-wash: var(--tape-wash);
   --color-safelight: var(--safelight);
+  --color-safelight-wash: var(--safelight-wash);
   /* The dark design's names, still used by the development-only tool playground. */
   --color-paper: var(--foreground);
   --color-ink: var(--background);
@@ -339,6 +344,18 @@ body {
   animation: letterbox-open 900ms var(--ease-out) both;
 }
 
+/* The run's film leader (timeline.tsx): its sweep is an angle the browser can ease, so each finished step glides it on
+   rather than jumping. */
+@property --sweep {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.leader {
+  background: conic-gradient(var(--accent) 0 var(--sweep), #3a3936 var(--sweep) 360deg);
+  transition: --sweep 600ms var(--ease-out);
+}
+
 /*
  * The projector over "Now showing" (landing.tsx): a soft cone of warm light from above the strip, with a brighter core
  * and a glow where the lens would be. Gradients only, painted once: no blur filter, nothing tied to scroll. It's on
@@ -364,7 +381,7 @@ body {
 }
 
 /* Decorations kept for the director's cut (eggs.tsx sets data-cut on <html>): the INTERVAL card, the film edge, the
-   clapper. Off by default, so a board reads calmly. */
+   clapper, the date stamps on location photos. Off by default, so a board reads calmly. */
 .cut-only {
   display: none;
 }
@@ -401,6 +418,7 @@ body {
     --tape: var(--light-tape);
     --tape-wash: var(--light-tape-wash);
     --safelight: var(--light-safelight);
+    --safelight-wash: var(--light-safelight-wash);
     --frame: #121211;
     color-scheme: light;
   }

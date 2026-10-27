@@ -101,9 +101,9 @@ function FailCard({ problem, onRetry }: { problem: string; onRetry?: () => void 
   const { t } = useLingo();
   const rateLimited = /too many|rate limit/i.test(problem);
   return (
-    <div role="alert" className="flex flex-col gap-3 rounded-[24px] border-2 border-safelight bg-[#fff6f4] p-6">
-      <p className="type-head text-[clamp(1.75rem,3vw,2.25rem)] leading-none text-[#8f1a10]">{rateLimited ? t.rateTitle : t.failTitle}</p>
-      <p className="text-[16px] leading-6 text-[#3a2420]">{problem}</p>
+    <div role="alert" className="flex flex-col gap-3 rounded-[24px] border-2 border-safelight bg-safelight-wash p-6">
+      <p className="type-head text-[clamp(1.75rem,3vw,2.25rem)] leading-none text-safelight">{rateLimited ? t.rateTitle : t.failTitle}</p>
+      <p className="text-[16px] leading-6">{problem}</p>
       {onRetry && (
         <button
           type="button"

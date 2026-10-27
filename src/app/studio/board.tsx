@@ -279,6 +279,8 @@ function Rework({
             {lingo.take(take)}
           </span>
         )}
+        {/* A slang chip says what it does beside its name ("gatekeep mode", then "deeper cuts"); in unc mode the plain name
+            is the whole label. */}
         {NUDGES.map((nudge) => (
           <button
             key={nudge}
@@ -289,7 +291,12 @@ function Rework({
             className="rounded-full border border-line bg-field px-4 py-2.5 text-[15px] hover:border-foreground aria-disabled:cursor-progress aria-disabled:opacity-50 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:font-semibold aria-pressed:text-background"
           >
             {lingo.nudges[nudge]}
-            {lingo.nudges[nudge] !== NUDGE_LABELS[nudge] && <span className="sr-only">: {NUDGE_LABELS[nudge]}</span>}
+            {lingo.nudges[nudge] !== NUDGE_LABELS[nudge] && (
+              <>
+                <span className="sr-only">: </span>
+                <span className="ml-2 text-[13px] font-normal opacity-75">{NUDGE_LABELS[nudge].toLowerCase()}</span>
+              </>
+            )}
           </button>
         ))}
         <div className="ml-auto flex flex-wrap items-center gap-2.5">
@@ -795,11 +802,14 @@ export function Board({
                         alt={`Photo of ${l.entity.name}`}
                         className={`${pinned ? "aspect-video" : `aspect-[3/2] ${placeGrid.wide(i)}`} w-full print:aspect-video`}
                       />
-                      <span
-                        aria-hidden
-                        className="absolute right-3 bottom-2.5 rounded-md bg-black/45 px-1.5 font-mono text-[17px] font-semibold tracking-[0.08em] text-[#ff9a3c] [text-shadow:0_0_6px_rgb(255_140_40/0.8)]"
-                      >
-                        {stamp}
+                      {/* Director's cut only: on a real photo of the place, a date reads as the day it was taken. */}
+                      <span className="cut-only">
+                        <span
+                          aria-hidden
+                          className="absolute right-3 bottom-2.5 rounded-md bg-black/45 px-1.5 font-mono text-[17px] font-semibold tracking-[0.08em] text-[#ff9a3c] [text-shadow:0_0_6px_rgb(255_140_40/0.8)]"
+                        >
+                          {stamp}
+                        </span>
                       </span>
                       {t.base?.map && map && (
                         <span
