@@ -8,6 +8,7 @@ import { useReceipts } from "@/app/studio/eggs";
 import { handOff } from "@/app/studio/handoff";
 import { StartYourOwn } from "@/app/studio/landing";
 import { BackArrow } from "@/app/studio/parts";
+import { ShareButton } from "@/app/studio/share";
 import { Timeline, replaySteps } from "@/app/studio/timeline";
 import type { Nudge } from "@/lib/agent/options";
 import type { Treatment } from "@/lib/agent/types";
@@ -29,13 +30,16 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
   };
   return (
     <div className="flex flex-col gap-8">
-      <Link
-        href="/#now-showing"
-        className="press -mb-2 flex min-h-11 items-center gap-2 self-start rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card print:hidden"
-      >
-        <BackArrow />
-        All examples
-      </Link>
+      <div className="-mb-2 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <Link
+          href="/#now-showing"
+          className="press flex min-h-11 items-center gap-2 rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card"
+        >
+          <BackArrow />
+          All examples
+        </Link>
+        <ShareButton title={treatment.title} path={`/t/${slug}`} />
+      </div>
       <Board
         treatment={treatment}
         state="current"

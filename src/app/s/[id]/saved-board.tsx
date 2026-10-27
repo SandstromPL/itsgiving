@@ -10,6 +10,7 @@ import { StartYourOwn, primaryButton } from "@/app/studio/landing";
 import { BackArrow } from "@/app/studio/parts";
 import { copyText } from "@/app/studio/clipboard";
 import { savedUrl } from "@/app/studio/save";
+import { ShareButton } from "@/app/studio/share";
 import { Timeline, replaySteps } from "@/app/studio/timeline";
 import type { Nudge } from "@/lib/agent/options";
 import type { Treatment } from "@/lib/agent/types";
@@ -30,13 +31,16 @@ export function SavedBoard({ id, treatment, own, shared }: { id: string; treatme
   return (
     <div className="flex flex-col gap-8">
       {own ? (
-        <OwnerBar id={id} shared={shared} />
+        <OwnerBar id={id} shared={shared} title={treatment.title} />
       ) : (
         // A shared page carries words someone else chose (their brief, and the writing it steered), on this site: say
         // so before anything else, so it isn't read as itsgiving's own.
-        <p className="self-start rounded-2xl border border-line bg-card px-4 py-2.5 text-[14px] leading-5 text-dim print:hidden">
-          Shared by an itsgiving user: their brief, Qloo&apos;s data and AI-written text, not checked by itsgiving.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <p className="rounded-2xl border border-line bg-card px-4 py-2.5 text-[14px] leading-5 text-dim">
+            Shared by an itsgiving user: their brief, Qloo&apos;s data and AI-written text, not checked by itsgiving.
+          </p>
+          <ShareButton title={treatment.title} path={`/s/${id}`} />
+        </div>
       )}
       <Board
         treatment={treatment}
@@ -69,7 +73,7 @@ export function SavedBoard({ id, treatment, own, shared }: { id: string; treatme
 }
 
 /** The owner's controls above their board: back to the list, the share link, and delete. */
-function OwnerBar({ id, shared: sharedAtFirst }: { id: string; shared: boolean }) {
+function OwnerBar({ id, shared: sharedAtFirst, title }: { id: string; shared: boolean; title: string }) {
   const router = useRouter();
   const [shared, setShared] = useState(sharedAtFirst);
   const [busy, setBusy] = useState(false);
@@ -127,15 +131,7 @@ function OwnerBar({ id, shared: sharedAtFirst }: { id: string; shared: boolean }
           >
             {shared ? "Share link: on" : "Share link: off"}
           </button>
-          {shared && (
-            <button
-              type="button"
-              onClick={async () => setNote({ text: (await copyText(savedUrl(id))) ? "Link copied." : `The link: ${savedUrl(id)}` })}
-              className={outline}
-            >
-              Copy link
-            </button>
-          )}
+          {shared && <ShareButton title={title} path={`/s/${id}`} />}
           <button
             type="button"
             disabled={busy}

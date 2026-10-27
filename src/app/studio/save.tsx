@@ -4,18 +4,14 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import type { Treatment } from "@/lib/agent/types";
 import { SignInWindow, useAccount } from "./account";
-import { copyText } from "./clipboard";
 import { handOffBoard } from "./handoff";
+import { ShareWindow } from "./share";
 
 // Save, on a board the studio built: it keeps the treatment in the director's account (its seal shows the server
 // built it), then offers its share link. Signed out, Save opens the sign-in window; the board waits in the handoff
 // and is saved when they come back.
 
-type Status =
-  | { kind: "idle" }
-  | { kind: "saving" }
-  | { kind: "saved"; id: string; shared: boolean; copied: boolean }
-  | { kind: "problem"; message: string };
+type Status = { kind: "idle" } | { kind: "saving" } | { kind: "saved"; id: string; shared: boolean } | { kind: "problem"; message: string };
 
 const ink = "rounded-full bg-foreground px-4 py-2.5 text-[15px] font-bold text-background hover:opacity-90 disabled:opacity-60";
 const outline = "rounded-full border border-foreground px-4 py-2.5 text-[15px] font-semibold hover:bg-foreground hover:text-background";
@@ -38,7 +34,7 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
         body: JSON.stringify({ treatment, seal }),
       });
       const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-      if (res.ok && body.id) setStatus({ kind: "saved", id: body.id, shared: false, copied: false });
+      if (res.ok && body.id) setStatus({ kind: "saved", id: body.id, shared: false });
       else setStatus({ kind: "problem", message: body.error ?? "Saving didn't work. Try again." });
     } catch {
       setStatus({ kind: "problem", message: "Saving didn't work: the connection dropped. Try again." });
@@ -52,6 +48,9 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
     void save();
   });
 
+  // Share turns the link on the first time, then opens the share window (the link, the phone's share sheet, a QR code).
+  const shareWindow = useRef<HTMLDivElement>(null);
+  const shareButton = useRef<HTMLButtonElement>(null);
   const share = async (saved: Extract<Status, { kind: "saved" }>) => {
     if (!saved.shared) {
       const res = await fetch(`/api/saved/${saved.id}`, {
@@ -65,8 +64,11 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
         return;
       }
     }
-    const copied = await copyText(savedUrl(saved.id));
-    setStatus({ ...saved, shared: true, copied });
+    setStatus({ ...saved, shared: true });
+    // `source` makes the button the window's invoker where the browser supports it, so closing returns focus to it.
+    (shareWindow.current?.showPopover as ((options?: { source?: HTMLElement }) => void) | undefined)?.call(shareWindow.current, {
+      source: shareButton.current ?? undefined,
+    });
   };
 
   if (account.state === "off" || account.state === "checking") return null;
@@ -89,8 +91,8 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
           </svg>
           Saved
         </span>
-        <button type="button" onClick={() => share(status)} className={outline}>
-          {status.copied ? "Link copied" : status.shared ? "Copy link" : "Share link"}
+        <button ref={shareButton} type="button" onClick={() => share(status)} className={outline}>
+          {status.shared ? "Share" : "Share link"}
         </button>
         <Link
           href={`/s/${status.id}`}
@@ -98,13 +100,10 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
         >
           Open
         </Link>
-        {status.shared && !status.copied && (
-          // The browser wouldn't copy: the link, to select by hand.
-          <span className="max-w-full truncate font-mono text-[13px] text-dim select-all">{savedUrl(status.id)}</span>
-        )}
         <span role="status" className="sr-only">
-          {status.copied ? "Share link copied." : "Saved to your treatments."}
+          {status.shared ? "Share link on." : "Saved to your treatments."}
         </span>
+        <ShareWindow id={`${id}-share`} ref={shareWindow} title={treatment.title} path={`/s/${status.id}`} />
       </div>
     );
   }
