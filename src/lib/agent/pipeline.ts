@@ -217,8 +217,11 @@ export async function runPipeline(
   const trail: Partial<Record<StepId, Provenance[]>> = {};
   const notes: string[] = [];
   const traces: LlmTrace[] = [];
-  /** Steps where a Qloo call failed: the treatment is then partial and must not be cached. */
-  const failed = new Set<StepId>();
+  /**
+   * Every Qloo call that failed, as step:tool=kind: the treatment is then partial and must not be cached, even when a
+   * lighter rung of the same step found what it needed.
+   */
+  const failures: string[] = [];
   const warnings = new Set<string>();
   let llmCalls = 0;
 
@@ -228,7 +231,7 @@ export async function runPipeline(
     // A request cut off by the run's deadline surfaces here as the abort, not as a tool error.
     signal.throwIfAborted();
     (trail[step] ??= []).push(...result.provenance);
-    if (result.status === "error") failed.add(step);
+    if (result.status === "error") failures.push(`${step}:${name}=${result.error?.kind ?? "error"}`);
     for (const warning of result.warnings) warnings.add(warning);
     return result;
   };
@@ -868,9 +871,11 @@ export async function runPipeline(
     traces,
     trail,
     deps,
-    complete: failed.size === 0,
+    complete: failures.length === 0,
   });
   if (warnings.size > 0) console.warn(JSON.stringify({ evt: "qloo_warnings", id: options.id, warnings: [...warnings].slice(0, 10) }));
+  // What made it partial: the kind of each failure (rate_limit, timeout, upstream…), never Qloo's own text.
+  if (failures.length > 0) console.warn(JSON.stringify({ evt: "qloo_failed", id: options.id, failed: failures.slice(0, 10) }));
   if (llmCalls > 3) throw new Error(`Pipeline made ${llmCalls} LLM calls; the budget is 3.`);
   return { kind: "treatment", treatment };
 }

@@ -275,6 +275,32 @@ describe("runPipeline when Qloo or the models misbehave", () => {
     expect(t.complete).toBe(false);
   });
 
+  it("logs each failed Qloo call, and how it failed, when a treatment comes back incomplete", async () => {
+    const lines: string[] = [];
+    const warn = vi.spyOn(console, "warn").mockImplementation((line: string) => void lines.push(line));
+    try {
+      for (const [id, fails] of [
+        ["partial", (url: string) => url.includes("urn:entity:brand")],
+        ["whole", () => false],
+      ] as const) {
+        const outcome = await runPipeline(
+          brief({ artist: "Bon Iver", city: "New York" }),
+          { qloo: flakyQloo(fails), llm: mockLlm() },
+          () => {},
+          { id, signal: new AbortController().signal },
+        );
+        expect(treatmentOf(outcome).complete).toBe(id === "whole");
+      }
+    } finally {
+      warn.mockRestore();
+    }
+    const logged = lines.filter((line) => line.includes('"evt":"qloo_failed"')).map((line) => JSON.parse(line));
+    // Only the partial run says why: every call about brands (the wardrobe's tag search, then the brands themselves)
+    // got Qloo's 503, named by its kind, without Qloo's own words.
+    expect(logged).toEqual([{ evt: "qloo_failed", id: "partial", failed: expect.any(Array) }]);
+    expect(new Set(logged[0].failed)).toEqual(new Set(["tags:find_tags=upstream", "wardrobe:styling_brands=upstream"]));
+  });
+
   it("keeps the first plan when the re-plan can only come from the template", async () => {
     const nonsense = (mock: Record<string, unknown>) => ({ ...mock, wardrobe_words: ["qwxzv"], ambience_words: ["zzvqx"] });
     const { provider, seen } = scriptedProvider({ plan: nonsense, replan: () => "not json" });
