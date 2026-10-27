@@ -60,6 +60,7 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
         }
         reworkNote="Built ahead of time. A change opens it in the studio, which re-runs the plan and the writing with it."
         own={false}
+        morph={slug}
       />
       <StartYourOwn />
     </div>

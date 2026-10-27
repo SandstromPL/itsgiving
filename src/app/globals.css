@@ -219,6 +219,27 @@ body {
   animation-duration: 250ms;
   animation-timing-function: var(--ease-out);
 }
+/* A homepage poster's still growing into its example's cover (morph.ts), while the rest of the page crossfades. The
+   picture keeps its crop as its box changes, inside the cover's round corners. Reduced motion never names the still,
+   so only the crossfade plays. */
+::view-transition-group(cover-still) {
+  animation-duration: 520ms;
+  animation-timing-function: var(--ease-out);
+  overflow: clip;
+  border-radius: 2rem;
+}
+::view-transition-old(cover-still),
+::view-transition-new(cover-still) {
+  height: 100%;
+  object-fit: cover;
+}
+/* The cover's words and pills arrive over the still as it settles, rather than appearing when it stops. */
+::view-transition-new(cover-words),
+::view-transition-new(cover-top) {
+  animation-duration: 300ms;
+  animation-delay: 240ms;
+  animation-fill-mode: both;
+}
 
 /* Popovers ("why", the title-card window, sign-in and the account menu) are windows: white, ink-edged, with a hard
    shadow. They open with a short fade from 96% size, from where they appear to come (the menu and the window from the

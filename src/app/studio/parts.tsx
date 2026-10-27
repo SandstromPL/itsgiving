@@ -96,7 +96,18 @@ export function ModesPending() {
 }
 
 /** An image from Qloo (or a mock placeholder); plain <img> because hosts vary per entity. */
-export function Still({ src, alt, className = "" }: { src?: string; alt: string; className?: string }) {
+export function Still({
+  src,
+  alt,
+  className = "",
+  loading = "lazy",
+}: {
+  src?: string;
+  alt: string;
+  className?: string;
+  /** Eager for a page's first picture (a board's cover), lazy for the rest. */
+  loading?: "lazy" | "eager";
+}) {
   const [broken, setBroken] = useState(false);
   if (!src || broken) {
     return (
@@ -110,7 +121,7 @@ export function Still({ src, alt, className = "" }: { src?: string; alt: string;
     <img
       src={src}
       alt={alt}
-      loading="lazy"
+      loading={loading}
       referrerPolicy="no-referrer"
       onError={() => setBroken(true)}
       className={`bg-field object-cover ${className}`}

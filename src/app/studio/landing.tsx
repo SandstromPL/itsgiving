@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useRef, type ReactNode } from "react";
 import type { FeaturedCover, FeaturedRun } from "@/lib/agent/featured";
 import { tmdbSize } from "@/lib/agent/options";
 import { ShootBaseBlock } from "./base-map";
 import { briefLine, splitTitles, type FormState } from "./form";
 import { useLingo } from "./lingo";
+import { morphToCover } from "./morph";
 import { Receipt, Still } from "./parts";
 import { suggestTitleFontFrom, titleFont, titleStyle } from "./title-fonts";
 
@@ -33,21 +35,36 @@ const posterTitle = "text-[clamp(1.6rem,2.3vw,2.15rem)] leading-[0.92] font-extr
 const poster = "w-[78%] shrink-0 snap-start sm:w-auto";
 
 /**
+ * What a link to an example page needs for the match cut: the still to name, the full page prefetched (with Partial
+ * Prefetching the default fetches only the page's shell, so the board couldn't render in the navigation's own commit),
+ * and the navigation started inside the view transition.
+ */
+function useMorphLink(slug: string) {
+  const router = useRouter();
+  const still = useRef<HTMLSpanElement>(null);
+  const onNavigate = (event: { preventDefault(): void }) => morphToCover(event, slug, still.current, () => router.push(`/t/${slug}`));
+  return [still, onNavigate] as const;
+}
+
+/**
  * A finished treatment's cover, opening like a letterbox on load: the page's one moment of motion. Qloo's receipt for
  * the film its still comes from is pinned to its corner, so the first screen carries proof, not only the pitch. On a
  * phone the cover is a letterboxed strip with the title alone, and the receipt one line under it.
  */
 function HeroCover({ cover, fontId, className = "" }: { cover: FeaturedCover; fontId: string; className?: string }) {
   const proof = cover.evidence;
+  const [still, onNavigate] = useMorphLink(cover.slug);
   return (
     <div className={`relative ${className}`}>
       <Link
         href={`/t/${cover.slug}`}
+        prefetch
+        onNavigate={onNavigate}
         aria-label={`${cover.title}: open this finished treatment`}
         className="letterbox-open surface-dark relative isolate flex aspect-[2.39/1] flex-col justify-between gap-2 overflow-hidden rounded-[2rem] p-4 [--hero-title:2.1rem] sm:aspect-auto sm:min-h-[27rem] sm:gap-8 sm:p-8 sm:[--hero-title:clamp(2.6rem,4.6vw,4.5rem)]"
         style={{ background: darkOf(cover.palette) }}
       >
-        <span aria-hidden className="absolute inset-0 -z-10">
+        <span ref={still} aria-hidden className="absolute inset-0 -z-10">
           {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 size-full" />}
         </span>
         <span className="self-start rounded-[19px] border border-edge bg-black/70 px-3 py-1 text-[12.5px] text-dim sm:px-3.5 sm:py-2 sm:text-[14px]">
@@ -117,7 +134,7 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
             Start a treatment
           </Link>
           {cover && (
-            <Link href={`/t/${cover.slug}`} className={`${secondaryButton} max-sm:hidden`}>
+            <Link href={`/t/${cover.slug}`} prefetch className={`${secondaryButton} max-sm:hidden`}>
               See a finished one
             </Link>
           )}
@@ -134,6 +151,41 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
  * reader chose, and last the poster for the one they haven't made yet, a way into the studio. The homepage leaves out
  * the treatment its hero already shows. The projector's beam (`.beam` in globals.css) is simply on.
  */
+/** A "Now showing" poster: its still grows into the example's cover when it opens (morph.ts). */
+function PosterCard({ cover }: { cover: FeaturedCover }) {
+  const { t, unc } = useLingo();
+  const [still, onNavigate] = useMorphLink(cover.slug);
+  return (
+    <Link
+      href={`/t/${cover.slug}`}
+      prefetch
+      onNavigate={onNavigate}
+      className="press flex w-full flex-col overflow-hidden rounded-[26px] ring-1 ring-white/10 transition-transform duration-200 [--press:0.98] hover:-translate-y-1"
+      style={{ background: darkOf(cover.palette) }}
+    >
+      <span className="relative isolate flex aspect-[4/5] w-full flex-col justify-end p-5">
+        <span ref={still} aria-hidden className="absolute inset-0 -z-10">
+          {cover.still && <Still src={tmdbSize(cover.still, "w780")} alt="" className="absolute inset-0 size-full" />}
+        </span>
+        <span className="scrim-under flex flex-col gap-3.5 [--scrim-b:1.25rem] [--scrim-fade:4rem] [--scrim-x:1.25rem]">
+          {cover.tone && (
+            <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
+              {unc ? `${t.giving}: ${cover.tone}` : `${t.giving} ${cover.tone.toLowerCase()}`}
+            </span>
+          )}
+          <span className={posterTitle}>{cover.title}</span>
+          <span className="text-[15px] text-pretty text-dim">{cover.line}</span>
+        </span>
+      </span>
+      <span aria-hidden className="grid h-3 w-full" style={{ gridTemplateColumns: `repeat(${cover.palette.length}, minmax(0, 1fr))` }}>
+        {cover.palette.map((hex) => (
+          <span key={hex} style={{ background: hex }} />
+        ))}
+      </span>
+    </Link>
+  );
+}
+
 export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
   const { t, unc } = useLingo();
   // Without featured treatments (a server without keys), the header's Examples link still needs somewhere to land.
@@ -168,33 +220,7 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
         <ul className="quiet-scroll -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pt-1 pb-3 sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] sm:gap-5 sm:overflow-visible sm:p-0">
           {covers.map((cover) => (
             <li key={cover.slug} className={poster}>
-              <Link
-                href={`/t/${cover.slug}`}
-                className="press flex w-full flex-col overflow-hidden rounded-[26px] ring-1 ring-white/10 transition-transform duration-200 [--press:0.98] hover:-translate-y-1"
-                style={{ background: darkOf(cover.palette) }}
-              >
-                <span className="relative isolate flex aspect-[4/5] w-full flex-col justify-end p-5">
-                  {cover.still && <Still src={tmdbSize(cover.still, "w780")} alt="" className="absolute inset-0 -z-10 size-full" />}
-                  <span className="scrim-under flex flex-col gap-3.5 [--scrim-b:1.25rem] [--scrim-fade:4rem] [--scrim-x:1.25rem]">
-                    {cover.tone && (
-                      <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
-                        {unc ? `${t.giving}: ${cover.tone}` : `${t.giving} ${cover.tone.toLowerCase()}`}
-                      </span>
-                    )}
-                    <span className={posterTitle}>{cover.title}</span>
-                    <span className="text-[15px] text-pretty text-dim">{cover.line}</span>
-                  </span>
-                </span>
-                <span
-                  aria-hidden
-                  className="grid h-3 w-full"
-                  style={{ gridTemplateColumns: `repeat(${cover.palette.length}, minmax(0, 1fr))` }}
-                >
-                  {cover.palette.map((hex) => (
-                    <span key={hex} style={{ background: hex }} />
-                  ))}
-                </span>
-              </Link>
+              <PosterCard cover={cover} />
             </li>
           ))}
           <li className={poster}>

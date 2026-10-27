@@ -23,6 +23,7 @@ import { cssString } from "@/lib/text";
 import { ShootBaseBlock, locationPins } from "./base-map";
 import { useCopied } from "./clipboard";
 import { jumpOnClick } from "./jump";
+import { landCover } from "./morph";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
 import { QlooTags, Still, Tape, Why, modelName } from "./parts";
@@ -151,6 +152,7 @@ function Cover({
   onPickFont,
   stills,
   onPickStill,
+  morph,
 }: {
   ref?: Ref<HTMLElement>;
   t: Treatment;
@@ -162,7 +164,13 @@ function Cover({
   /** The references with a still, to choose among. */
   stills: CoverStill[];
   onPickStill: (id: string) => void;
+  /** On an example's own page, its slug: a homepage poster's still may grow into this cover (morph.ts). */
+  morph?: string;
 }) {
+  const stillLayer = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (morph) landCover(morph, stillLayer.current?.parentElement ?? null, stillLayer.current);
+  }, [morph]);
   const who = treatmentWho(t);
   const subject = subjectPhrase(who.artists, who.films, t.brief.format);
   return (
@@ -173,11 +181,11 @@ function Cover({
       style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
     >
       {/* A reference film's still, never its poster (or a mock placeholder): their own lettering would fight the title. */}
-      <div aria-hidden className="absolute inset-0 -z-10">
-        {still && <Still src={still.src} alt="" className="absolute inset-0 size-full" />}
+      <div ref={stillLayer} aria-hidden className="absolute inset-0 -z-10">
+        {still && <Still src={still.src} alt="" loading="eager" className="absolute inset-0 size-full" />}
       </div>
       {/* The pills up top sit on the frame itself, so each brings its own dark: AA over a white frame. */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div data-morph="top" className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim">
             {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
@@ -202,7 +210,10 @@ function Cover({
           onPickStill={onPickStill}
         />
       </div>
-      <div className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]">
+      <div
+        data-morph="words"
+        className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]"
+      >
         <h1 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
           {t.title}
         </h1>
@@ -691,6 +702,7 @@ export function Board({
   reworkNote,
   own = true,
   save,
+  morph,
 }: {
   treatment: Treatment;
   /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
@@ -710,6 +722,8 @@ export function Board({
   own?: boolean;
   /** Saving to an account, beside Save as PDF: the studio's SaveControl, or a saved treatment's own controls. */
   save?: ReactNode;
+  /** On an example's own page, its slug, so the cover can finish a homepage poster's match cut (morph.ts). */
+  morph?: string;
 }) {
   const lingo = useLingo().t;
   const whose = own ? "your" : "the director's";
@@ -769,6 +783,7 @@ export function Board({
       <div className="flex flex-col gap-6 print:break-after-page">
         <Cover
           ref={cover}
+          morph={morph}
           t={t}
           still={still}
           fontId={fontId}
