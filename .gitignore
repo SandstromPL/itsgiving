@@ -12,6 +12,9 @@
 # Qloo response caches and smoke-test output: Qloo data must not be committed to a public repo
 /.cache/
 
+# graphify's knowledge graph of the repo: built locally, and it holds text from the private notes above
+/graphify-out/
+
 # dependencies
 /node_modules
 /.pnp
