@@ -19,6 +19,18 @@ export interface LlmTrace {
   calls: number;
 }
 
+/** What a credit names: who the run reads, what Qloo found for them, and where the shoot is based. */
+export type CreditKind = "subject" | "audience" | "base" | "style" | "films" | "brands" | "places";
+
+/** A step's find, billed like a film's opening credit while the run builds (timeline.tsx): Qloo's names only. */
+export interface Credit {
+  kind: CreditKind;
+  /** Up to three, in Qloo's order. */
+  names: string[];
+  /** The artist Qloo doesn't have, whose audience was read through `names` instead (a subject credit only). */
+  standInFor?: string;
+}
+
 export interface StepEvent {
   type: "step";
   id: StepId;
@@ -28,6 +40,8 @@ export interface StepEvent {
   ms?: number;
   qloo?: Provenance[];
   llm?: LlmTrace;
+  /** On a step that found something to name: a step run again after a re-plan sends its credit again. */
+  credit?: Credit;
 }
 
 export type Role = "artist" | "touchstone" | "director" | "stand_in";

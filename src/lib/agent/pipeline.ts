@@ -24,6 +24,8 @@ import type {
   Ambiguity,
   BaseArea,
   BriefField,
+  Credit,
+  CreditKind,
   LlmStep,
   LlmTrace,
   Pick,
@@ -148,6 +150,25 @@ function names(entities: CompactEntity[]): string[] {
   return entities.map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`);
 }
 
+/** How many names a credit carries: the run stage sets the newest credit large, so a few say it. */
+const CREDIT_NAMES = 3;
+
+/** A step's credit for what it found (entities, tags or an area), or none when it found nothing to name. */
+function toCredit(kind: CreditKind, found: { name: string }[], standInFor?: string): Credit | undefined {
+  const names = uniqueBy(found, (item) => normalizeName(item.name))
+    .slice(0, CREDIT_NAMES)
+    .map((item) => item.name);
+  if (names.length === 0) return undefined;
+  return standInFor ? { kind, names, standInFor } : { kind, names };
+}
+
+/** a1, b1, a2, b2…: the first few then sample both lists. */
+function alternate<T>(a: T[], b: T[]): T[] {
+  return Array.from({ length: Math.max(a.length, b.length) }, (_, i) => [a[i], b[i]])
+    .flat()
+    .filter((item) => item !== undefined);
+}
+
 /** Tags never used to steer a treatment, whatever the semantic search ranks them (live "intimate" also returns these). */
 const UNSAFE_TAG = /adult|erotic|sex|strip|nsfw/i;
 
@@ -250,11 +271,17 @@ export async function runPipeline(
   const begin = (id: StepId, label: string) => {
     emit({ type: "step", id, status: "running", label });
     const started = Date.now();
-    return (status: StepStatus, summary: string, llm?: LlmTrace) =>
-      emit({ type: "step", id, status, label, summary, ms: Date.now() - started, qloo: trail[id], llm });
+    return (status: StepStatus, summary: string, { llm, credit }: { llm?: LlmTrace; credit?: Credit } = {}) =>
+      emit({ type: "step", id, status, label, summary, ms: Date.now() - started, qloo: trail[id], llm, credit });
   };
 
-  const llm = async <T>(step: LlmStep, label: string, call: () => Promise<LlmResult<T>>, summarize: (data: T) => string): Promise<T> => {
+  const llm = async <T>(
+    step: LlmStep,
+    label: string,
+    call: () => Promise<LlmResult<T>>,
+    summarize: (data: T) => string,
+    credited?: (data: T) => Credit | undefined,
+  ): Promise<T> => {
     const end = begin(step, label);
     llmCalls += 1;
     const started = Date.now();
@@ -289,7 +316,11 @@ export async function runPipeline(
         `Live models were unavailable for the ${step} step${last?.kind ? ` (${describeKind(last.kind)})` : ""}, so the labelled template wrote it.`,
       );
     }
-    end(result.degraded ? "warning" : "done", summarize(result.data), trace);
+    // No credit when every live model failed and the template answered: its plan is a stopgap, and its re-plan isn't used.
+    end(result.degraded ? "warning" : "done", summarize(result.data), {
+      llm: trace,
+      credit: result.degraded ? undefined : credited?.(result.data),
+    });
     return result.data;
   };
 
@@ -451,6 +482,9 @@ export async function runPipeline(
   endResolve(
     missing.length > 0 || artistGone ? "warning" : "done",
     `${resolvedLine.join(", ")}${director.length > 0 ? `; your taste: ${director.length} film${director.length === 1 ? "" : "s"}` : ""}.`,
+    {
+      credit: artistGone && brief.artist ? toCredit("subject", [...standIns, ...touchstones], brief.artist) : toCredit("subject", subjects),
+    },
   );
 
   const subjectIds = subjects.map((e) => e.id);
@@ -496,7 +530,7 @@ export async function runPipeline(
   );
   if (audience.status === "error") notes.push(`The audience read failed (${audience.summary}).`);
   for (const warning of audience.warnings) notes.push(warning);
-  endAudience(audience.status === "ok" ? "done" : "warning", audience.summary);
+  endAudience(audience.status === "ok" ? "done" : "warning", audience.summary, { credit: toCredit("audience", tasteTags) });
 
   let overlap: CompactTag[] = [];
   if (endOverlap && shared) {
@@ -570,6 +604,11 @@ export async function runPipeline(
         const base = areas.find((a) => a.ref === plan.base);
         return `${clip(plan.direction, 200)}${base ? ` Base: ${base.name}.` : ""}`;
       },
+      (plan) =>
+        toCredit(
+          "base",
+          areas.filter((a) => a.ref === plan.base),
+        ),
     ).then((plan) => normalizePlan(plan, brief));
   let plan = await askPlan(planContext, "plan");
 
@@ -623,7 +662,14 @@ export async function runPipeline(
     return steps;
   };
 
-  const report = (step: StepId, label: string, what: string, relaxed: Relaxed, describe: (items: CompactEntity[]) => string) => {
+  const report = (
+    step: StepId,
+    kind: CreditKind,
+    label: string,
+    what: string,
+    relaxed: Relaxed,
+    describe: (items: CompactEntity[]) => string,
+  ) => {
     if (relaxed.error) {
       notes.push(`${label}: ${relaxed.error}`);
       emit({ type: "step", id: step, status: "error", label, summary: relaxed.error, qloo: trail[step] });
@@ -638,7 +684,8 @@ export async function runPipeline(
       relaxed.items.length === 0
         ? `No ${what.toLowerCase()} matched, even after relaxing.`
         : `${describe(relaxed.items)}${relaxed.relaxations.length > 0 ? ` (relaxed: ${relaxed.relaxations.join(", ")})` : ""}`;
-    emit({ type: "step", id: step, status, label, summary, qloo: trail[step] });
+    // Relaxed finds are credited too: they are what the treatment uses.
+    emit({ type: "step", id: step, status, label, summary, qloo: trail[step], credit: toCredit(kind, relaxed.items) });
   };
 
   const execute = async (current: Plan): Promise<Execution> => {
@@ -686,6 +733,8 @@ export async function runPipeline(
       found.length > 0
         ? `${found.join(", ")}${[...wardrobe.missed, ...ambience.missed].length > 0 ? `; no tags for ${[...wardrobe.missed, ...ambience.missed].map((w) => `"${w}"`).join(", ")}` : ""}.`
         : "None of the style words matched a Qloo tag.",
+      // A wardrobe tag, then an ambience one: the credit's few names speak for both.
+      { credit: toCredit("style", alternate(wardrobe.tags, ambience.tags)) },
     );
 
     for (const [id, label] of [
@@ -740,10 +789,11 @@ export async function runPipeline(
     // The base held when the first rung (near it) was enough, or was all there was.
     const held = base !== undefined && places.items.length > 0 && places.relaxations.length === 0;
 
-    report("references", STEP_LABELS.references, "Reference films", references, (items) => names(items).slice(0, 4).join(", "));
-    report("wardrobe", STEP_LABELS.wardrobe, "Wardrobe brands", brands, (items) => names(items).slice(0, 5).join(", "));
+    report("references", "films", STEP_LABELS.references, "Reference films", references, (items) => names(items).slice(0, 4).join(", "));
+    report("wardrobe", "brands", STEP_LABELS.wardrobe, "Wardrobe brands", brands, (items) => names(items).slice(0, 5).join(", "));
     report(
       "locations",
+      "places",
       STEP_LABELS.locations,
       "Locations",
       places,
