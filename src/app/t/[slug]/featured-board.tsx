@@ -31,7 +31,7 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
     <div className="flex flex-col gap-8">
       <Link
         href="/#now-showing"
-        className="-mb-2 flex min-h-11 items-center gap-2 self-start rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card print:hidden"
+        className="press -mb-2 flex min-h-11 items-center gap-2 self-start rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card print:hidden"
       >
         <BackArrow />
         All examples

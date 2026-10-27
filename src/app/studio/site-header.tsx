@@ -61,7 +61,7 @@ export function SiteHeader({
                 // The examples link points at the homepage's strip, so on a featured treatment it's the current
                 // section rather than the current page.
                 aria-current={here ? (item.id === "examples" ? "true" : "page") : undefined}
-                className={`rounded-full px-2.5 py-2 text-[15px] font-semibold lg:px-3 ${
+                className={`press rounded-full px-2.5 py-2 text-[15px] font-semibold lg:px-3 ${
                   here ? "bg-foreground text-background" : "text-dim hover:bg-card hover:text-foreground"
                 }`}
               >

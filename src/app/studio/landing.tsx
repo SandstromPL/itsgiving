@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { FeaturedCover, FeaturedRun } from "@/lib/agent/featured";
 import { tmdbSize } from "@/lib/agent/options";
 import { ShootBaseBlock } from "./base-map";
@@ -24,9 +24,9 @@ export function darkOf(palette: string[]): string {
 }
 
 export const primaryButton =
-  "inline-flex min-h-14 items-center justify-center rounded-full bg-foreground px-7 text-[17px] font-bold text-background hover:opacity-90";
+  "press inline-flex min-h-14 items-center justify-center rounded-full bg-foreground px-7 text-[17px] font-bold text-background hover:opacity-90";
 export const secondaryButton =
-  "inline-flex min-h-14 items-center justify-center rounded-full border border-foreground px-7 text-[17px] font-bold hover:bg-card";
+  "press inline-flex min-h-14 items-center justify-center rounded-full border border-foreground px-7 text-[17px] font-bold hover:bg-card";
 
 const posterTitle = "text-[clamp(1.6rem,2.3vw,2.15rem)] leading-[0.92] font-extrabold tracking-[-0.045em] text-balance";
 /** A poster's place in "Now showing": most of a phone's width in the sideways row, a grid cell from small screens up. */
@@ -97,27 +97,10 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
 /**
  * "Now showing": the featured treatments as posters, each a link to its own page, in a dark strip whichever room the
  * reader chose, and last the poster for the one they haven't made yet, a way into the studio. The homepage leaves out
- * the treatment its hero already shows. The projector's beam (`.beam` in globals.css) fades in once, the first time the
- * strip comes into view.
+ * the treatment its hero already shows. The projector's beam (`.beam` in globals.css) is simply on.
  */
 export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
   const { t, unc } = useLingo();
-  const strip = useRef<HTMLElement>(null);
-  const [lit, setLit] = useState(false);
-  useEffect(() => {
-    const el = strip.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-        setLit(true);
-        observer.disconnect();
-      },
-      { threshold: 0.25 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
   // Without featured treatments (a server without keys), the header's Examples link still needs somewhere to land.
   if (covers.length === 0) {
     return (
@@ -135,8 +118,8 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
     );
   }
   return (
-    <section id="now-showing" ref={strip} aria-labelledby="featured-heading" className="surface-dark grain relative isolate bg-background">
-      <span aria-hidden data-on={lit || undefined} className="beam print:hidden" />
+    <section id="now-showing" aria-labelledby="featured-heading" className="surface-dark grain relative isolate bg-background">
+      <span aria-hidden className="beam print:hidden" />
       <div className="mx-auto flex w-full max-w-[80rem] flex-col gap-8 px-4 py-16 sm:px-8 sm:py-24">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <h2 id="featured-heading" className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
@@ -146,12 +129,13 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
         </div>
         {/* On a phone the posters sit in a row that scrolls sideways, the next one peeking in, rather than four screens
             of posters one under another. */}
-        <ul className="quiet-scroll -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pt-1 pb-3 sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] sm:gap-5 sm:overflow-visible sm:p-0">
+        {/* A sideways swipe past the last poster stays in the row, rather than becoming the browser's Back. */}
+        <ul className="quiet-scroll -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pt-1 pb-3 sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] sm:gap-5 sm:overflow-visible sm:p-0">
           {covers.map((cover) => (
             <li key={cover.slug} className={poster}>
               <Link
                 href={`/t/${cover.slug}`}
-                className="flex w-full flex-col overflow-hidden rounded-[26px] ring-1 ring-white/10 transition-transform duration-200 hover:-translate-y-1"
+                className="press flex w-full flex-col overflow-hidden rounded-[26px] ring-1 ring-white/10 transition-transform duration-200 [--press:0.98] hover:-translate-y-1"
                 style={{ background: darkOf(cover.palette) }}
               >
                 <span className="relative isolate flex aspect-[4/5] w-full flex-col justify-end gap-3.5 p-5">
@@ -186,7 +170,7 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
             <Link
               href="/studio"
               aria-label={`${t.nextUp.title}: start a treatment`}
-              className="flex w-full flex-col overflow-hidden rounded-[26px] bg-frame transition-transform duration-200 [outline:2px_dashed_var(--accent)] [outline-offset:-10px] hover:-translate-y-1"
+              className="press flex w-full flex-col overflow-hidden rounded-[26px] bg-frame transition-transform duration-200 [--press:0.98] [outline:2px_dashed_var(--accent)] [outline-offset:-10px] hover:-translate-y-1"
             >
               <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
                 <span className="font-mono text-[12px] text-dim">{t.nextUp.label}</span>

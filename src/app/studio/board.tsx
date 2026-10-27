@@ -418,7 +418,9 @@ function SectionBar({
           ref={tabs}
           aria-label="Treatment sections"
           onScroll={measure}
-          className="quiet-scroll -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto px-1"
+          // A trackpad swipe past the last tab stays in the bar, rather than becoming the browser's Back (which in the
+          // studio would leave the board).
+          className="quiet-scroll -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto overscroll-x-contain px-1"
           style={{ maskImage: mask, WebkitMaskImage: mask }}
         >
           {SECTIONS.map(([id, label]) => (

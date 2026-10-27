@@ -135,6 +135,16 @@
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
+/* Three curves for everything that moves: ease-out for what enters or answers a press (quick to start, soft to land),
+   ease-in-out for what travels from one place to another, and the drawer's for a sheet rising from a phone's edge.
+   Nothing eases in: a slow start reads as lag. */
+@theme static {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 /* Bricolage at full weight with tight tracking carries the hierarchy; headlines are lowercase by choice, not by CSS. */
 /* Headings wrap in even lines: no last line of one word ("producers", "places"). */
 @utility type-poster {
@@ -156,9 +166,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Room for a scrollbar on every page, so the header doesn't shift between a short page (the 404) and a long one. */
+/* Room for a scrollbar on every page, so the header doesn't shift between a short page (the 404) and a long one. Phones
+   drop their grey flash on a tap: a pressed button answers for itself (below). */
 html {
   scrollbar-gutter: stable;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A press answers at once: a button, or a link that acts as one (`press`), sinks a little while it's held. Disabled
+   ones don't. A base style, so a component's own transition utilities still win. */
+@layer base {
+  button,
+  .press {
+    transition: scale 150ms var(--ease-out);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :where(button, .press):active:not(:disabled, [aria-disabled="true"]) {
+    scale: var(--press, 0.97);
+  }
 }
 
 body {
@@ -179,11 +205,10 @@ body {
 }
 
 /* Popovers ("why", the title-card window, sign-in and the account menu) are windows: white, ink-edged, with a hard
-   shadow. */
-[popover].why,
-[popover].window,
-[popover].dialog,
-[popover].menu {
+   shadow. They open with a short fade from 96% size, from where they appear to come (the menu and the window from the
+   top-right corner their buttons sit near, the centred ones from the middle), and close a little faster. Scrolling
+   inside one never carries on into the page behind it. */
+[popover]:is(.why, .window, .dialog, .menu) {
   border: 2px solid #121211;
   border-radius: 22px;
   background: #ffffff;
@@ -191,17 +216,48 @@ body {
   box-shadow: 8px 8px 0 #121211;
   padding: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  opacity: 0;
+  scale: 0.96;
+  transition:
+    opacity 150ms var(--ease-out),
+    scale 150ms var(--ease-out),
+    translate 150ms var(--ease-out),
+    overlay 150ms allow-discrete,
+    display 150ms allow-discrete;
 }
-[popover].why,
-[popover].dialog {
+[popover]:is(.why, .window, .dialog, .menu):popover-open {
+  opacity: 1;
+  scale: 1;
+  transition-duration: 200ms;
+}
+@starting-style {
+  [popover]:is(.why, .window, .dialog, .menu):popover-open {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+[popover]:is(.why, .dialog) {
   margin: auto;
   max-width: min(30rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 4rem);
+  max-height: calc(100dvh - 4rem);
 }
-[popover].why::backdrop,
-[popover].window::backdrop,
-[popover].dialog::backdrop {
+[popover]:is(.why, .window, .dialog)::backdrop {
   background: rgb(18 18 17 / 0.3);
+  opacity: 0;
+  transition:
+    opacity 150ms var(--ease-out),
+    overlay 150ms allow-discrete,
+    display 150ms allow-discrete;
+}
+[popover]:is(.why, .window, .dialog):popover-open::backdrop {
+  opacity: 1;
+  transition-duration: 200ms;
+}
+@starting-style {
+  [popover]:is(.why, .window, .dialog):popover-open::backdrop {
+    opacity: 0;
+  }
 }
 /* The account menu drops from the header's right-hand corner, where its button is. */
 [popover].menu {
@@ -210,6 +266,7 @@ body {
   margin: 0;
   width: min(17rem, calc(100vw - 2rem));
   box-shadow: 6px 6px 0 #121211;
+  transform-origin: top right;
 }
 /* The title-card window sits to the right of the cover, so the title it restyles stays in view. */
 [popover].window {
@@ -217,7 +274,8 @@ body {
   inset: 5.5rem 1.5rem auto auto;
   margin: 0;
   width: min(27rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 7rem);
+  max-height: calc(100dvh - 7rem);
+  transform-origin: top right;
 }
 /* Open, it's a column: the bar and Done stay put while the faces between them scroll. Clip, not hidden: focusing the
    chosen face would otherwise scroll the window itself and lift its bar out of view. */
@@ -226,11 +284,28 @@ body {
   flex-direction: column;
   overflow: clip;
 }
+/* On a phone the window is a sheet along the bottom edge: it rises from below and sinks back. */
 @media (max-width: 40rem) {
   [popover].window {
     inset: auto 0.75rem 0.75rem 0.75rem;
     width: auto;
-    max-height: 70vh;
+    max-height: 70dvh;
+    opacity: 1;
+    scale: 1;
+    translate: 0 calc(100% + 1rem);
+    transition-timing-function: var(--ease-drawer);
+    transition-duration: 200ms;
+  }
+  [popover].window:popover-open {
+    translate: 0 0;
+    transition-duration: 300ms;
+  }
+  @starting-style {
+    [popover].window:popover-open {
+      opacity: 1;
+      scale: 1;
+      translate: 0 calc(100% + 1rem);
+    }
   }
 }
 
@@ -261,13 +336,13 @@ body {
   }
 }
 .letterbox-open {
-  animation: letterbox-open 900ms cubic-bezier(0.2, 0.7, 0.1, 1) both;
+  animation: letterbox-open 900ms var(--ease-out) both;
 }
 
 /*
  * The projector over "Now showing" (landing.tsx): a soft cone of warm light from above the strip, with a brighter core
- * and a glow where the lens would be. Gradients only, painted once: no blur filter, nothing tied to scroll. It fades in
- * once, the first time the strip comes into view, and sits behind the posters so their type stays crisp.
+ * and a glow where the lens would be. Gradients only, painted once: no blur filter, nothing tied to scroll. It's on
+ * from the start, behind the posters so their type stays crisp: the cover's letterbox is the page's one motion.
  */
 .beam {
   position: absolute;
@@ -286,11 +361,6 @@ body {
       transparent 60deg
     );
   mask-image: linear-gradient(#000 0%, #000 40%, transparent 96%);
-  opacity: 0;
-  transition: opacity 600ms cubic-bezier(0.2, 0.7, 0.1, 1);
-}
-.beam[data-on] {
-  opacity: 1;
 }
 
 /* Decorations kept for the director's cut (eggs.tsx sets data-cut on <html>): the INTERVAL card, the film edge, the
@@ -302,13 +372,15 @@ body {
   display: contents;
 }
 
+/* Reduced motion means gentler, not none: nothing moves, grows or plays, but fades and colour changes still ease, so a
+   window or a toast doesn't flash into place. */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
   ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-property: opacity, color, background-color, border-color, outline-color, text-decoration-color, fill, stroke !important;
   }
 }
 

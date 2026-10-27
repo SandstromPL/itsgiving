@@ -72,7 +72,7 @@ export function TitleCardPicker({
           </button>
         </div>
         {/* Only the faces scroll: the window's bar (Close) and Done stay in view, on a phone too. */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="flex flex-col gap-3 px-5 pt-5">
             <h2 id={`${id}-title`} className="type-head text-[2.1rem] leading-none text-[#121211]">
               {lines.titleWindow}

@@ -153,10 +153,10 @@ export function UncSwitch() {
     >
       <span
         aria-hidden
-        className={`relative h-7 w-[46px] shrink-0 rounded-full border-2 border-foreground ${unc ? "bg-foreground" : "bg-card"}`}
+        className={`relative h-7 w-[46px] shrink-0 rounded-full border-2 border-foreground transition-colors duration-200 ease-in-out ${unc ? "bg-foreground" : "bg-card"}`}
       >
         <span
-          className={`absolute top-[3px] size-[18px] rounded-full transition-[left] duration-200 ${unc ? "left-[21px] bg-accent" : "left-[3px] bg-foreground"}`}
+          className={`absolute top-[3px] left-[3px] size-[18px] rounded-full transition-[translate,background-color] duration-200 ease-in-out ${unc ? "translate-x-[18px] bg-accent" : "bg-foreground"}`}
         />
       </span>
       {/* "unc" alone below laptop width, so the account button fits beside it: in the first row on phones, in the one

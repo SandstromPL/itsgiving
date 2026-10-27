@@ -50,32 +50,49 @@ const STUDIO_TITLE = "Studio: itsgiving";
 const stopRunningSteps = (summary: string) => (steps: StepEvent[]) =>
   steps.map((s): StepEvent => (s.status === "running" ? { ...s, status: "error", summary } : s));
 
-/** A fresh treatment lands with a short toast; the live region already announced it, so this is for the eyes. */
-function Toast({ toast }: { toast: { title: string; line: string } | null }) {
-  if (!toast) return null;
+interface ToastNote {
+  title: string;
+  line: string;
+  open: boolean;
+}
+
+/** How long the toast stays, counted only while the tab is in view. */
+const TOAST_MS = 6000;
+
+/**
+ * A fresh treatment lands with a short toast; the live region already announced it, so this is for the eyes. It's
+ * always there, closed until a treatment lands: it rises from the corner a moment after the board (once its letterbox
+ * has begun to open), sinks back out keeping its words, and lets taps through to whatever is under it.
+ */
+function Toast({ toast }: { toast: ToastNote | null }) {
   return (
     <div
       aria-hidden
-      className="fixed right-4 bottom-4 z-40 flex max-w-[min(25rem,calc(100vw-2rem))] items-center gap-3.5 rounded-[20px] bg-[#121211] px-4 py-3.5 text-white shadow-[6px_6px_0_rgb(0_0_0/0.15)] print:hidden"
+      data-open={toast?.open || undefined}
+      className="pointer-events-none fixed right-4 bottom-4 z-40 flex max-w-[min(25rem,calc(100vw-2rem))] translate-y-[calc(100%+1rem)] items-center gap-3.5 rounded-[20px] bg-[#121211] px-4 py-3.5 text-white opacity-0 shadow-[6px_6px_0_rgb(0_0_0/0.15)] transition-[opacity,translate] duration-200 data-open:translate-y-0 data-open:opacity-100 data-open:delay-400 data-open:duration-300 print:hidden"
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent">
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#121211"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M5 12l5 5 9-10" />
-        </svg>
-      </span>
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[19px] leading-tight font-extrabold tracking-[-0.03em]">{toast.title}</span>
-        <span className="truncate text-[14px] text-[#d9d5cc]">{toast.line}</span>
-      </span>
+      {toast && (
+        <>
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#121211"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 12l5 5 9-10" />
+            </svg>
+          </span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-[19px] leading-tight font-extrabold tracking-[-0.03em]">{toast.title}</span>
+            <span className="truncate text-[14px] text-[#d9d5cc]">{toast.line}</span>
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -132,7 +149,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const [startedAt, setStartedAt] = useState(0);
   /** Which take of the brief is on the board: 1, then one more per rework. */
   const [take, setTake] = useState(saved.board?.take ?? 1);
-  const [toast, setToast] = useState<{ title: string; line: string } | null>(null);
+  const [toast, setToast] = useState<ToastNote | null>(null);
   const active = useRef<AbortController | null>(null);
   const stopActive = useRef<() => void>(() => {});
   const focusTitle = useRef(false);
@@ -236,10 +253,28 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     onScreen("treatment-title")?.focus();
   }, [treatment, view]);
 
+  // The toast's time runs only while the tab is in view: a director who looked away during the run (the tab's title
+  // says "Ready:") still sees it on coming back.
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 6000);
-    return () => clearTimeout(timer);
+    if (!toast?.open) return;
+    let left = TOAST_MS;
+    let since = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = () => {
+      since = Date.now();
+      timer = setTimeout(() => setToast((note) => note && { ...note, open: false }), left);
+    };
+    const onVisibility = () => {
+      if (!document.hidden) return run();
+      clearTimeout(timer);
+      left -= Date.now() - since;
+    };
+    if (!document.hidden) run();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [toast]);
 
   const run = async (input: RunInput) => {
@@ -330,6 +365,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
             setToast({
               title: failedBefore.current ? lingo.back : lingo.done,
               line: `${event.treatment.title}: ${Math.round((Date.now() - began) / 1000)} s, ${event.treatment.qloo.calls} Qloo calls`,
+              open: true,
             });
           failedBefore.current = false;
           setStatus(`Treatment ready: ${event.treatment.title}.`);
