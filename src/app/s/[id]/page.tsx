@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { connection } from "next/server";
 import { cache, Suspense } from "react";
 import { ModeBadges } from "@/app/studio/parts";
 import { SiteHeader } from "@/app/studio/site-header";
@@ -20,7 +21,12 @@ import { SavedBoard, SavedMissing } from "./saved-board";
  * comes at 30.) Per server instance, like the site's other limits; IPv6 counts by its /64 (see clientIp).
  */
 const opens = new RateLimiter(60, 60_000);
-const address = async () => clientIp(await headers());
+
+/** The visitor's address, for the limit. Request time only: the limit reads the clock, which a prerender may not. */
+async function address() {
+  await connection();
+  return clientIp(await headers());
+}
 
 /** Who's asking and what they may see, read once per request for both the page and its metadata. */
 const lookup = cache(async (id: string) => {
