@@ -111,6 +111,12 @@ export function StreetTiles({ frame }: { frame: MapFrame }) {
   );
 }
 
+/**
+ * The corner of the map the credit takes, in screen pixels from the bottom-right: its chip (174 × 24 in the site's
+ * type), its inset and a little room. Names placed on the map keep out of it.
+ */
+export const CREDIT_CORNER = { width: 184, height: 34 };
+
 /** OpenStreetMap's credit, as its licence asks: on the map's corner, or right under a map too small to spare one. */
 export function MapCredit({ under = false }: { under?: boolean }) {
   return (

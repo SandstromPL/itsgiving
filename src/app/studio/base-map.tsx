@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } fr
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 import { heatContours } from "./contours";
-import { MapCredit, StreetTiles, fixed, mapFrame, type Bounds } from "./street-map";
+import { CREDIT_CORNER, MapCredit, StreetTiles, fixed, mapFrame, type Bounds } from "./street-map";
 
 // The shoot base: Qloo's heatmap around the strongest areas for this audience, as contour lines on the city's streets,
 // with the areas as rings, the one the planner chose, and the scouted locations as numbered pins. Lines, rings and
@@ -96,10 +96,38 @@ interface Box {
 
 type Side = "above" | "below" | "right" | "left";
 
+/** Where a name goes: beside its ring, and above or below it either centred or slid to the left or right. */
+interface Placement {
+  side: Side;
+  along: -1 | 0 | 1;
+}
+
+/** The places to try, best first: centred above or below, then slid along the ring's top or bottom, then its sides. */
+const PLACEMENTS: Placement[] = [
+  { side: "above", along: 0 },
+  { side: "below", along: 0 },
+  { side: "above", along: -1 },
+  { side: "above", along: 1 },
+  { side: "below", along: -1 },
+  { side: "below", along: 1 },
+  { side: "right", along: 0 },
+  { side: "left", along: 0 },
+];
+
+const area = (b: Box) => Math.max(0, b.right - b.left) * Math.max(0, b.bottom - b.top);
+const overlap = (a: Box, b: Box) =>
+  area({
+    left: Math.max(a.left, b.left),
+    top: Math.max(a.top, b.top),
+    right: Math.min(a.right, b.right),
+    bottom: Math.min(a.bottom, b.bottom),
+  });
+
 /**
- * Each area's name beside its ring, on the first side that stays in the frame and clear of the pins and the
- * names placed before it. Names are HTML at a fixed size, so in SVG units they grow as the map shrinks: `scale` is
- * screen pixels per SVG unit (1 before the map is measured).
+ * Each area's name beside its ring, in the first place that stays in the frame and clear of the pins, the
+ * OpenStreetMap credit and the names placed before it; where no place is clear, in the one that hides least of it.
+ * Names are HTML at a fixed size, so in SVG units they grow as the map shrinks: `scale` is screen pixels per SVG
+ * unit (1 before the map is measured).
  */
 export function placeLabels(
   rings: { name: string; x: number; y: number; r: number }[],
@@ -107,37 +135,42 @@ export function placeLabels(
   width: number,
   height: number,
   scale = 1,
-): Side[] {
+): Placement[] {
   const px = (n: number) => n / scale;
-  const taken: Box[] = pins.map((p) => ({ left: p.x - px(10), top: p.y - px(10), right: p.x + px(10), bottom: p.y + px(10) }));
+  const taken: Box[] = [
+    ...pins.map((p) => ({ left: p.x - px(10), top: p.y - px(10), right: p.x + px(10), bottom: p.y + px(10) })),
+    { left: width - px(CREDIT_CORNER.width), top: height - px(CREDIT_CORNER.height), right: width, bottom: height },
+  ];
+  const frame = { left: 0, top: 0, right: width, bottom: height };
+  // How much of a name would be hidden: under what's taken, or cut off by the frame.
+  const hidden = (b: Box) => taken.reduce((sum, t) => sum + overlap(b, t), 0) + area(b) - overlap(b, frame);
   return rings.map((ring) => {
     const w = px(ring.name.length * 6.6 + 10);
     const h = px(18);
     const gap = px(4);
-    const boxes: Record<Side, Box> = {
-      above: { left: ring.x - w / 2, right: ring.x + w / 2, top: ring.y - ring.r - gap - h, bottom: ring.y - ring.r - gap },
-      below: { left: ring.x - w / 2, right: ring.x + w / 2, top: ring.y + ring.r + gap, bottom: ring.y + ring.r + gap + h },
-      right: { left: ring.x + ring.r + gap, right: ring.x + ring.r + gap + w, top: ring.y - h / 2, bottom: ring.y + h / 2 },
-      left: { left: ring.x - ring.r - gap - w, right: ring.x - ring.r - gap, top: ring.y - h / 2, bottom: ring.y + h / 2 },
+    const box = ({ side, along }: Placement): Box => {
+      if (side === "right" || side === "left") {
+        const left = side === "right" ? ring.x + ring.r + gap : ring.x - ring.r - gap - w;
+        return { left, right: left + w, top: ring.y - h / 2, bottom: ring.y + h / 2 };
+      }
+      const left = ring.x + ((along - 1) * w) / 2;
+      const top = side === "above" ? ring.y - ring.r - gap - h : ring.y + ring.r + gap;
+      return { left, right: left + w, top, bottom: top + h };
     };
-    const fits = (b: Box) =>
-      b.left >= 0 &&
-      b.right <= width &&
-      b.top >= 0 &&
-      b.bottom <= height &&
-      !taken.some((t) => b.left < t.right && b.right > t.left && b.top < t.bottom && b.bottom > t.top);
-    const side = (["above", "below", "right", "left"] as const).find((s) => fits(boxes[s])) ?? "above";
-    taken.push(boxes[side]);
-    return side;
+    const placement =
+      PLACEMENTS.find((p) => hidden(box(p)) === 0) ?? PLACEMENTS.reduce((best, p) => (hidden(box(p)) < hidden(box(best)) ? p : best));
+    taken.push(box(placement));
+    return placement;
   });
 }
 
-const LABEL_SHIFT: Record<Side, string> = {
-  above: "translate(-50%, calc(-100% - 4px))",
-  below: "translate(-50%, 4px)",
-  right: "translate(4px, -50%)",
-  left: "translate(calc(-100% - 4px), -50%)",
-};
+/** A name's offset from the point of its ring it's placed at, matching the boxes above. */
+const labelShift = ({ side, along }: Placement) =>
+  side === "right"
+    ? "translate(4px, -50%)"
+    : side === "left"
+      ? "translate(calc(-100% - 4px), -50%)"
+      : `translate(${(along - 1) * 50}%, ${side === "above" ? "calc(-100% - 4px)" : "4px"})`;
 
 function HeatMap({
   base,
@@ -185,7 +218,7 @@ function HeatMap({
     .map((a) => ({ area: a, name: a.name, x: f.x(a.lon), y: f.y(a.lat), r: f.metres(a.radius_m, a.lat) }));
   const spots = pins.map((p) => ({ x: f.x(p.lon), y: f.y(p.lat) }));
   const placed = placePins(spots);
-  const sides = placeLabels(rings, placed, f.width, f.height, scale);
+  const names = placeLabels(rings, placed, f.width, f.height, scale);
   const chosen = base.areas.find((a) => a.ref === base.chosen);
   const summary =
     `${mock ? "Synthetic heatmap" : "Qloo heatmap"} of ${city} for this audience, in contour lines: strongest around ${base.areas.map((a) => a.name).join(", then ")}.` +
@@ -277,7 +310,7 @@ function HeatMap({
             below: { x: ring.x, y: ring.y + ring.r },
             right: { x: ring.x + ring.r, y: ring.y },
             left: { x: ring.x - ring.r, y: ring.y },
-          }[sides[i]];
+          }[names[i].side];
           return (
             <span
               key={ring.area.ref}
@@ -285,7 +318,7 @@ function HeatMap({
               className={`absolute whitespace-nowrap rounded-[4px] bg-frame/85 px-1.5 py-[3px] text-[12px] leading-none ${
                 ring.area.ref === base.chosen ? "font-bold text-foreground" : "text-dim"
               }`}
-              style={{ ...at(anchor), transform: LABEL_SHIFT[sides[i]] }}
+              style={{ ...at(anchor), transform: labelShift(names[i]) }}
             >
               {ring.name}
             </span>
