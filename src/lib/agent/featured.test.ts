@@ -24,8 +24,14 @@ function fakeTreatment(input: BriefInput, title = "Almost, Every Evening"): Trea
     brief: brief({ ...input, thinking: "deep" }),
     subjects: [{ id: "a1", name: input.artist ?? "Someone", kind: "artist", tags: [] }],
     palette: [{ name: "Ink", hex: "#0A0908" }],
-    references: [{ entity: { id: "f1", name: "Mimi", kind: "movie", tags: [], image: "https://img.example/mimi.jpg" } }],
+    references: [
+      {
+        entity: { id: "f1", name: "Mimi", kind: "movie", tags: [], image: "https://img.example/mimi.jpg" },
+        qloo: { tool: "pull_references", rank: 2, of: 10, affinity: 0.931, tags: [], because: [{ name: "Prateek Kuhad", score: 1 }] },
+      },
+    ],
     tone: [{ tag: { id: "urn:tag:keyword:qloo:introspective", name: "Introspective" }, source: "audience", note: "Quiet." }],
+    mock: { qloo: false, llm: false },
   } as unknown as Treatment;
 }
 
@@ -184,6 +190,8 @@ describe("featured examples", () => {
       line: "Music video for Prateek Kuhad / Mumbai",
       palette: ["#0A0908"],
       still: "https://image.tmdb.org/t/p/w1280/mimi.jpg",
+      // The proof pinned to the homepage cover: what Qloo said about the film the still comes from.
+      evidence: { name: "Mimi", qloo: t.references[0].qloo, mock: false },
       tone: "Introspective",
     });
   });
