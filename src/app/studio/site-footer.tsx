@@ -27,7 +27,12 @@ export function SiteFooter() {
           </span>
         </div>
         <p className="text-[13px] leading-5 text-faint">
-          Maps © OpenStreetMap contributors. Film stills from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.
+          Maps © OpenStreetMap contributors. Film stills from{" "}
+          {/* TMDB's own logo file, unaltered (public/tmdb.svg, from themoviedb.org/about/logos-attribution), standing in
+              for its name beside the notice its terms ask for. */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- a static SVG, shown exactly as TMDB supplies it */}
+          <img src="/tmdb.svg" alt="TMDB" width={92} height={12} className="inline-block h-3 w-auto align-[-1px]" />. This product uses the
+          TMDB API but is not endorsed or certified by TMDB.
         </p>
       </div>
     </footer>
