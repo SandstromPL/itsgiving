@@ -253,6 +253,10 @@ export default function About() {
               A saved treatment is private until you turn on its share link. Shared pages are never indexed and don&apos;t say whose they
               are, and deleting a treatment takes its link down with it.
             </p>
+            <p className={lead}>
+              Deleting your account, at the foot of Your treatments, removes everything you saved and every link to it. Your Google or
+              GitHub account stays as it was.
+            </p>
           </section>
         )}
 

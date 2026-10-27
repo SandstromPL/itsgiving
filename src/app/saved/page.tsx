@@ -8,9 +8,11 @@ import { tmdbSize } from "@/lib/agent/options";
 import { SavedStoreError, savedList, type SavedSummary } from "@/lib/saved/store";
 import { accountsOn } from "@/lib/supabase/config";
 import { viewerId } from "@/lib/supabase/server";
+import { DeleteAccount } from "./delete-account";
 
-// The signed-in person's saved treatments, newest first, each opening its own page (/s/<id>). Signed out, it asks
-// them to sign in; it's also where a cancelled or failed sign-in lands (?signin=failed), and says so.
+// The signed-in person's saved treatments, newest first, each opening its own page (/s/<id>), and at the foot a way to
+// delete the account. Signed out, it asks them to sign in; it's also where a cancelled or failed sign-in lands
+// (?signin=failed) and where a deleted account lands (?account=deleted), and says which.
 
 export const metadata: Metadata = { title: "Your treatments: itsgiving", robots: { index: false, follow: false } };
 
@@ -37,19 +39,26 @@ export default function SavedListPage({ searchParams }: PageProps<"/saved">) {
 }
 
 async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["searchParams"] }) {
-  const { signin } = await searchParams;
+  const { signin, account } = await searchParams;
   if (!accountsOn) return <p className="max-w-[46ch] text-[1.15rem] leading-[1.5] text-dim">Accounts aren&apos;t set up on this server.</p>;
   const viewer = await viewerId();
   if (!viewer) {
     return (
       <div className="flex max-w-[42rem] flex-col items-start gap-5 rounded-[28px] border border-line bg-card p-8">
+        {account === "deleted" && (
+          <p role="status" className="text-[1.05rem] font-semibold text-foreground">
+            Your account is deleted, with every treatment it saved.
+          </p>
+        )}
         {signin === "failed" && (
           <p role="alert" className="text-[1.05rem] font-semibold text-safelight">
             Sign-in didn&apos;t finish. Try again, or pick the other account.
           </p>
         )}
         <p className="text-[1.15rem] leading-[1.5] text-dim">
-          Sign in with Google or GitHub to see the treatments you&apos;ve saved. Building one needs no account.
+          {account === "deleted"
+            ? "Signing in again with Google or GitHub starts a new, empty account. Building a treatment needs none."
+            : "Sign in with Google or GitHub to see the treatments you've saved. Building one needs no account."}
         </p>
         <SignInButton next="/saved" className={primaryButton} />
       </div>
@@ -67,16 +76,24 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
       </p>
     );
   }
-  if (items.length === 0) {
-    return (
-      <div className="flex max-w-[42rem] flex-col items-start gap-5">
-        <p className="text-[1.15rem] leading-[1.5] text-dim">Nothing saved yet. Build a treatment, then press Save on its board.</p>
-        <Link href="/studio" className={primaryButton}>
-          Open the studio
-        </Link>
-      </div>
-    );
-  }
+  return (
+    <>
+      {items.length === 0 ? (
+        <div className="flex max-w-[42rem] flex-col items-start gap-5">
+          <p className="text-[1.15rem] leading-[1.5] text-dim">Nothing saved yet. Build a treatment, then press Save on its board.</p>
+          <Link href="/studio" className={primaryButton}>
+            Open the studio
+          </Link>
+        </div>
+      ) : (
+        <SavedGrid items={items} />
+      )}
+      <DeleteAccount saved={items.length} />
+    </>
+  );
+}
+
+function SavedGrid({ items }: { items: SavedSummary[] }) {
   return (
     <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (

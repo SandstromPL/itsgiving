@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     console.log(JSON.stringify({ evt: "saved", action: "save", outcome: outcome.kind, ms: Date.now() - started }));
     if (outcome.kind === "full")
       return problem(409, `You have ${SAVED_LIMIT} saved treatments, as many as there's room for. Delete one to save this.`);
+    if (outcome.kind === "no_account") return problem(401, "This account was deleted. Sign in again to save.");
     return Response.json({ id: outcome.id }, { status: outcome.created ? 201 : 200 });
   } catch (err) {
     if (!(err instanceof SavedStoreError)) throw err;

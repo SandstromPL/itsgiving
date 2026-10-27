@@ -43,6 +43,22 @@ export async function viewerId(): Promise<string | null> {
   return typeof sub === "string" && sub ? sub : null;
 }
 
+/**
+ * Who's signed in, asked of Supabase itself rather than read off the token: a session that signed out, or an account
+ * that's gone, no longer counts, though its token would verify until it expires. A round trip, so only for what can't
+ * be undone.
+ */
+export async function confirmedViewerId(): Promise<string | null> {
+  await connection();
+  const supabase = await sessionSupabase();
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getUser();
+  return data.user?.id ?? null;
+}
+
+/** How long the server waits for the database: a slow or paused project then reads as unavailable, not a hung page. */
+const DATABASE_TIMEOUT_MS = 8_000;
+
 let admin: SupabaseClient | null = null;
 
 /**
@@ -55,6 +71,12 @@ export function adminSupabase(): SupabaseClient | null {
   if (!config || !secret) return null;
   admin ??= createClient(config.url, secret, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: {
+      fetch: (input, init) => {
+        const timeout = AbortSignal.timeout(DATABASE_TIMEOUT_MS);
+        return fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout });
+      },
+    },
   });
   return admin;
 }

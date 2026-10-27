@@ -130,7 +130,8 @@ export function SignInWindow({ id, title = "Sign in", next, before }: { id: stri
           </p>
         )}
         <p className="text-[13px] leading-5 text-[#5e5a52]">
-          itsgiving keeps your name and email from Google or GitHub, and the treatments you save. None of it goes to Qloo or the AI models.
+          itsgiving keeps your name and email from Google or GitHub, and the treatments you save. None of it goes to Qloo or the AI models,
+          and you can delete it all from Your treatments.
         </p>
         <button
           type="button"

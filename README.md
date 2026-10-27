@@ -119,7 +119,8 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - **Saved treatments** (`/s/<id>`), with accounts set up: Save on a studio board keeps the treatment in the director's
   account (signing in with Google or GitHub first if needed, then coming back to the same board, saved). Its page is
   private until its owner turns on the share link; then anyone with the link reads it, like an example, and its rework
-  chips take it to the studio as their own take. **Your treatments** (`/saved`) lists them.
+  chips take it to the studio as their own take. **Your treatments** (`/saved`) lists them, and at its foot deletes
+  the account along with everything saved in it.
 - **One header on every page:** Examples, Studio and About, with the current section lit (a featured treatment counts
   as Examples), then the unc-mode switch, the account button (Sign in, or your initial with your treatments and Sign
   out) and the theme, since those choices carry across pages. Pages add only status badges, live or mock. On phones
@@ -292,6 +293,8 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
   the same id.
 - `PATCH /api/saved/{id}` with `{ "shared": true | false }`, and `DELETE /api/saved/{id}`: the owner's only; anyone
   else gets a 404.
+- `DELETE /api/account`: deletes the signed-in person's account and every treatment they saved, which ends their
+  share links. Only from the site's own pages (same-origin), and only ever the caller's own account.
 - `GET /auth/callback`: where Google or GitHub sends someone back after signing in (through Supabase); it only ever
   returns them to a path on this site.
 - `GET /api/health`: makes a real Qloo call and reports mode, host and provenance, plus the LLM chain (never called).
@@ -328,7 +331,8 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
 - Accounts: Supabase keeps the name and email that Google or GitHub share at sign-in; itsgiving keeps the treatments
   people save, in a private database (they hold Qloo data, which may be stored privately but never in git). None of
   it goes to Qloo or the LLMs. A saved treatment is private until its owner shares it; shared pages are never indexed
-  and don't name their owner, and deleting a treatment removes it and its link.
+  and don't name their owner, and deleting a treatment removes it and its link. Deleting the account (at the foot of
+  `/saved`) removes the person's sign-in record and everything they saved.
 
 ## Limitations
 

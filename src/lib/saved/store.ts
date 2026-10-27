@@ -58,7 +58,7 @@ const summaryFrom = (row: Omit<Row, "owner_id" | "treatment">): SavedSummary => 
   savedAt: row.created_at,
 });
 
-export type SaveOutcome = { kind: "saved"; id: string; created: boolean } | { kind: "full" };
+export type SaveOutcome = { kind: "saved"; id: string; created: boolean } | { kind: "full" } | { kind: "no_account" };
 
 /** Keeps a treatment for its owner; the same take again returns the row it already has. */
 export async function saveTreatment(ownerId: string, treatment: Treatment): Promise<SaveOutcome> {
@@ -93,6 +93,8 @@ export async function saveTreatment(ownerId: string, treatment: Treatment): Prom
       const id = await existing();
       if (id) return { kind: "saved", id, created: false };
     }
+    // The account was deleted on another device and this one's token hasn't expired yet: there's no one to save for.
+    if (error.code === "23503") return { kind: "no_account" };
     fail("saving a treatment", error);
   }
   return { kind: "saved", id: data.id as string, created: true };
@@ -142,4 +144,14 @@ export async function deleteSaved(id: string, ownerId: string): Promise<boolean>
   const { data, error } = await db().from(TABLE).delete().eq("id", id).eq("owner_id", ownerId).select("id");
   if (error) fail("deleting a saved treatment", error);
   return (data ?? []).length > 0;
+}
+
+/**
+ * Deletes a person's account: their Supabase user, and with it every treatment they saved (the table's foreign key
+ * cascades), so its share links stop working at once. Someone already gone counts as done: a second press, another tab.
+ */
+export async function deleteAccount(ownerId: string): Promise<void> {
+  const { error } = await db().auth.admin.deleteUser(ownerId);
+  // Only Supabase's own "no such user" means gone; any other 404 (a wrong project address) must not claim an erasure.
+  if (error && !(error.status === 404 && error.code === "user_not_found")) fail("deleting an account", error);
 }
