@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { STEP_LABELS, STEP_ORDER, THINKING, type Thinking } from "@/lib/agent/options";
-import type { LlmTrace, StepEvent, StepStatus, Treatment } from "@/lib/agent/types";
+import { STEP_LABELS, STEP_ORDER, THINKING, tagLabel, type Thinking } from "@/lib/agent/options";
+import type { CreditKind, LlmTrace, StepEvent, StepStatus, Treatment } from "@/lib/agent/types";
 import { describeKind } from "@/lib/llm/types";
 import type { Provenance } from "@/lib/qloo/client";
+import { useCredits, useShown, type Billed } from "./credits";
 import { useLingo } from "./lingo";
 import { Tape, thinkingName } from "./parts";
 
@@ -197,12 +198,108 @@ function Leader({ settled, total }: { settled: number; total: number }) {
   );
 }
 
+/** The words before a credit's names: a film's opening titles, or plain labels in unc mode. */
+const BILLING: Record<"genz" | "plain", Record<CreditKind, string>> = {
+  genz: {
+    subject: "Starring the audience of",
+    audience: "Featuring a taste for",
+    base: "Shot where the fans are",
+    style: "Styled in",
+    films: "With nods to",
+    brands: "Wardrobe by",
+    places: "On location at",
+  },
+  plain: {
+    subject: "Audience of",
+    audience: "Audience taste",
+    base: "Shoot base",
+    style: "Style tags",
+    films: "Reference films",
+    brands: "Wardrobe",
+    places: "Locations",
+  },
+};
+
+/** A credit's role. An artist Qloo doesn't have is named here, in plain type: the name is the brief's, not Qloo's. */
+function role(credit: Billed, unc: boolean): string {
+  const words = BILLING[unc ? "plain" : "genz"][credit.kind];
+  return credit.standInFor ? `${words} ${credit.standInFor}, read through` : words;
+}
+
+/**
+ * Qloo's names in lime (tape pink when mocked). Lines break between names, not inside one that fits, and never before
+ * the dot that separates them.
+ */
+function Names({ credit, tone }: { credit: Billed; tone: string }) {
+  const tags = credit.kind === "audience" || credit.kind === "style";
+  return (
+    <span className="flex flex-wrap gap-x-[0.3em]">
+      {credit.names.map((name, i) => (
+        <span key={i} className={tone}>
+          {tags ? tagLabel(name) : name}
+          {i < credit.names.length - 1 && <span className="text-faint">{"\u00a0·"}</span>}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * What the run has found, billed like a film's opening titles as each step lands: the newest set large, the ones
+ * before it small beneath, like end credits. Each enters with a short fade and rise (a fade alone with reduced
+ * motion); one a re-plan updates keeps its place. Their room is held from the start, so a credit that wraps or a new
+ * one doesn't move what's beneath. Screen readers skip it: the run log reads every step.
+ */
+function Credits({ steps, mock }: { steps: StepEvent[]; mock: boolean }) {
+  const { unc } = useLingo();
+  const credits = useCredits(steps);
+  const shown = useShown(credits.length);
+  const newest = shown > 0 ? credits[shown - 1] : undefined;
+  const tone = mock ? "text-tape" : "text-accent";
+  return (
+    <div aria-hidden className="mt-6 border-t border-line pt-5">
+      {/* A role and two lines of names, at the names' size. */}
+      <div className="min-h-[calc(1.625rem_+_2.2em)] text-[1.5rem] sm:text-[clamp(1.75rem,2.6vw,2.25rem)]">
+        {newest && (
+          <div key={newest.kind} className="transition-[opacity,translate] duration-[350ms] starting:translate-y-2.5 starting:opacity-0">
+            <p className="text-[15px] leading-5 text-dim">{role(newest, unc)}</p>
+            <p className="type-head mt-1.5 leading-[1.1]">
+              <Names credit={newest} tone={tone} />
+            </p>
+          </div>
+        )}
+      </div>
+      {/* Six rows, held on wider screens, where the run log under the stage is in view. */}
+      <dl className="mt-6 grid content-start gap-y-2.5 sm:min-h-[10.625rem] sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-x-5">
+        {credits.slice(0, Math.max(0, shown - 1)).map((credit) => (
+          <div key={credit.kind} className="grid transition-opacity duration-300 starting:opacity-0 sm:col-span-2 sm:grid-cols-subgrid">
+            <dt className="text-[14px] leading-5 text-faint sm:text-right">{role(credit, unc)}</dt>
+            <dd className="text-[15px] leading-5 font-semibold">
+              <Names credit={credit} tone={tone} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 /**
  * The stage while a first treatment is being built: the run itself, step by step, instead of an empty frame. Past
  * ten seconds people look away, so it says how long a run usually takes (the depth's hint), which step it's on, and
- * keeps the tab's title counting.
+ * keeps the tab's title counting. What each step finds rolls in as the run's credits.
  */
-export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; startedAt: number; thinking: Thinking }) {
+export function RunStage({
+  steps,
+  startedAt,
+  thinking,
+  mock,
+}: {
+  steps: StepEvent[];
+  startedAt: number;
+  thinking: Thinking;
+  mock: boolean;
+}) {
   const elapsed = useElapsed(startedAt);
   const { t } = useLingo();
   const status = (id: (typeof STEP_ORDER)[number]) => steps.find((s) => s.id === id)?.status ?? "pending";
@@ -213,7 +310,7 @@ export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; s
   }, [elapsed]);
   return (
     <div className="flex flex-col gap-5">
-      <div className="surface-dark grain flex flex-wrap items-center gap-x-8 gap-y-6 rounded-[2rem] bg-background p-7 sm:p-9">
+      <div className="surface-dark grain flex flex-wrap items-center gap-x-8 gap-y-6 rounded-[2rem] bg-background p-7 sm:items-start sm:p-9">
         <Leader settled={Math.min(settled, STEP_ORDER.length)} total={STEP_ORDER.length} />
         <div className="min-w-0 flex-[1_1_16rem]">
           <h2 className="type-poster text-[clamp(3rem,6vw,5.25rem)]">{t.cooking}</h2>
@@ -227,6 +324,7 @@ export function RunStage({ steps, startedAt, thinking }: { steps: StepEvent[]; s
             Step {Math.min(STEP_ORDER.length, settled + 1)} of {STEP_ORDER.length}
             {current ? `: ${current}` : ""}
           </p>
+          <Credits steps={steps} mock={mock} />
           {elapsed >= 60 && <p className="mt-2 font-serif text-[1.6rem] leading-tight italic">{t.slowBurn}</p>}
         </div>
       </div>

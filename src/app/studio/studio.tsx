@@ -603,7 +603,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 Stop
               </button>
             </div>
-            <RunStage steps={steps} startedAt={startedAt} thinking={pending.form.thinking} />
+            {/* A run of its own each time: its credits and their queue start empty. */}
+            <RunStage key={startedAt} steps={steps} startedAt={startedAt} thinking={pending.form.thinking} mock={modes?.qloo === "mock"} />
           </div>
         ) : (
           // One column on wide screens: the way back, a question or a failure line up with the brief beneath them.
