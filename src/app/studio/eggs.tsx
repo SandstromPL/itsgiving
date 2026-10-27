@@ -74,7 +74,7 @@ export function DirectorsCut() {
 const CYCLE = ["it's giving… A24", "it's giving… Wes Anderson", "it's giving… Wong Kar-wai", "it's giving… Bollywood"];
 
 /** A lime cinema camera on an ink tile, like the tab icon (src/app/icon.svg), and the name. */
-function Mark({ name }: { name: string }) {
+export function Mark({ name }: { name: string }) {
   return (
     <>
       {/* An ink tile in either room: in the dark one its edge keeps it visible. */}
