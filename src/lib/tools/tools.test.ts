@@ -4,6 +4,7 @@ import { createMockFetch } from "../qloo/mock/server";
 import { mockEntityId } from "../qloo/mock/catalog";
 import { distanceM, heatGrid, hotAreas, type HeatArea, type HeatGrid } from "./heatmap";
 import { TOOLS, runTool, toolDefinitions } from "./registry";
+import { readAudience, tasteOverlap } from "./taste";
 import { oneBranchEach } from "./treatment";
 import type { CompactEntity, HeatCell } from "../qloo";
 
@@ -292,6 +293,33 @@ describe("scout_locations", () => {
     const result = await runTool("scout_locations", { city: "Mumbai", venue_kinds: ["music_venue"], price_level_max: 1 }, ctx);
     expect(result.status).toBe("empty");
     expect(result.summary).toContain("more venue_kinds");
+  });
+});
+
+describe("read_audience and taste_overlap", () => {
+  // Qloo files some film themes under who people are ("lesbian", "LGBT"). A summary is shown as it is (the run log).
+  const tags = [
+    { tag_id: "urn:tag:keyword:media:lesbian", name: "lesbian" },
+    { tag_id: "urn:tag:keyword:media:friendship", name: "friendship" },
+    { tag_id: "urn:tag:keyword:media:lgbt", name: "LGBT" },
+    { tag_id: "urn:tag:keyword:media:teenager", name: "teenager" },
+  ];
+  const tagging = {
+    qloo: {
+      insights: async (params: Record<string, unknown>) => ({
+        data: { results: params["filter.type"] === "urn:demographics" ? { demographics: [] } : { tags } },
+      }),
+      compare: async () => ({ data: { results: { tags } } }),
+    } as unknown as QlooClient,
+  };
+
+  it("leave tags that say who people are out of their summaries, and keep them in the data", async () => {
+    const audience = await readAudience.run({ entity_ids: ["e"], tag_types: ["keyword_media"], take: 15 }, tagging);
+    expect(audience.summary).toBe("Audience over-indexes on friendship, teenager.");
+    expect(audience.data.taste_tags.map((t) => t.name)).toContain("lesbian");
+    const shared = await tasteOverlap.run({ group_a_ids: ["a"], group_b_ids: ["b"], take: 12 }, tagging);
+    expect(shared.summary).toBe("Shared traits: friendship, teenager.");
+    expect(shared.data.shared_traits).toHaveLength(4);
   });
 });
 

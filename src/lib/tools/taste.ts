@@ -11,7 +11,19 @@ import {
   type InsightsResponse,
 } from "../qloo";
 import { mockEntityId } from "../qloo/mock/catalog";
+import { isIdentityTag } from "../text";
 import { SEARCHABLE_KINDS, TAG_KIND_VALUES, defineTool, entityIds, plural, take } from "./shared";
+
+/**
+ * Up to six tag names for a summary, leaving out any that name who people are (isIdentityTag): summaries are shown as
+ * they are (the studio's run log). The data keeps every tag, and its users filter them themselves.
+ */
+const summaryTags = (tags: { name: string }[]) =>
+  tags
+    .filter((t) => !isIdentityTag(t.name))
+    .slice(0, 6)
+    .map((t) => t.name)
+    .join(", ");
 
 export const findTags = defineTool({
   name: "find_tags",
@@ -119,12 +131,8 @@ export const readAudience = defineTool({
     return {
       status: tasteTags.length + audience.length > 0 ? "ok" : "empty",
       summary:
-        `Audience over-indexes on ${
-          tasteTags
-            .slice(0, 6)
-            .map((t) => t.name)
-            .join(", ") || "no clear tags"
-        }.` + (audience[0] ? ` ${audience[0].leans.charAt(0).toUpperCase()}${audience[0].leans.slice(1)}.` : ""),
+        `Audience over-indexes on ${summaryTags(tasteTags) || "no clear tags"}.` +
+        (audience[0] ? ` ${audience[0].leans.charAt(0).toUpperCase()}${audience[0].leans.slice(1)}.` : ""),
       data: { taste_tags: tasteTags, demographics: audience },
       warnings,
     };
@@ -153,15 +161,15 @@ export const tasteOverlap = defineTool({
       take: input.take,
     });
     const traits = tagList(response.data).map(compactTag);
+    const named = summaryTags(traits);
     return {
       status: traits.length > 0 ? "ok" : "empty",
       summary:
-        traits.length > 0
-          ? `Shared traits: ${traits
-              .slice(0, 6)
-              .map((t) => t.name)
-              .join(", ")}.`
-          : "No shared traits found between the two groups.",
+        traits.length === 0
+          ? "No shared traits found between the two groups."
+          : named
+            ? `Shared traits: ${named}.`
+            : "The groups share only traits that say who people are, so none are named.",
       data: { shared_traits: traits },
     };
   },
