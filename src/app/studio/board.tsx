@@ -19,6 +19,7 @@ import {
 } from "@/lib/agent/options";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
+import { cssString } from "@/lib/text";
 import { ShootBaseBlock, locationPins } from "./base-map";
 import { jumpOnClick } from "./jump";
 import { darkOf } from "./landing";
@@ -506,12 +507,6 @@ function dateStamp(iso: string): string {
   const d = new Date(iso);
   const two = (n: number) => String(n).padStart(2, "0");
   return `'${two(d.getUTCFullYear() % 100)} ${two(d.getUTCMonth() + 1)} ${two(d.getUTCDate())}`;
-}
-
-/** Any text as a CSS string: everything but letters, digits and spaces goes in as a hex escape. */
-function cssString(text: string): string {
-  const safe = [...text].map((ch) => (/[\p{L}\p{N} ]/u.test(ch) ? ch : `\\${ch.codePointAt(0)!.toString(16).padStart(6, "0")}`));
-  return `"${safe.join("")}"`;
 }
 
 /**

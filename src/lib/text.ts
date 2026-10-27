@@ -12,6 +12,17 @@ export function excerpt(text: string, max: number): string {
 }
 
 /**
+ * Any text as a quoted CSS string (the printed page's running footer takes the treatment's title this way): everything
+ * but letters, digits and spaces goes in as a hex escape, each ended by a space. CSS takes one whitespace after an
+ * escape as its end, so without that space a title's own space after a comma or a full stop disappeared ("Almost,In
+ * Bandra").
+ */
+export function cssString(text: string): string {
+  const safe = [...text].map((ch) => (/[\p{L}\p{N} ]/u.test(ch) ? ch : `\\${ch.codePointAt(0)!.toString(16)} `));
+  return `"${safe.join("")}"`;
+}
+
+/**
  * Tags that name who people are rather than what they like: sexual orientation and gender identity, religion,
  * ethnicity, health, party politics. Qloo has some as film themes ("LGBT", "lesbian"), but "the audience over-indexes
  * on lesbian" or "it's giving gay" reads as profiling the people in it, so they never become tone or evidence, or a

@@ -7,6 +7,7 @@ import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
 import { RateLimiter, TtlCache, clientIp } from "./guards";
 import { distanceM } from "../tools/heatmap";
+import { cssString } from "../text";
 import type { TmdbClient } from "../tmdb";
 import { NONE_PICK, coverStill, excerpt, isIdentityTag, subjectPhrase, tagLabel, tmdbSize } from "./options";
 import { clipSentences, closestTags, filmStills, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
@@ -751,6 +752,13 @@ describe("text helpers", () => {
     expect(excerpt("A long run of words without any full stop in it at all", 30)).toBe("A long run of words without…");
     expect(excerpt("Quiet, warm; welcoming staff", 14)).toBe("Quiet, warm…");
     expect(excerpt(note, 500)).toBe(note);
+  });
+
+  it("writes any title as a CSS string that keeps its own spaces", () => {
+    // Each escape ends in a space, which CSS reads as the escape's end, so a space after a comma or a full stop stays.
+    expect(cssString("Almost, In Bandra")).toBe('"Almost\\2c  In Bandra"');
+    expect(cssString("Kurla, 2 A.M.")).toBe('"Kurla\\2c  2 A\\2e M\\2e "');
+    expect(cssString('A "quote" \\ here')).toBe('"A \\22 quote\\22  \\5c  here"');
   });
 
   it("swaps whole refs only, longest first", () => {
