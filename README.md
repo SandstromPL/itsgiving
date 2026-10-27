@@ -118,7 +118,8 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   managers and producers who commission them), then what it is, what Qloo is, and how each step of a run uses Qloo.
 - **Saved treatments** (`/s/<id>`), with accounts set up: Save on a studio board keeps the treatment in the director's
   account (signing in with Google or GitHub first if needed, then coming back to the same board, saved). Its page is
-  private until its owner turns on the share link; then anyone with the link reads it, like an example, and its rework
+  private until its owner turns on the share link; then anyone with the link reads it (one address can open 60 saved
+  treatments a minute), like an example, and its rework
   chips take it to the studio as their own take. **Your treatments** (`/saved`) lists them, and at its foot deletes
   the account along with everything saved in it.
 - **One header on every page:** Examples, Studio and About, with the current section lit (a featured treatment counts

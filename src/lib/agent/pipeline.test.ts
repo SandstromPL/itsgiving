@@ -5,7 +5,7 @@ import { MemoryCache } from "../qloo/cache";
 import { mockEntityId } from "../qloo/mock/catalog";
 import { createMockFetch } from "../qloo/mock/server";
 import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type BriefInput } from "./brief";
-import { RateLimiter, TtlCache } from "./guards";
+import { RateLimiter, TtlCache, clientIp } from "./guards";
 import { distanceM } from "../tools/heatmap";
 import type { TmdbClient } from "../tmdb";
 import { NONE_PICK, coverStill, excerpt, isIdentityTag, subjectPhrase, tagLabel, tmdbSize } from "./options";
@@ -649,6 +649,42 @@ describe("guards", () => {
     expect(limiter.check("b").ok).toBe(true);
     now = 1001;
     expect(limiter.check("a").ok).toBe(true);
+  });
+
+  it("says whether a key is at its limit without counting a hit", () => {
+    let now = 0;
+    const limiter = new RateLimiter(2, 1000, () => now);
+    expect(limiter.full("a")).toBe(false);
+    limiter.check("a");
+    expect(limiter.full("a")).toBe(false);
+    expect(limiter.full("a")).toBe(false); // looking twice didn't use the second hit
+    limiter.check("a");
+    expect(limiter.full("a")).toBe(true);
+    expect(limiter.full("b")).toBe(false);
+    now = 1001;
+    expect(limiter.full("a")).toBe(false);
+  });
+
+  it("keeps at most its budget of keys, forgetting the least recently seen", () => {
+    const limiter = new RateLimiter(1, 1000, () => 0, 3);
+    for (const key of ["a", "b", "c"]) limiter.check(key);
+    expect(limiter.check("a").ok).toBe(false); // refused, but seen again: now the most recent
+    limiter.check("d"); // a fourth key: "b", the least recently seen, goes
+    expect(limiter.full("b")).toBe(false);
+    expect(["a", "c", "d"].map((key) => limiter.full(key))).toEqual([true, true, true]);
+  });
+
+  it("counts an IPv4 client whole and an IPv6 client by its /64", () => {
+    const key = (forwarded: string) => clientIp(new Headers({ "x-forwarded-for": forwarded }));
+    expect(key("203.0.113.9, 10.0.0.1")).toBe("203.0.113.9");
+    expect(key("::ffff:203.0.113.9")).toBe("203.0.113.9");
+    expect(key("2001:db8:85a3::8a2e:370:7334")).toBe("2001:db8:85a3:0::/64");
+    expect(key("2001:0DB8:85a3:0000:1111:8a2e:0370:7334")).toBe("2001:db8:85a3:0::/64");
+    expect(key("2001:db8:85a3:0:ffff::1")).toBe(key("2001:db8:85a3::2")); // one /64, any host part
+    expect(key("2001:db8:85a4::1")).not.toBe(key("2001:db8:85a3::1"));
+    expect(key("::1")).toBe("0:0:0:0::/64");
+    expect(clientIp(new Headers({ "x-real-ip": "198.51.100.4" }))).toBe("198.51.100.4");
+    expect(clientIp(new Headers())).toBe("unknown");
   });
 
   it("expires and evicts cache entries", () => {
