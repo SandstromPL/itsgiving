@@ -1,6 +1,7 @@
 import type { LlmAttempt, LlmMode, ProducedBy } from "../llm";
 import type { CompactEntity, CompactTag, Provenance, QlooMode } from "../qloo";
 import type { HeatArea, HeatGrid } from "../tools/heatmap";
+import type { RankedTag } from "../tools/taste";
 import type { Brief } from "./brief";
 
 export type StepId =
@@ -143,7 +144,17 @@ export interface Treatment {
   shots: string[];
   /** Qloo results the writer did not cite, still shown as evidence. */
   extras: { references: CompactEntity[]; brands: CompactEntity[]; locations: CompactEntity[] };
-  audience: { taste_tags: CompactTag[]; overlap: CompactTag[]; leans: string[] };
+  audience: {
+    taste_tags: CompactTag[];
+    overlap: CompactTag[];
+    leans: string[];
+    /**
+     * The film subgenres the audience over-indexes on, in Qloo's order, each with its place in Qloo's list. Tags that say
+     * who people are are left out. The cover's era suggestion reads them (studio/eras.ts). Missing on treatments built
+     * before 2026-10-27, and when the call failed.
+     */
+    subgenres?: RankedTag[];
+  };
   /** The entities whose audience Qloo read. */
   subjects: CompactEntity[];
   /** Missing on treatments built before stand-ins (2026-10-26); treatmentWho() falls back to the subjects. */

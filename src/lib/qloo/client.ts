@@ -61,6 +61,11 @@ interface GetOptions {
   emptyOn404?: boolean;
   /** Skip the response cache, e.g. for a health check that must prove the key works now. */
   noCache?: boolean;
+  /**
+   * A shorter limit on each attempt than the client's own, for an optional call that mustn't hold up the ones it runs
+   * beside. A slow attempt fails as a QlooError ("timeout") like any other, so its caller can drop it.
+   */
+  timeoutMs?: number;
 }
 
 const MAX_BODY_CHARS = 5 * 1024 * 1024;
@@ -186,8 +191,8 @@ export class QlooClient {
     return this.get<EntityListResponse>("/entities", params);
   }
 
-  insights(params: QlooParams) {
-    return this.get<InsightsResponse>("/v2/insights", params);
+  insights(params: QlooParams, options: Pick<GetOptions, "timeoutMs"> = {}) {
+    return this.get<InsightsResponse>("/v2/insights", params, options);
   }
 
   tags(params: QlooParams) {
@@ -252,7 +257,7 @@ export class QlooClient {
 
       let response: Response;
       let body: string;
-      const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 20_000);
+      const timeout = AbortSignal.timeout(Math.min(options.timeoutMs ?? Number.POSITIVE_INFINITY, this.options.timeoutMs ?? 20_000));
       try {
         response = await fetchImpl(url, {
           method: "GET",

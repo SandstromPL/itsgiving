@@ -22,12 +22,13 @@ import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { cssString } from "@/lib/text";
 import { ShootBaseBlock, locationPins } from "./base-map";
 import { useCopied } from "./clipboard";
+import { EraLayer, useEra } from "./era-layer";
 import { jumpOnClick } from "./jump";
 import { landCover } from "./morph";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
 import { QlooTags, Still, Tape, Why, modelName } from "./parts";
-import { TitleCardPicker, type CoverStill } from "./title-card";
+import { TitleCardPicker, type CoverStill, type EraPick } from "./title-card";
 import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
@@ -153,6 +154,7 @@ function Cover({
   stills,
   onPickStill,
   morph,
+  era,
 }: {
   ref?: Ref<HTMLElement>;
   t: Treatment;
@@ -166,6 +168,8 @@ function Cover({
   onPickStill: (id: string) => void;
   /** On an example's own page, its slug: a homepage poster's still may grow into this cover (morph.ts). */
   morph?: string;
+  /** The film tradition's look the cover wears, if any (eras.ts). */
+  era: EraPick;
 }) {
   const stillLayer = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -208,8 +212,10 @@ function Cover({
           stills={stills}
           stillId={still?.id}
           onPickStill={onPickStill}
+          era={era}
         />
       </div>
+      <EraLayer id={era.id} title={t.title} />
       <div
         data-morph="words"
         className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]"
@@ -734,6 +740,8 @@ export function Board({
   // The suggestion follows each rework until the director picks a face themselves.
   const [picked, setPicked] = useState<string | null>(null);
   const fontId = picked ?? suggestion.id;
+  // No era until the director picks one; picking one picks its face as well.
+  const era = useEra(t, setPicked);
   // The cover's still is the writer's pick until the director picks another; theirs holds across reworks while its film
   // is still among the references.
   const stills = t.references.flatMap((r): CoverStill[] => (r.still ? [{ id: r.entity.id, name: r.entity.name, src: r.still }] : []));
@@ -768,6 +776,7 @@ export function Board({
   return (
     <article
       ref={article}
+      {...era.wear}
       aria-labelledby="treatment-title"
       aria-busy={state === "updating"}
       // Printed at four fifths of screen size: a screen's type is large print on paper, and a film or a place fits in a
@@ -791,6 +800,7 @@ export function Board({
           onPickFont={setPicked}
           stills={stills}
           onPickStill={setStillPick}
+          era={era.pick}
         />
         <Giving t={t} mock={mock} whose={whose} />
         <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} note={reworkNote} save={save} />

@@ -121,6 +121,14 @@ export const TITLE_FONTS: TitleFont[] = [
     },
     scale: 0.5,
   },
+  {
+    id: "marquee",
+    name: "marquee",
+    plain: "Art Deco marquee",
+    evokes: "a 1950s picture palace",
+    style: { fontFamily: "var(--font-tc-limelight), serif", fontWeight: 400, letterSpacing: "0.02em", lineHeight: 1.02 },
+    scale: 0.8,
+  },
 ];
 
 export const titleFont = (id: string) => TITLE_FONTS.find((f) => f.id === id) ?? TITLE_FONTS[0];

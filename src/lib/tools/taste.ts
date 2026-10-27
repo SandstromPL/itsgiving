@@ -7,6 +7,7 @@ import {
   compactTag,
   entityUrn,
   tagList,
+  type CompactTag,
   type DemographicsBlock,
   type InsightsResponse,
 } from "../qloo";
@@ -82,13 +83,27 @@ function leans(block: DemographicsBlock): string {
   return `${topAges.length > 0 ? `over-indexes ${topAges.join(" and ")}` : "no clear age skew"}, ${gender}`;
 }
 
+/** A Qloo tag with its place in the one call that returned it: 1-based, of how many came back. */
+export interface RankedTag extends CompactTag {
+  rank: number;
+  of: number;
+}
+
+/**
+ * The film subgenres an audience over-indexes on, for the cover's era suggestion: a film tradition it leans to
+ * (Bollywood, French New Wave) shows up among the first 25. Only a suggestion hangs on it, so the call gets a short
+ * limit, and when it fails the audience read goes on without it.
+ */
+const SUBGENRES = 25;
+const SUBGENRE_TIMEOUT_MS = 2_500;
+
 export const readAudience = defineTool({
   name: "read_audience",
   description:
     "Describe who loves the given entities: the taste vocabulary their audience over-indexes on (Qloo taste tags such as " +
-    "themes, genres, styles and ambiences) plus age and gender skew. Call this early in a treatment, right after resolving " +
-    "the artist or touchstones, to ground tone, references, wardrobe and locations in the real audience. These are " +
-    "aggregate affinities, never facts about any individual.",
+    "themes, genres, styles and ambiences), age and gender skew, and the film subgenres it leans to. Call this early in a " +
+    "treatment, right after resolving the artist or touchstones, to ground tone, references, wardrobe and locations in the " +
+    "real audience. These are aggregate affinities, never facts about any individual.",
   inputSchema: z.strictObject({
     entity_ids: entityIds(10),
     tag_types: z
@@ -101,7 +116,7 @@ export const readAudience = defineTool({
   example: { entity_ids: [mockEntityId("Prateek Kuhad")] },
   async run(input, { qloo }) {
     const warnings: string[] = [];
-    const [tagsResponse, demographics] = await Promise.all([
+    const [tagsResponse, demographics, subgenres] = await Promise.all([
       qloo.insights({
         "filter.type": INSIGHT_MODES.tag,
         "signal.interests.entities": input.entity_ids,
@@ -115,6 +130,27 @@ export const readAudience = defineTool({
           if (!(err instanceof QlooError)) throw err;
           warnings.push(`Demographics unavailable: ${err.message}`);
           return [] as DemographicsBlock[];
+        }),
+      // Its own call, so the taste tags above stay the ones they were.
+      qloo
+        .insights(
+          {
+            "filter.type": INSIGHT_MODES.tag,
+            "signal.interests.entities": input.entity_ids,
+            "filter.tag.types": TAG_TYPES.subgenre,
+            "filter.parents.types": entityUrn("movie"),
+            take: SUBGENRES,
+          },
+          { timeoutMs: SUBGENRE_TIMEOUT_MS },
+        )
+        .then((r) => {
+          const tags = tagList(r.data).map(compactTag);
+          return tags.map((tag, i): RankedTag => ({ ...tag, rank: i + 1, of: tags.length }));
+        })
+        .catch((err: unknown) => {
+          if (!(err instanceof QlooError)) throw err;
+          warnings.push(`Film subgenres unavailable: ${err.message}`);
+          return [] as RankedTag[];
         }),
     ]);
     // Qloo can return one word in two tag families ("India" genre, "india" keyword); keep the stronger one.
@@ -133,7 +169,7 @@ export const readAudience = defineTool({
       summary:
         `Audience over-indexes on ${summaryTags(tasteTags) || "no clear tags"}.` +
         (audience[0] ? ` ${audience[0].leans.charAt(0).toUpperCase()}${audience[0].leans.slice(1)}.` : ""),
-      data: { taste_tags: tasteTags, demographics: audience },
+      data: { taste_tags: tasteTags, demographics: audience, film_subgenres: subgenres },
       warnings,
     };
   },

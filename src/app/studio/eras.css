@@ -1,0 +1,219 @@
+/*
+ * Era looks (eras.ts, drawn by era-layer.tsx). An era dresses a treatment's cover and the shape of its receipts. It never
+ * changes the reader's theme, so nothing here sets a theme colour: the era's own colours arrive as --era-* on the board
+ * that wears it (`data-era`, eraStyle). Its moment moves only transform and opacity, and only when it's picked.
+ */
+
+/* The title in the era's colour, on the cover only. */
+[data-era] #treatment-title {
+  color: var(--era-title);
+}
+
+/* What an era brings fades in when it's picked: a fade, so it stays under reduced motion. */
+.era-layer > :not(.era-moment) {
+  transition: opacity 400ms var(--ease-out);
+}
+@starting-style {
+  .era-layer > :not(.era-moment) {
+    opacity: 0;
+  }
+}
+
+/* The texture lies over the still and under the words' own dark (the scrim's -1), so the words read as they did. */
+.era-texture {
+  position: absolute;
+  inset: 0;
+  z-index: -5;
+  pointer-events: none;
+}
+/* Bombay '75: the poster's print, inks a little richer, under a fine halftone screen. */
+[data-era-layer="bombay75"] .era-texture {
+  backdrop-filter: saturate(1.35) contrast(1.06);
+  background-image: radial-gradient(color-mix(in srgb, var(--era-tint) 20%, transparent) 0.7px, transparent 1.2px);
+  background-size: 4px 4px;
+}
+/* Paris '60: black-and-white stock, with a coarse grain. */
+[data-era-layer="paris60"] .era-texture {
+  backdrop-filter: grayscale(1) contrast(1.15);
+  background-image: radial-gradient(rgb(255 255 255 / 0.1) 0.7px, transparent 1.1px);
+  background-size: 3px 3px;
+}
+/* Hong Kong '94: coloured gels, a green fluorescent cast from one side and sodium amber from the other. */
+[data-era-layer="hongkong94"] .era-texture {
+  background:
+    linear-gradient(105deg, color-mix(in srgb, var(--era-tint) 62%, transparent), transparent 62%),
+    linear-gradient(285deg, color-mix(in srgb, var(--era-a) 58%, transparent), transparent 55%);
+  mix-blend-mode: color;
+}
+/* Hollywood '54: three-strip colour, the dyes deeper and richer, warmed at the centre like a projector's spill. */
+[data-era-layer="hollywood54"] .era-texture {
+  backdrop-filter: saturate(1.7) contrast(1.08);
+  background: radial-gradient(ellipse 75% 60% at 50% 40%, color-mix(in srgb, var(--era-tint) 14%, transparent), transparent 75%);
+}
+
+/* A receipt changes shape, never colour or face: Qloo's paper, its highlight and the mock's pink keep their meaning. */
+/* A single-screen cinema's ticket stub. */
+[data-era="bombay75"] [data-receipt] {
+  border-radius: 14px;
+  corner-shape: scoop;
+}
+/* A square-cut card. */
+[data-era="paris60"] [data-receipt] {
+  border-radius: 0;
+}
+/* A shop's price label. */
+[data-era="hongkong94"] [data-receipt] {
+  border-radius: 12px;
+  corner-shape: bevel;
+}
+/* A ticket with stepped Deco corners. */
+[data-era="hollywood54"] [data-receipt] {
+  border-radius: 14px;
+  corner-shape: notch;
+}
+
+/* The moments, each once on a pick (era-layer.tsx puts the overlays away after). Reduced motion skips them. */
+.era-moment {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.era-intertitle {
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: #0a0908;
+  opacity: 0;
+}
+.era-intertitle p {
+  max-width: 18ch;
+  font-family: var(--font-tc-jost), sans-serif;
+  font-size: clamp(2.25rem, 6vw, 5rem);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.08;
+  text-align: center;
+  text-transform: uppercase;
+}
+.era-curtain > span {
+  position: absolute;
+  inset-block: 0;
+  width: 51%;
+  /* Velvet: soft folds, lit at each crest. */
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--era-a) 45%, #000) 0,
+    var(--era-a) 22px,
+    color-mix(in srgb, var(--era-a) 80%, #fff) 30px,
+    var(--era-a) 38px,
+    color-mix(in srgb, var(--era-a) 45%, #000) 60px
+  );
+  translate: 0 0;
+}
+.era-curtain > span:first-child {
+  left: 0;
+  translate: -100% 0;
+}
+.era-curtain > span:last-child {
+  right: 0;
+  translate: 100% 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Bombay '75: the triple zoom, three quick pushes in on the hero, and back. */
+  header:has(> [data-moment="bombay75"]) #treatment-title {
+    transform-origin: 0 100%;
+    animation: era-triple-zoom 1100ms var(--ease-out) both;
+  }
+  /* Paris '60: a jump cut to an intertitle and back. */
+  .era-intertitle {
+    animation: era-hold 900ms both;
+  }
+  /* Hong Kong '94: the title arrives step-printed, a few frames held at a time. */
+  header:has(> [data-moment="hongkong94"]) #treatment-title {
+    animation: era-step-print 900ms steps(7, end) both;
+  }
+  /* Hollywood '54: the curtain parts. */
+  .era-curtain > span:first-child {
+    animation: era-curtain-left 1400ms var(--ease-in-out) both;
+  }
+  .era-curtain > span:last-child {
+    animation: era-curtain-right 1400ms var(--ease-in-out) both;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .era-moment {
+    display: none;
+  }
+}
+
+@keyframes era-triple-zoom {
+  0% {
+    scale: 1;
+  }
+  10%,
+  28% {
+    scale: 1.05;
+  }
+  36%,
+  54% {
+    scale: 1.1;
+  }
+  62%,
+  80% {
+    scale: 1.15;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes era-hold {
+  from,
+  to {
+    opacity: 1;
+  }
+}
+@keyframes era-step-print {
+  from {
+    translate: -0.45em 0;
+    opacity: 0.25;
+  }
+  to {
+    translate: 0 0;
+    opacity: 1;
+  }
+}
+@keyframes era-curtain-left {
+  0%,
+  25% {
+    translate: 0 0;
+  }
+  100% {
+    translate: -100% 0;
+  }
+}
+@keyframes era-curtain-right {
+  0%,
+  25% {
+    translate: 0 0;
+  }
+  100% {
+    translate: 100% 0;
+  }
+}
+
+/* Textures are for the screen, and switch off for readers who ask for less motion or less transparency. */
+@media (prefers-reduced-motion: reduce), (prefers-reduced-transparency: reduce) {
+  .era-texture {
+    display: none;
+  }
+}
+
+/* On paper an era keeps its face, colours, stickers and credit; the texture and the moment stay on screen. */
+@media print {
+  .era-texture,
+  .era-moment {
+    display: none;
+  }
+}

@@ -4,6 +4,7 @@ import type { TmdbClient } from "../tmdb";
 import type { HeatArea, HeatGrid } from "../tools/heatmap";
 import { runTool } from "../tools/registry";
 import { VENUE_KIND_VALUES, normalizeName } from "../tools/shared";
+import type { RankedTag } from "../tools/taste";
 import type { ToolResult } from "../tools/types";
 import { pickKey, priceLevelMax, type Brief } from "./brief";
 import { NONE_PICK, STAND_IN_LIMIT, STEP_LABELS, isIdentityTag, joinNames, type Thinking } from "./options";
@@ -465,7 +466,7 @@ export async function runPipeline(
   const endOverlap = director.length > 0 ? begin("overlap", STEP_LABELS.overlap) : undefined;
   const endHeatmap = begin("heatmap", STEP_LABELS.heatmap);
   const [audience, shared, heat] = await Promise.all([
-    tool<{ taste_tags: CompactTag[]; demographics: { entity_id: string; leans: string }[] }>("audience", "read_audience", {
+    tool<AudienceRead>("audience", "read_audience", {
       entity_ids: subjectIds,
       take: 15,
     }),
@@ -491,6 +492,7 @@ export async function runPipeline(
   endHeatmap(heat.status === "ok" ? "done" : heat.status === "error" ? "error" : "warning", heat.summary);
   // Tags that name who people are (LGBT, a religion, a health condition) never become tone or evidence: see isIdentityTag.
   const tasteTags = (audience.data?.taste_tags ?? []).filter((tag) => !isIdentityTag(tag.name));
+  const subgenres = (audience.data?.film_subgenres ?? []).filter((tag) => !isIdentityTag(tag.name));
   const leans = (audience.data?.demographics ?? []).map((d) =>
     subjects.length > 1 ? `${entityNames.get(d.entity_id) ?? "audience"}: ${d.leans}` : d.leans,
   );
@@ -876,6 +878,7 @@ export async function runPipeline(
     tasteTags,
     overlap,
     leans,
+    subgenres,
     areas,
     heatMap,
     notes,
@@ -889,6 +892,13 @@ export async function runPipeline(
   if (failures.length > 0) console.warn(JSON.stringify({ evt: "qloo_failed", id: options.id, failed: failures.slice(0, 10) }));
   if (llmCalls > 3) throw new Error(`Pipeline made ${llmCalls} LLM calls; the budget is 3.`);
   return { kind: "treatment", treatment };
+}
+
+/** What the pipeline reads from read_audience. */
+interface AudienceRead {
+  taste_tags: CompactTag[];
+  demographics: { entity_id: string; leans: string }[];
+  film_subgenres: RankedTag[];
 }
 
 interface AssembleInput {
@@ -908,6 +918,7 @@ interface AssembleInput {
   tasteTags: CompactTag[];
   overlap: CompactTag[];
   leans: string[];
+  subgenres: RankedTag[];
   areas: BaseArea[];
   heatMap?: HeatGrid;
   notes: string[];
@@ -1005,7 +1016,12 @@ function assemble(input: AssembleInput): Treatment {
       brands: uncited(run.brands.items),
       locations: uncited(run.places.items),
     },
-    audience: { taste_tags: input.tasteTags, overlap: input.overlap, leans: input.leans },
+    audience: {
+      taste_tags: input.tasteTags,
+      overlap: input.overlap,
+      leans: input.leans,
+      ...(input.subgenres.length > 0 ? { subgenres: input.subgenres } : {}),
+    },
     subjects: input.subjects,
     who: input.who,
     director: input.director,

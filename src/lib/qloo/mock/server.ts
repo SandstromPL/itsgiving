@@ -1,5 +1,17 @@
 import type { FetchLike } from "../client";
-import { AUDIENCES, CITIES, ENTITIES, LOCALITIES, TAGS, type MockCity, type MockEntity, type MockLocality, type MockTag } from "./catalog";
+import { TAG_TYPES } from "../urns";
+import {
+  AUDIENCES,
+  CITIES,
+  ENTITIES,
+  LOCALITIES,
+  SUBGENRES,
+  TAGS,
+  type MockCity,
+  type MockEntity,
+  type MockLocality,
+  type MockTag,
+} from "./catalog";
 
 // A small fake of the Qloo API for building without a key. It mirrors the
 // documented request/response shapes and the known gotchas (403 for
@@ -381,7 +393,9 @@ function insights(params: URLSearchParams): Response {
     const parentTypes = list(params, "filter.parents.types");
     const hasFilter = tagTypes.length > 0 || parentTypes.length > 0;
     if (!profile.hasSignal && !hasFilter) return fail(400, "at least one valid signal or filter is required");
-    const candidates = TAGS.filter(
+    // Film subgenres answer only a call that asks for them (read_audience's era leg).
+    const pool = tagTypes.includes(TAG_TYPES.subgenre) ? [...TAGS, ...SUBGENRES] : TAGS;
+    const candidates = pool.filter(
       (t) =>
         (tagTypes.length === 0 || tagTypes.includes(t.type)) &&
         (parentTypes.length === 0 || t.parents.some((parent) => parentTypes.includes(parent))),
