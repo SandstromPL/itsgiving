@@ -209,6 +209,17 @@ body {
   scrollbar-color: var(--line) transparent;
 }
 
+/* Switching the theme crossfades the whole page (theme.tsx), briefly; a fade, so reduced motion keeps it. The
+   transition's overlay would swallow a click while it runs, so clicks go through to the page. */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 250ms;
+  animation-timing-function: var(--ease-out);
+}
+
 /* Popovers ("why", the title-card window, sign-in and the account menu) are windows: white, ink-edged, with a hard
    shadow. They open with a short fade from 96% size, from where they appear to come (the menu and the window from the
    top-right corner their buttons sit near, the centred ones from the middle), and close a little faster. Scrolling

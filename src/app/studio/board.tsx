@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
 import {
   BUDGETS,
   FORMATS,
@@ -25,7 +25,7 @@ import { useCopied } from "./clipboard";
 import { jumpOnClick } from "./jump";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
-import { QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
+import { QlooTags, Still, Tape, Why, modelName } from "./parts";
 import { TitleCardPicker, type CoverStill } from "./title-card";
 import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
 
@@ -448,6 +448,60 @@ function SectionBar({
     nav.scrollTo({ left: offset - (nav.clientWidth - link.offsetWidth) / 2, behavior: reduce ? "auto" : "smooth" });
   }, [current]);
 
+  // The lit tab's pill is one element under the tabs. After a click it slides to the tab the jump lights (translate,
+  // and scaleX only while it moves); the scrollspy moves it at once, since nothing but this bar follows the scroll.
+  const pill = useRef<HTMLSpanElement>(null);
+  const placed = useRef<{ x: number; w: number } | null>(null);
+  const slide = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [sliding, setSliding] = useState(false);
+  const place = useCallback((animate: boolean) => {
+    const el = pill.current;
+    const link = tabs.current?.querySelector<HTMLElement>('[aria-current="location"]');
+    if (!el) return;
+    if (!link) {
+      el.style.opacity = "0";
+      placed.current = null;
+      return;
+    }
+    const from = placed.current;
+    const to = { x: link.offsetLeft, w: link.offsetWidth };
+    const y = link.offsetTop;
+    Object.assign(el.style, {
+      opacity: "1",
+      width: `${to.w}px`,
+      height: `${link.offsetHeight}px`,
+      transform: `translate(${to.x}px, ${y}px)`,
+    });
+    placed.current = to;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (animate && from && !reduce && (from.x !== to.x || from.w !== to.w)) {
+      el.animate(
+        [{ transform: `translate(${from.x}px, ${y}px) scaleX(${from.w / to.w})` }, { transform: `translate(${to.x}px, ${y}px)` }],
+        { duration: 260, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+      );
+    }
+  }, []);
+  useLayoutEffect(() => place(slide.current !== undefined), [current, place]);
+  useEffect(() => {
+    const nav = tabs.current;
+    if (!nav) return;
+    // A font arriving late re-sizes the tabs, not the bar: watch the tabs themselves.
+    const resized = new ResizeObserver(() => place(false));
+    for (const link of nav.querySelectorAll("a")) resized.observe(link);
+    return () => {
+      resized.disconnect();
+      clearTimeout(slide.current);
+    };
+  }, [place]);
+  const slideNext = () => {
+    clearTimeout(slide.current);
+    setSliding(true);
+    slide.current = setTimeout(() => {
+      slide.current = undefined;
+      setSliding(false);
+    }, 400);
+  };
+
   useEffect(() => {
     let frame = 0;
     const update = () => {
@@ -515,16 +569,26 @@ function SectionBar({
           onScroll={measure}
           // A trackpad swipe past the last tab stays in the bar, rather than becoming the browser's Back (which in the
           // studio would leave the board).
-          className="quiet-scroll -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto overscroll-x-contain px-1"
+          className="quiet-scroll relative isolate -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto overscroll-x-contain px-1"
           style={{ maskImage: mask, WebkitMaskImage: mask }}
         >
+          <span
+            ref={pill}
+            aria-hidden
+            className="pointer-events-none absolute top-0 left-0 -z-10 origin-left rounded-full bg-foreground opacity-0"
+          />
           {SECTIONS.map(([id, label]) => (
             <a
               key={id}
               href={`#${id}`}
-              onClick={(event) => jumpOnClick(event, article.current?.querySelector<HTMLElement>(`#${id}`))}
+              onClick={(event) => {
+                slideNext();
+                jumpOnClick(event, article.current?.querySelector<HTMLElement>(`#${id}`));
+              }}
               aria-current={current === id ? "location" : undefined}
-              className="shrink-0 rounded-full px-3 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim hover:text-foreground aria-[current=location]:bg-foreground aria-[current=location]:text-background"
+              // While the pill slides in, the lit label turns light as it arrives, never before.
+              style={sliding && current === id ? { transitionDelay: "140ms" } : undefined}
+              className="shrink-0 rounded-full px-3 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim transition-colors duration-150 hover:text-foreground aria-[current=location]:text-background"
             >
               {label}
             </a>
@@ -774,9 +838,8 @@ export function Board({
                       {r.notes.borrow}
                     </p>
                   </div>
-                  <Receipt qloo={r.qloo} mock={mock} className={`mt-auto ${printReceipt}`} />
                   <Why
-                    label="Why this film"
+                    label="why this film"
                     name={r.entity.name}
                     qloo={r.qloo}
                     read={[
@@ -785,6 +848,7 @@ export function Board({
                     ]}
                     writtenBy={t.writtenBy}
                     mock={mock}
+                    className={`mt-auto ${printReceipt}`}
                   />
                 </div>
               </li>
@@ -835,14 +899,14 @@ export function Board({
                   <QlooTags tags={w.qloo.tags} />
                 </div>
                 <p className={prose}>{w.notes.look}</p>
-                <Receipt qloo={w.qloo} mock={mock} className="mt-auto" />
                 <Why
-                  label="Why this brand"
+                  label="why this brand"
                   name={w.entity.name}
                   qloo={w.qloo}
                   read={[{ term: "The look", text: w.notes.look }]}
                   writtenBy={t.writtenBy}
                   mock={mock}
+                  className="mt-auto"
                 />
               </li>
             ))}
@@ -935,29 +999,29 @@ export function Board({
                         )}
                         <p className={prose}>{l.notes.scene}</p>
                       </div>
-                      <Receipt qloo={l.qloo} mock={mock} className={`mt-auto ${printReceipt}`} />
+                      <Why
+                        label="why this place"
+                        name={l.entity.name}
+                        qloo={l.qloo}
+                        note={place?.ambience}
+                        read={[{ term: "The scene", text: l.notes.scene }]}
+                        writtenBy={t.writtenBy}
+                        mock={mock}
+                        className={`mt-auto ${printReceipt}`}
+                      />
                       {/* On paper the map link (a live one in a PDF) closes the writing's column. */}
-                      <div className="flex flex-wrap items-center gap-2 print:col-start-2 print:row-start-4 print:px-5 print:pb-4">
-                        <Why
-                          label="Why this place"
-                          name={l.entity.name}
-                          qloo={l.qloo}
-                          note={place?.ambience}
-                          read={[{ term: "The scene", text: l.notes.scene }]}
-                          writtenBy={t.writtenBy}
-                          mock={mock}
-                        />
-                        {map && (
+                      {map && (
+                        <div className="flex flex-wrap items-center gap-2 print:col-start-2 print:row-start-4 print:px-5 print:pb-4">
                           <a
                             href={map}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-full px-3 py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
+                            className="rounded-full py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
                           >
                             Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
                           </a>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </li>
                 );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { THEME_KEY } from "./theme-script";
 
 export type ThemeChoice = "light" | "dark";
@@ -28,6 +29,17 @@ const theme = {
     return () => theme.listeners.delete(listener);
   },
 };
+
+/**
+ * Switches the room with a quick crossfade of the whole page, where the browser has view transitions: a fade, so
+ * reduced motion keeps it. The switch re-renders inside the transition (flushSync), so the picture it fades to has the
+ * new choice pressed.
+ */
+function choose(choice: ThemeChoice) {
+  if (choice === theme.read()) return;
+  if (!document.startViewTransition) return theme.write(choice);
+  document.startViewTransition(() => flushSync(() => theme.write(choice))).ready.catch(() => {});
+}
 
 const icon = {
   width: 20,
@@ -75,7 +87,7 @@ export function ThemeSwitch() {
           aria-label={option.label}
           aria-pressed={choice === option.id}
           title={option.label}
-          onClick={() => theme.write(option.id)}
+          onClick={() => choose(option.id)}
           className="grid size-10 place-items-center rounded-full text-foreground hover:bg-field aria-pressed:bg-foreground aria-pressed:text-background"
         >
           {option.glyph}

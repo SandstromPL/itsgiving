@@ -137,12 +137,15 @@ export function Receipt({
   mock,
   label,
   className = "",
+  children,
 }: {
   qloo: QlooEvidence;
   mock: boolean;
   /** What the receipt is for, when the slip stands apart from its item ("the still: Sita Ramam"). */
   label?: string;
   className?: string;
+  /** A last line under the evidence: the board's "why this film", which opens the whole read. */
+  children?: ReactNode;
 }) {
   const affinity = pct(qloo.affinity);
   return (
@@ -162,6 +165,7 @@ export function Receipt({
       </p>
       {affinity && <p>affinity {affinity}</p>}
       {qloo.because[0] && <p>picked because of {qloo.because[0].name}</p>}
+      {children}
     </div>
   );
 }
@@ -176,6 +180,10 @@ export function QlooTags({ tags, max = 3 }: { tags: string[]; max?: number }) {
 const LIST_OF: Record<string, string> = { reference_films: "films", styling_brands: "brands", scout_locations: "places" };
 
 /** "Why" popover: Qloo's evidence on top, itsgiving's interpretation below, never mixed. */
+/**
+ * A pick's receipt, which opens the whole read: its last line ("why this film") is the button, and its press area
+ * spans the slip, so the slip itself is what you tap. The slip shows the focus ring. On paper the line is left out.
+ */
 export function Why({
   label,
   name,
@@ -184,6 +192,7 @@ export function Why({
   writtenBy,
   mock,
   note,
+  className = "",
 }: {
   label: string;
   name: string;
@@ -194,19 +203,27 @@ export function Why({
   mock: boolean;
   /** Qloo's own description of the item, e.g. a place's atmosphere. */
   note?: string;
+  /** Placement of the receipt in its card. */
+  className?: string;
 }) {
   const id = useId();
   const evidence = mock ? "text-[#a3195b]" : "text-[#855000]";
   return (
     <>
-      <button
-        type="button"
-        popoverTarget={id}
-        className="self-start rounded-full border border-foreground px-3.5 py-2 text-sm font-semibold hover:bg-foreground hover:text-background print:hidden"
+      <Receipt
+        qloo={qloo}
+        mock={mock}
+        className={`group relative hover:border-solid has-focus-visible:outline-2 has-focus-visible:outline-offset-3 has-focus-visible:outline-foreground ${className}`}
       >
-        {label}
-        <span className="sr-only">: {name}</span>
-      </button>
+        <button
+          type="button"
+          popoverTarget={id}
+          className="mt-1 cursor-pointer font-semibold underline decoration-1 underline-offset-[3px] group-hover:decoration-2 after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none print:hidden"
+        >
+          {label}
+          <span className="sr-only">: {name}</span>
+        </button>
+      </Receipt>
       <div id={id} popover="auto" className="why" role="dialog" aria-label={`Why ${name}`}>
         <div className="p-6">
           <p className="type-head text-[1.75rem] leading-tight">{name}</p>
