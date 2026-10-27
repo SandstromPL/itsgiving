@@ -7,6 +7,7 @@ import {
   Instrument_Serif,
   JetBrains_Mono,
   Jost,
+  Limelight,
   Michroma,
   Tilt_Neon,
   Yatra_One,
@@ -27,7 +28,9 @@ const tilt = Tilt_Neon({ variable: "--font-tc-tilt", subsets: ["latin"], preload
 const fraunces = Fraunces({ variable: "--font-tc-fraunces", subsets: ["latin"], axes: ["SOFT", "WONK"], preload: false });
 const bodoni = Bodoni_Moda({ variable: "--font-tc-bodoni", subsets: ["latin"], style: "italic", preload: false });
 const michroma = Michroma({ variable: "--font-tc-michroma", subsets: ["latin"], weight: "400", preload: false });
+// The Hollywood '54 era's face (studio/eras.ts): Art Deco, drawn for 1920s theatre and film titles.
+const limelight = Limelight({ variable: "--font-tc-limelight", subsets: ["latin"], weight: "400", preload: false });
 
-export const fontVariables = [bricolage, instrument, jetbrains, yatra, jost, cinzel, courier, tilt, fraunces, bodoni, michroma]
+export const fontVariables = [bricolage, instrument, jetbrains, yatra, jost, cinzel, courier, tilt, fraunces, bodoni, michroma, limelight]
   .map((font) => font.variable)
   .join(" ");

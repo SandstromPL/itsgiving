@@ -38,6 +38,8 @@ export const TAG_TYPES = {
   decor: "urn:tag:decor:qloo",
   setting: "urn:tag:setting:qloo",
   amenity_place: "urn:tag:amenity:place",
+  /** Film subgenres, film traditions among them (Bollywood, French New Wave): read_audience's era leg. */
+  subgenre: "urn:tag:subgenre:qloo",
 } as const;
 
 export type TagKind = keyof typeof TAG_TYPES;

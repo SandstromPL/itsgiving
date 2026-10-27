@@ -162,6 +162,25 @@ export const TAGS: MockTag[] = [
   tag(G_PLACE, "park", "Park", [PLACE], ["warm", "dreamy", "tender"], 0.7),
 ];
 
+const SUBGENRE = "urn:tag:subgenre:qloo";
+
+/**
+ * Film subgenres, under live Qloo's IDs for the film traditions the cover's eras borrow from (studio/eras.ts), with a
+ * few others and one that names who people are, which the pipeline must drop. The mock serves them only to a call that
+ * asks for subgenres, so the tag search and comparisons above never see them.
+ */
+export const SUBGENRES: MockTag[] = [
+  tag(SUBGENRE, "observational", "Observational", [MOVIE], ["intimate", "minimalist", "tender"], 0.6),
+  tag(SUBGENRE, "character_driven", "Character-Driven", [MOVIE], ["intimate", "melancholic", "tender"], 0.7),
+  tag(SUBGENRE, "lgbtq_cinema", "LGBTQ Cinema", [MOVIE], ["tender", "intimate", "rebellious"], 0.6),
+  tag(SUBGENRE, "bollywood", "Bollywood", [MOVIE], ["romantic", "warm", "epic", "maximalist"], 0.8),
+  tag(SUBGENRE, "french_new_wave", "French New Wave", [MOVIE], ["rebellious", "minimalist", "playful", "urban"], 0.55),
+  tag(SUBGENRE, "hong_kong_new_wave", "Hong Kong New Wave", [MOVIE], ["neon", "nocturnal", "melancholic", "romantic"], 0.5),
+  tag(SUBGENRE, "hollywood_musical", "Hollywood Musical", [MOVIE], ["epic", "romantic", "retro", "playful"], 0.6),
+  tag(SUBGENRE, "noir", "Noir", [MOVIE], ["dark", "gritty", "nocturnal"], 0.6),
+  tag(SUBGENRE, "romantic_tragedy", "Romantic Tragedy", [MOVIE], ["romantic", "melancholic"], 0.6),
+];
+
 export const CITIES: MockCity[] = [
   { name: "Mumbai", countryCode: "IN", aliases: ["mumbai", "bombay", "mumbai, india"], center: { lat: 19.076, lon: 72.8777 } },
   {
