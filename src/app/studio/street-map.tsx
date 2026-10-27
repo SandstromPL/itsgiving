@@ -27,6 +27,8 @@ function project(lat: number, lon: number, zoom: number) {
 }
 
 export interface MapFrame {
+  /** What the frame shows, edge to edge. */
+  bounds: Bounds;
   /** The tiles' zoom level. */
   zoom: number;
   /** The frame in its own units, `long` on the longer side (about a pixel each at desktop width). */
@@ -57,6 +59,7 @@ export function mapFrame(bounds: Bounds, long = 600, sharp = 560): MapFrame {
   const world = { left: nw.x, top: nw.y, width: se.x - nw.x, height: se.y - nw.y };
   const k = long / Math.max(world.width, world.height);
   return {
+    bounds,
     zoom,
     width: fixed(world.width * k),
     height: fixed(world.height * k),
@@ -69,7 +72,8 @@ export function mapFrame(bounds: Bounds, long = 600, sharp = 560): MapFrame {
 
 /**
  * The street tiles behind a frame, placed in percentages so they scale with it, and darkened as one layer: grey,
- * low, a little more contrast, so water stays darker than land and streets show as faint lines under the heat.
+ * low, a little more contrast, so water stays darker than land and streets show as faint lines under the heat. On
+ * paper they're grey and pale instead, under ink.
  */
 export function StreetTiles({ frame }: { frame: MapFrame }) {
   const { zoom, world } = frame;
@@ -80,7 +84,10 @@ export function StreetTiles({ frame }: { frame: MapFrame }) {
   }
   const at = (offset: number, size: number) => `${fixed((offset / size) * 100, 3)}%`;
   return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden rounded-[inherit] [filter:grayscale(1)_brightness(0.3)_contrast(1.2)]">
+    <div
+      aria-hidden
+      className="absolute inset-0 overflow-hidden rounded-[inherit] [filter:grayscale(1)_brightness(0.3)_contrast(1.2)] print:opacity-60 print:[filter:grayscale(1)]"
+    >
       {tiles.map(({ x, y }) => (
         // eslint-disable-next-line @next/next/no-img-element -- map tiles, placed by hand; the optimizer would only re-encode them
         <img
@@ -112,7 +119,7 @@ export function MapCredit({ under = false }: { under?: boolean }) {
       target="_blank"
       rel="noreferrer"
       className={`text-[11px] leading-none text-dim hover:text-foreground ${
-        under ? "" : "absolute right-1.5 bottom-1.5 z-20 rounded-[4px] bg-frame/85 px-1.5 py-[6.5px] print:bg-transparent"
+        under ? "" : "absolute right-1.5 bottom-1.5 z-20 rounded-[4px] bg-frame/85 px-1.5 py-[6.5px]"
       }`}
     >
       © OpenStreetMap contributors
