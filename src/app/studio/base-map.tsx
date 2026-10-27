@@ -1,11 +1,12 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
-import { MapCredit, StreetTiles, fixed, mapFrame, type MapFrame } from "./street-map";
+import { heatContours } from "./contours";
+import { MapCredit, StreetTiles, fixed, mapFrame, type Bounds } from "./street-map";
 
-// The shoot base: Qloo's heatmap around the strongest areas for this audience, on the city's streets, with the
-// areas as rings, the one the planner chose, and the scouted locations as numbered pins. Squares, rings and leader
-// lines are SVG and scale with the map; names and numbers are HTML on top, so they stay legible at any width.
+// The shoot base: Qloo's heatmap around the strongest areas for this audience, as contour lines on the city's streets,
+// with the areas as rings, the one the planner chose, and the scouted locations as numbered pins. Lines, rings and
+// leader lines are SVG and scale with the map; names and numbers are HTML on top, so they stay legible at any width.
 // One drawing everywhere: a treatment's board and the homepage's "How it works" both use ShootBaseBlock.
 
 /** The frame's longer side in SVG units; about a pixel each on a desktop screen. */
@@ -29,14 +30,22 @@ export function locationPins(t: Treatment): Pin[] {
 }
 
 /**
- * How much of the highlighter a square gets: none where the audience is weak, and still see-through in the middle
- * of the range, so the streets show under all but the strongest squares. One hue getting brighter on a dark map: a
- * sequential scale.
+ * The contour lines, weakest first, at fractions of the map's strongest spot: one hue that gains weight and strength
+ * with the heat (a sequential scale), and a faint fill inside the top line only, so the eye finds the strongest ground
+ * first and the streets show through everywhere. Widths are screen pixels. Even the faintest line is 3:1 on the streets
+ * under it, lime or pink on screen and ink or pink on paper.
  */
-export const heatAlpha = (heat: number) => (heat < 0.15 ? 0 : Math.round(820 * heat ** 2) / 1000);
+const LINES = [
+  { level: 0.2, width: 1, opacity: 0.65 },
+  { level: 0.4, width: 1.4, opacity: 0.77 },
+  { level: 0.6, width: 1.8, opacity: 0.88 },
+  { level: 0.8, width: 2.25, opacity: 1 },
+];
+const LEVELS = LINES.map((l) => l.level);
+const TOP_FILL = 0.14;
 
-/** The map's frame: the grid's bounds, grown to keep every pin inside. */
-function frame(map: HeatGrid, pins: Pin[]): MapFrame {
+/** What the map frames: the grid's bounds, grown to keep every pin inside. */
+function frameBounds(map: HeatGrid, pins: Pin[]): Bounds {
   // Grids saved before bounds were recorded are framed on their own squares.
   let { south, west, north, east } = map.bounds ?? {
     south: Math.min(...map.tiles.map((t) => t.lat)) - map.cell.lat,
@@ -50,7 +59,7 @@ function frame(map: HeatGrid, pins: Pin[]): MapFrame {
     west = Math.min(west, p.lon - map.cell.lon);
     east = Math.max(east, p.lon + map.cell.lon);
   }
-  return mapFrame({ south, west, north, east }, W);
+  return { south, west, north, east };
 }
 
 interface Point {
@@ -152,8 +161,13 @@ function HeatMap({
   /** Pinned beside the locations: never taller than the screen leaves room for. */
   compact?: boolean;
 }) {
-  const f = frame(map, pins);
-  const tone = mock ? "var(--tape)" : "var(--accent)";
+  // The frame and its lines are kept while the bounds stay the same: the board draws the map again as each location is
+  // read, and tracing the lines takes a few milliseconds.
+  const { south, west, north, east } = frameBounds(map, pins);
+  const f = useMemo(() => mapFrame({ south, west, north, east }, W), [south, west, north, east]);
+  const lines = useMemo(() => heatContours(map, f, LEVELS), [map, f]);
+  // The lines' colour, as `--heat`: the highlighter on screen and ink on paper, or tape pink, both places, when mocked.
+  const heat = mock ? "[--heat:var(--tape)]" : "[--heat:var(--accent)] print:[--heat:var(--foreground)]";
   // Screen pixels per SVG unit, once the map is on screen: where the names fit depends on it.
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -164,15 +178,6 @@ function HeatMap({
     observer.observe(el);
     return () => observer.disconnect();
   }, [f.width]);
-  // A square's edges, with a thin gap of map between neighbours.
-  const square = (tile: { lat: number; lon: number }) => {
-    const left = f.x(tile.lon - map.cell.lon / 2);
-    const right = f.x(tile.lon + map.cell.lon / 2);
-    const top = f.y(tile.lat + map.cell.lat / 2);
-    const bottom = f.y(tile.lat - map.cell.lat / 2);
-    const gap = (right - left) * 0.08;
-    return { x: left + gap, y: top + gap, width: right - left - 2 * gap, height: bottom - top - 2 * gap, rx: (right - left) * 0.14 };
-  };
   const at = (p: Point) => ({ left: `${(p.x / f.width) * 100}%`, top: `${(p.y / f.height) * 100}%` });
   // The chosen area is labelled first, so it gets the best spot.
   const rings = [...base.areas]
@@ -183,7 +188,7 @@ function HeatMap({
   const sides = placeLabels(rings, placed, f.width, f.height, scale);
   const chosen = base.areas.find((a) => a.ref === base.chosen);
   const summary =
-    `${mock ? "Synthetic heatmap" : "Qloo heatmap"} of ${city} for this audience: strongest around ${base.areas.map((a) => a.name).join(", then ")}.` +
+    `${mock ? "Synthetic heatmap" : "Qloo heatmap"} of ${city} for this audience, in contour lines: strongest around ${base.areas.map((a) => a.name).join(", then ")}.` +
     (chosen ? ` The shoot is based in ${chosen.name}.` : "") +
     (pins.length > 0 ? ` Locations ${pins.map((p) => p.n).join(", ")} are marked.` : "");
   // On paper, beside the locations, the map takes the left of its block and the words the right (ShootBaseBlock), so the
@@ -199,14 +204,14 @@ function HeatMap({
     : { wrap: "", caption: "", map: "", legend: "" };
 
   return (
-    <div className={paper.wrap}>
+    <div className={`${heat} ${paper.wrap}`}>
       <p className={`mb-3 max-w-[60ch] text-[14px] leading-5 text-dim ${paper.caption}`}>
         <span className="font-semibold text-foreground">Where the fans are.</span> {mock ? "A synthetic heatmap" : "Qloo's heatmap"} of{" "}
-        {audience} across {city}: the brighter a square, the stronger this audience is there.
+        {audience} across {city}, drawn as contour lines: the bolder the line, the stronger this audience is inside it.
       </p>
       <div
         ref={box}
-        className={`relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] ${paper.map}`}
+        className={`relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] print:bg-white ${paper.map}`}
         style={
           {
             aspectRatio: `${f.width} / ${f.height}`,
@@ -221,9 +226,21 @@ function HeatMap({
       >
         <StreetTiles frame={f} />
         <svg viewBox={`0 0 ${f.width} ${f.height}`} role="img" aria-label={summary} className="absolute inset-0 size-full">
-          {map.tiles.map((tile, i) =>
-            heatAlpha(tile.heat) > 0 ? <rect key={i} {...square(tile)} fill={tone} fillOpacity={heatAlpha(tile.heat)} /> : null,
-          )}
+          {lines.map((line, i) => (
+            <Fragment key={line.level}>
+              {i === lines.length - 1 && <path d={line.area} fill="var(--heat)" fillOpacity={TOP_FILL} fillRule="evenodd" />}
+              <path
+                d={line.line}
+                fill="none"
+                stroke="var(--heat)"
+                strokeOpacity={LINES[i].opacity}
+                strokeWidth={LINES[i].width}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </Fragment>
+          ))}
           {rings.map(({ area, x, y, r }) => (
             <circle
               key={area.ref}
@@ -314,15 +331,24 @@ function HeatMap({
       <div className={`mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim ${paper.legend}`}>
         <span className="flex items-center gap-1.5">
           Weaker
-          <span aria-hidden className="flex gap-0.5">
-            {[0.25, 0.45, 0.65, 0.85, 1].map((heat) => (
-              <span
-                key={heat}
-                className="size-3 rounded-[2px]"
-                style={{ background: `color-mix(in srgb, ${tone} ${Math.round(heatAlpha(heat) * 100)}%, #2b2b2b)` }}
+          {/* The four lines as small loops, drawn as on the map. */}
+          <svg aria-hidden viewBox="0 0 70 12" className="h-3 w-[70px]">
+            {LINES.map((l, i) => (
+              <rect
+                key={l.level}
+                x={i * 18 + 1.25}
+                y={1.25}
+                width={13.5}
+                height={9.5}
+                rx={4.75}
+                fill={i === LINES.length - 1 ? "var(--heat)" : "none"}
+                fillOpacity={TOP_FILL}
+                stroke="var(--heat)"
+                strokeOpacity={l.opacity}
+                strokeWidth={l.width}
               />
             ))}
-          </span>
+          </svg>
           Stronger
         </span>
         <span>Rings: the strongest areas, {base.areas[0]?.radius_m / 1000} km around; solid is the shoot base</span>
@@ -333,6 +359,14 @@ function HeatMap({
 }
 
 const percent = (share: number) => `${Math.round(share * 100)}%`;
+
+/**
+ * On paper the block is part of the white page, lined up with the cards around it: ink type, lines and rings over grey
+ * streets, with the light room's evidence and mock colours. `.surface-dark` sets its tokens outside Tailwind's layers,
+ * so these must be important.
+ */
+const PAPER =
+  "print:p-0 print:[--background:#fff]! print:[--foreground:var(--light-foreground)]! print:[--dim:var(--light-dim)]! print:[--line:var(--light-line)]! print:[--frame:#fff]! print:[--tungsten:var(--light-tungsten)]! print:[--tape:var(--light-tape)]!";
 
 /**
  * The shoot base and its map. Takes the parts rather than a whole treatment, so the homepage can draw a featured run's
@@ -373,7 +407,9 @@ export function ShootBaseBlock({
   const map = base.map && base.map.tiles.length > 0 && base.map;
   if (compact) {
     return (
-      <div className="surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6 print:grid print:break-inside-avoid print:grid-cols-[auto_minmax(0,1fr)] print:grid-rows-[auto_auto_auto_auto_1fr] print:items-start print:gap-x-6 print:gap-y-3">
+      <div
+        className={`surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6 print:grid print:break-inside-avoid print:grid-cols-[auto_minmax(0,1fr)] print:grid-rows-[auto_auto_auto_auto_1fr] print:items-start print:gap-x-6 print:gap-y-3 ${PAPER}`}
+      >
         <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1">
           <div>
             <h4 className="text-[14px] font-semibold text-dim">Shoot base</h4>
@@ -394,7 +430,9 @@ export function ShootBaseBlock({
     );
   }
   return (
-    <div className="surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem] print:break-inside-avoid">
+    <div
+      className={`surface-dark mb-10 grid gap-8 rounded-[28px] bg-background p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_17rem] print:break-inside-avoid ${PAPER}`}
+    >
       {map ? (
         <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} />
       ) : (

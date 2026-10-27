@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { distanceM } from "@/lib/tools/heatmap";
-import { heatAlpha } from "./base-map";
 import { mapFrame } from "./street-map";
 
 // Roughly Mumbai's heatmap frame: a tall, narrow city.
@@ -36,14 +35,5 @@ describe("mapFrame", () => {
     for (const value of [f.x(72.8311), f.y(19.0596), f.metres(2_000, 19.06), f.width]) {
       expect(Math.round(value * 100) / 100).toBe(value);
     }
-  });
-});
-
-describe("heatAlpha", () => {
-  it("leaves weak squares off the map and rises with the heat", () => {
-    expect(heatAlpha(0.1)).toBe(0);
-    const steps = [0.2, 0.4, 0.6, 0.8, 1].map(heatAlpha);
-    expect(steps.every((alpha, i) => i === 0 || alpha > steps[i - 1])).toBe(true);
-    expect(heatAlpha(1)).toBeCloseTo(0.82, 3);
   });
 });
