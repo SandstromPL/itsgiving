@@ -151,26 +151,37 @@ function names(entities: CompactEntity[]): string[] {
 /** Tags never used to steer a treatment, whatever the semantic search ranks them (live "intimate" also returns these). */
 const UNSAFE_TAG = /adult|erotic|sex|strip|nsfw/i;
 
+/** An error's message and, where the network gave one, its code (ETIMEDOUT, ECONNRESET): what a log needs to say why. */
+function failureReason(err: unknown): string {
+  const code = (e: unknown) => (e && typeof e === "object" && "code" in e && typeof e.code === "string" ? e.code : undefined);
+  const cause = err instanceof Error ? err.cause : undefined;
+  const why = code(err) ?? code(cause) ?? (cause instanceof Error ? code(cause.cause) : undefined);
+  return [err instanceof Error ? err.message : String(err), why].filter(Boolean).join(" ");
+}
+
 /**
  * Stills for the reference films the writer may cite, keyed by entity ID: TMDB's backdrop of each film it knows by IMDb
- * ID. A film without one keeps Qloo's poster on its card, and a failure only costs the stills, never the treatment.
+ * ID. A film without one keeps Qloo's poster on its card, and a failure only costs the stills, never the treatment. The
+ * warning says why they failed, not only how many.
  */
 export async function filmStills(films: CompactEntity[], tmdb: TmdbClient | undefined, signal?: AbortSignal): Promise<Map<string, string>> {
   const stills = new Map<string, string>();
   if (!tmdb?.configured) return stills;
   let failed = 0;
+  const reasons = new Set<string>();
   await Promise.all(
     films.map(async (film) => {
       if (!film.external?.imdb) return;
       try {
         const still = await tmdb.backdrop(film.external.imdb, signal);
         if (still) stills.set(film.id, still);
-      } catch {
+      } catch (err) {
         failed++;
+        reasons.add(failureReason(err));
       }
     }),
   );
-  if (failed > 0) console.warn(JSON.stringify({ evt: "tmdb_stills", failed, of: films.length }));
+  if (failed > 0) console.warn(JSON.stringify({ evt: "tmdb_stills", failed, of: films.length, why: [...reasons].slice(0, 3) }));
   return stills;
 }
 

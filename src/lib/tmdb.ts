@@ -1,3 +1,4 @@
+import { request } from "node:https";
 import { defaultSleep, type FetchLike } from "./qloo";
 
 // The Movie Database, used for two things. It turns a director's public TMDB list into IMDb IDs, which Qloo looks up
@@ -21,16 +22,42 @@ export function tmdbConfigFromEnv(env: Record<string, string | undefined> = proc
   return { apiKey: env.TMDB_API_KEY?.trim() || undefined, baseUrl: env.TMDB_BASE_URL?.trim() || TMDB_BASE_URL };
 }
 
-/** A failure worth showing the director as is: it says what went wrong and what to do. */
+/** A failure worth showing the director as is: it says what went wrong and what to do. `cause` is for the logs. */
 export class TmdbError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    cause?: unknown,
   ) {
-    super(message);
+    super(message, { cause });
     this.name = "TmdbError";
   }
 }
+
+/**
+ * A GET over IPv4 only, as a fetch. TMDB's API sits on CloudFront, which lists eight IPv6 addresses and four IPv4 ones.
+ * From a network whose IPv6 route to them is broken, Node's own fetch (it gives each address 250 ms) failed whole
+ * bursts of lookups with ETIMEDOUT once its first connections had closed: 16 of 32 in a local test (2026-10-27), and
+ * still 8 of 32 with 1.5 s an address. Over IPv4 alone, none of 32 failed. Connections are kept alive between calls.
+ */
+export const ipv4Fetch: FetchLike = (url, init) =>
+  new Promise((resolve, reject) => {
+    const req = request(
+      url,
+      { method: "GET", family: 4, headers: Object.fromEntries(new Headers(init?.headers)), signal: init?.signal ?? undefined },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("error", reject);
+        res.on("end", () => {
+          const status = res.statusCode ?? 502;
+          resolve(new Response(status === 204 || status === 304 ? null : Buffer.concat(chunks), { status }));
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
 
 export interface TmdbListItem {
   tmdbId: number;
@@ -113,17 +140,21 @@ export class TmdbClient {
       const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 8_000);
       let response: Response;
       try {
-        response = await (this.options.fetch ?? fetch)(`${this.options.baseUrl}${path}?${query}`, {
+        response = await (this.options.fetch ?? ipv4Fetch)(`${this.options.baseUrl}${path}?${query}`, {
           headers: { Accept: "application/json", ...(bearer ? { Authorization: `Bearer ${key}` } : {}) },
           signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
         });
-      } catch {
+      } catch (err) {
         signal?.throwIfAborted();
         if (attempt < 2 && !timeout.aborted) {
           await defaultSleep(300, signal);
           continue;
         }
-        throw new TmdbError(timeout.aborted ? "TMDB took too long to answer. Try again." : "Couldn't reach TMDB. Try again.");
+        throw new TmdbError(
+          timeout.aborted ? "TMDB took too long to answer. Try again." : "Couldn't reach TMDB. Try again.",
+          undefined,
+          err,
+        );
       }
       if ((response.status === 429 || response.status >= 500) && attempt < 2) {
         await defaultSleep(600, signal);

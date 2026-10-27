@@ -8,7 +8,7 @@ import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type Bri
 import { RateLimiter, TtlCache, clientIp } from "./guards";
 import { distanceM } from "../tools/heatmap";
 import { cssString } from "../text";
-import type { TmdbClient } from "../tmdb";
+import { TmdbError, type TmdbClient } from "../tmdb";
 import { NONE_PICK, coverStill, excerpt, isIdentityTag, subjectPhrase, tagLabel, tmdbSize } from "./options";
 import { clipSentences, closestTags, filmStills, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { describeBrief, planSchema } from "./plan";
@@ -848,7 +848,8 @@ describe("identity tags, tag labels and stills", () => {
     const tmdb = {
       configured: true,
       backdrop: async (imdb: string) => {
-        if (imdb === "tt2") throw new Error("down");
+        if (imdb === "tt2")
+          throw new TmdbError("Couldn't reach TMDB. Try again.", undefined, Object.assign(new Error("connect"), { code: "ETIMEDOUT" }));
         return imdb === "tt1" ? "still-1" : undefined;
       },
     } as unknown as TmdbClient;
@@ -859,6 +860,13 @@ describe("identity tags, tag labels and stills", () => {
     ] as CompactEntity[];
     expect([...(await filmStills(films, tmdb))]).toEqual([["A", "still-1"]]);
     expect(warn).toHaveBeenCalledOnce();
+    // The warning says why, down to the network's own code.
+    expect(JSON.parse(warn.mock.calls[0][0] as string)).toEqual({
+      evt: "tmdb_stills",
+      failed: 1,
+      of: 3,
+      why: ["Couldn't reach TMDB. Try again. ETIMEDOUT"],
+    });
     expect((await filmStills(films, undefined)).size).toBe(0);
     warn.mockRestore();
   });
