@@ -245,7 +245,9 @@ tables" can stay off: the migration grants the server's role itself). Apply `sup
 callback is `https://<ref>.supabase.co/auth/v1/callback`) and turn off the Email provider. Set the Site URL to the
 site, which lets sign-ins come back to its `/auth/callback`. To sign in from `npm run dev` against the hosted project,
 also add `http://localhost:3000/**` to the redirect URLs: an exact `/auth/callback` entry won't match the `?next=` the
-app adds.
+app adds. A project created with automatic RLS gets a function, `public.rls_auto_enable()`, that the Security Advisor
+flags because the browser roles may call it: `revoke execute on function public.rls_auto_enable() from public, anon,
+authenticated;` in the SQL editor clears that, and new tables still get RLS.
 
 | Command | Purpose |
 | --- | --- |
