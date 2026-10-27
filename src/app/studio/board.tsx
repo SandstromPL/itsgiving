@@ -21,6 +21,7 @@ import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { cssString } from "@/lib/text";
 import { ShootBaseBlock, locationPins } from "./base-map";
+import { useCopied } from "./clipboard";
 import { jumpOnClick } from "./jump";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
@@ -88,7 +89,7 @@ function Section({
 }: {
   id: string;
   title: string;
-  note?: string;
+  note?: ReactNode;
   follows?: boolean;
   children: ReactNode;
 }) {
@@ -206,16 +207,87 @@ function Cover({
           {t.title}
         </h1>
         <p className="max-w-[40ch] font-serif text-[clamp(1.4rem,2.4vw,1.9rem)] leading-[1.2] text-pretty italic">{t.logline}</p>
-        <ul aria-label="Palette" className="flex flex-wrap gap-2">
-          {t.palette.map((c) => (
-            <li key={c.hex} className="flex items-center gap-2 rounded-full bg-black/40 py-1.5 pr-3.5 pl-1.5 text-[13px]">
-              <span aria-hidden className="size-[22px] rounded-full ring-1 ring-white/25" style={{ background: c.hex }} />
-              {c.name}
-            </li>
-          ))}
-        </ul>
+        <CoverPalette palette={t.palette} />
       </div>
     </header>
+  );
+}
+
+const check = (
+  <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </svg>
+);
+
+/** The cover's colours, each a chip that copies its hex: "Copied" sits over the name, so the row doesn't shift. */
+function CoverPalette({ palette }: { palette: Treatment["palette"] }) {
+  const { copied, copy } = useCopied();
+  return (
+    <>
+      <ul aria-label="Palette" className="flex flex-wrap gap-2">
+        {palette.map((c) => (
+          <li key={c.hex}>
+            <button
+              type="button"
+              title={c.hex}
+              aria-label={`Copy ${c.name}, ${c.hex}`}
+              onClick={() => copy(c.hex)}
+              className="flex cursor-pointer items-center gap-2 rounded-full bg-black/40 py-1.5 pr-3.5 pl-1.5 text-[13px] hover:bg-black/60"
+            >
+              <span aria-hidden className="size-[22px] rounded-full ring-1 ring-white/25" style={{ background: c.hex }} />
+              <span className="relative whitespace-nowrap">
+                <span className={copied === c.hex ? "invisible" : undefined}>{c.name}</span>
+                {copied === c.hex && <span className="absolute inset-y-0 left-0 flex items-center gap-1">{check}Copied</span>}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p role="status" className="sr-only">
+        {copied ? `Copied ${copied}` : ""}
+      </p>
+    </>
+  );
+}
+
+/** The palette, each colour a button that copies its hex, which colourists paste straight into a grade or a deck. */
+function PaletteSwatches({ palette }: { palette: Treatment["palette"] }) {
+  const { copied, copy } = useCopied();
+  return (
+    <>
+      <ul className="grid grid-cols-3 gap-4 sm:grid-cols-6">
+        {palette.map((c) => (
+          <li key={c.hex}>
+            <button
+              type="button"
+              aria-label={`Copy ${c.name}, ${c.hex}`}
+              onClick={() => copy(c.hex)}
+              className="block w-full cursor-pointer rounded-[20px] text-left [--press:0.98]"
+            >
+              <span
+                aria-hidden
+                className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10 print:aspect-[3/2]"
+                style={{ background: c.hex }}
+              />
+              <span className="mt-2 block text-[15px] leading-tight font-semibold">{c.name}</span>
+              <span className="flex items-center gap-1 font-mono text-[13px] text-faint">
+                {copied === c.hex ? (
+                  <>
+                    {check}
+                    Copied
+                  </>
+                ) : (
+                  c.hex
+                )}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p role="status" className="sr-only">
+        {copied ? `Copied ${copied}` : ""}
+      </p>
+    </>
   );
 }
 
@@ -918,20 +990,8 @@ export function Board({
         </div>
       </Section>
 
-      <Section id="palette" title="Palette">
-        <ul className="grid grid-cols-3 gap-4 sm:grid-cols-6">
-          {t.palette.map((c) => (
-            <li key={c.hex}>
-              <span
-                aria-hidden
-                className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10 print:aspect-[3/2]"
-                style={{ background: c.hex }}
-              />
-              <span className="mt-2 block text-[15px] leading-tight font-semibold">{c.name}</span>
-              <span className="block font-mono text-[13px] text-faint">{c.hex}</span>
-            </li>
-          ))}
-        </ul>
+      <Section id="palette" title="Palette" note={<span className="print:hidden">Tap a colour to copy its hex code.</span>}>
+        <PaletteSwatches palette={t.palette} />
       </Section>
 
       <Section
