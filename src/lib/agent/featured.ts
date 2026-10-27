@@ -5,7 +5,7 @@ import { qlooConfigFromEnv } from "../qloo";
 import { distanceM } from "../tools/heatmap";
 import { briefKey, briefSchema, normalizeBrief } from "./brief";
 import { EXAMPLES } from "./examples";
-import { FORMATS, audiencePhrase, coverStill, isIdentityTag, subjectPhrase, tagLabel, treatmentWho } from "./options";
+import { FORMATS, audiencePhrase, coverReference, isIdentityTag, subjectPhrase, tagLabel, treatmentWho } from "./options";
 import type { QlooEvidence, ShootBase, Treatment } from "./types";
 
 // Featured treatments: the examples pre-built by `npm run featured` (scripts/featured.ts), so judges and
@@ -33,6 +33,8 @@ export interface FeaturedCover {
   line: string;
   palette: string[];
   still?: string;
+  /** What Qloo said about the film the still comes from: the proof pinned to the homepage's cover. */
+  evidence?: { name: string; qloo: QlooEvidence; mock: boolean };
   /** The first tone tag Qloo gave the treatment, for the poster's "it's giving" sticker. */
   tone?: string;
 }
@@ -71,15 +73,19 @@ export function loadFeatured(file = FEATURED_FILE): FeaturedItem[] {
 }
 
 export function featuredCovers(items: FeaturedItem[] = loadFeatured()): FeaturedCover[] {
-  return items.map(({ slug, treatment: t }) => ({
-    slug,
-    title: t.title,
-    logline: t.logline,
-    line: `${FORMATS[t.brief.format]} ${subjectPhrase(treatmentWho(t).artists, treatmentWho(t).films, t.brief.format)} / ${t.brief.city}`,
-    palette: t.palette.map((c) => c.hex),
-    still: coverStill(t),
-    tone: t.tone.find((tone) => !isIdentityTag(tone.tag.name))?.tag.name,
-  }));
+  return items.map(({ slug, treatment: t }) => {
+    const cover = coverReference(t);
+    return {
+      slug,
+      title: t.title,
+      logline: t.logline,
+      line: `${FORMATS[t.brief.format]} ${subjectPhrase(treatmentWho(t).artists, treatmentWho(t).films, t.brief.format)} / ${t.brief.city}`,
+      palette: t.palette.map((c) => c.hex),
+      still: cover?.still,
+      evidence: cover && { name: cover.entity.name, qloo: cover.qloo, mock: t.mock.qloo },
+      tone: t.tone.find((tone) => !isIdentityTag(tone.tag.name))?.tag.name,
+    };
+  });
 }
 
 const LIVE = { qloo: "live", llm: "live" };

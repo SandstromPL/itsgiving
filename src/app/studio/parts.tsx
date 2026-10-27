@@ -132,7 +132,18 @@ function ordinal(n: number): string {
  * drove it. Pink when the mock stands in for Qloo, so mock numbers never pass as Qloo's. Always on paper, even on a
  * dark frame.
  */
-export function Receipt({ qloo, mock, className = "" }: { qloo: QlooEvidence; mock: boolean; className?: string }) {
+export function Receipt({
+  qloo,
+  mock,
+  label,
+  className = "",
+}: {
+  qloo: QlooEvidence;
+  mock: boolean;
+  /** What the receipt is for, when the slip stands apart from its item ("the still: Sita Ramam"). */
+  label?: string;
+  className?: string;
+}) {
   const affinity = pct(qloo.affinity);
   return (
     <div
@@ -142,6 +153,7 @@ export function Receipt({ qloo, mock, className = "" }: { qloo: QlooEvidence; mo
       } ${className}`}
     >
       <p className="font-semibold">{mock ? "Mock receipt, not Qloo" : "Qloo receipt"}</p>
+      {label && <p>{label}</p>}
       <p>
         <span className={`px-1 ${mock ? "bg-[#ffd6ea]" : "bg-accent"} text-[#121211]`}>
           rank {qloo.rank} of {qloo.of}

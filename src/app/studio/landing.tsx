@@ -7,7 +7,7 @@ import { tmdbSize } from "@/lib/agent/options";
 import { ShootBaseBlock } from "./base-map";
 import { briefLine, splitTitles, type FormState } from "./form";
 import { useLingo } from "./lingo";
-import { Still } from "./parts";
+import { Receipt, Still } from "./parts";
 import { suggestTitleFontFrom, titleFont, titleStyle } from "./title-fonts";
 
 // The homepage, the pitch: what itsgiving is, finished treatments to open, and one real run explained. No form here;
@@ -32,64 +32,99 @@ const posterTitle = "text-[clamp(1.6rem,2.3vw,2.15rem)] leading-[0.92] font-extr
 /** A poster's place in "Now showing": most of a phone's width in the sideways row, a grid cell from small screens up. */
 const poster = "w-[78%] shrink-0 snap-start sm:w-auto";
 
-/** A finished treatment's cover, opening like a letterbox on load: the page's one moment of motion. */
-function HeroCover({ cover, fontId }: { cover: FeaturedCover; fontId: string }) {
+/**
+ * A finished treatment's cover, opening like a letterbox on load: the page's one moment of motion. Qloo's receipt for
+ * the film its still comes from is pinned to its corner, so the first screen carries proof, not only the pitch. On a
+ * phone the cover is a letterboxed strip with the title alone, and the receipt one line under it.
+ */
+function HeroCover({ cover, fontId, className = "" }: { cover: FeaturedCover; fontId: string; className?: string }) {
+  const proof = cover.evidence;
   return (
-    <Link
-      href={`/t/${cover.slug}`}
-      aria-label={`${cover.title}: open this finished treatment`}
-      className="letterbox-open surface-dark relative isolate flex min-h-[22rem] flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-6 sm:min-h-[27rem] sm:p-8"
-      style={{ background: darkOf(cover.palette) }}
-    >
-      <span aria-hidden className="absolute inset-0 -z-10">
-        {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 size-full" />}
-      </span>
-      <span className="self-start rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim">{cover.line}</span>
-      {/* The still shows at full strength; the words bring their own dark (scrim-under). */}
-      <span className="scrim-under flex flex-col gap-4 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2rem] sm:[--scrim-x:2rem]">
-        <span className="max-w-[14ch] text-balance" style={titleStyle(titleFont(fontId), "clamp(2.6rem, 4.6vw, 4.5rem)")}>
-          {cover.title}
+    <div className={`relative ${className}`}>
+      <Link
+        href={`/t/${cover.slug}`}
+        aria-label={`${cover.title}: open this finished treatment`}
+        className="letterbox-open surface-dark relative isolate flex aspect-[2.39/1] flex-col justify-between gap-2 overflow-hidden rounded-[2rem] p-4 [--hero-title:2.1rem] sm:aspect-auto sm:min-h-[27rem] sm:gap-8 sm:p-8 sm:[--hero-title:clamp(2.6rem,4.6vw,4.5rem)]"
+        style={{ background: darkOf(cover.palette) }}
+      >
+        <span aria-hidden className="absolute inset-0 -z-10">
+          {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 size-full" />}
         </span>
-        <span className="max-w-[38ch] font-serif text-[clamp(1.2rem,1.8vw,1.5rem)] leading-[1.25] text-pretty italic">{cover.logline}</span>
-        <span aria-hidden className="flex gap-1.5">
-          {cover.palette.map((hex) => (
-            <span key={hex} className="size-5 rounded-full ring-1 ring-white/25" style={{ background: hex }} />
-          ))}
+        <span className="self-start rounded-[19px] border border-edge bg-black/70 px-3 py-1 text-[12.5px] text-dim sm:px-3.5 sm:py-2 sm:text-[14px]">
+          {cover.line}
         </span>
-      </span>
-    </Link>
+        {/* The still shows at full strength; the words bring their own dark (scrim-under). */}
+        <span className="scrim-under flex flex-col gap-4 [--scrim-b:1rem] [--scrim-fade:3rem] [--scrim-x:1rem] sm:[--scrim-b:2rem] sm:[--scrim-fade:6rem] sm:[--scrim-x:2rem]">
+          <span className="max-w-[14ch] text-balance" style={titleStyle(titleFont(fontId), "var(--hero-title)")}>
+            {cover.title}
+          </span>
+          <span className="hidden max-w-[38ch] font-serif text-[clamp(1.2rem,1.8vw,1.5rem)] leading-[1.25] text-pretty italic sm:block">
+            {cover.logline}
+          </span>
+          <span aria-hidden className="hidden gap-1.5 sm:flex">
+            {cover.palette.map((hex) => (
+              <span key={hex} className="size-5 rounded-full ring-1 ring-white/25" style={{ background: hex }} />
+            ))}
+          </span>
+        </span>
+      </Link>
+      {proof && (
+        <>
+          <Receipt
+            qloo={proof.qloo}
+            mock={proof.mock}
+            label={`the still: ${proof.name}`}
+            className="absolute right-[-0.75rem] bottom-[-5rem] hidden w-[17rem] rotate-2 shadow-[4px_4px_0_rgb(0_0_0/0.12)] sm:block"
+          />
+          <p
+            data-receipt={proof.mock ? "mock" : "qloo"}
+            className={`mt-3 rounded-xl border border-dashed px-3 py-2 font-mono text-[12.5px] leading-[1.6] sm:hidden ${
+              proof.mock ? "border-[#e79ac0] bg-[#fff5fa] text-[#a3195b]" : "border-[#c9c1af] bg-[#fffdf6] text-[#2b2925]"
+            }`}
+          >
+            {proof.mock ? "Mock receipt, not Qloo" : "Qloo receipt"}: {proof.name}, the still, ranks{" "}
+            <span className={`px-1 ${proof.mock ? "bg-[#ffd6ea]" : "bg-accent"} text-[#121211]`}>
+              {proof.qloo.rank} of {proof.qloo.of}
+            </span>{" "}
+            for this audience
+          </p>
+        </>
+      )}
+    </div>
   );
 }
 
 export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string }) {
   return (
-    <section className="mx-auto grid w-full max-w-[80rem] items-center gap-12 px-4 pt-10 pb-16 sm:px-8 sm:pt-14 sm:pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-      <div className="flex flex-col gap-7">
-        <span className="-rotate-3 self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-[#121211]">
+    <section className="mx-auto grid w-full max-w-[80rem] items-center gap-5 px-4 pt-8 pb-16 sm:gap-12 sm:px-8 sm:pt-14 sm:pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
+      {/* On a phone the column opens up (`contents`) so the cover can sit between the headline and the paragraph: the
+          first screen then holds a finished treatment and its receipt as well as the pitch. */}
+      <div className="contents sm:flex sm:flex-col sm:gap-7">
+        <span className="order-1 -rotate-3 self-start justify-self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-[#121211]">
           for music-video and short-film directors
         </span>
-        <h1 className="type-poster text-[clamp(4.25rem,8vw,7.5rem)]">
+        <h1 className="order-2 type-poster text-[3.9rem] sm:text-[clamp(4.25rem,8vw,7.5rem)]">
           your voice,
           <br />
           their taste.
         </h1>
-        <p className="max-w-[34ch] text-[1.3rem] leading-[1.45] text-dim">
+        <p className="order-4 max-w-[34ch] text-[1.15rem] leading-[1.45] text-dim sm:text-[1.3rem]">
           Give it an artist, or the films your short is after, and a city. It reads what that audience actually loves on Qloo and writes a
           treatment you can pitch, with receipts for every pick.
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className="order-5 flex flex-wrap gap-3">
           <Link href="/studio" className={primaryButton}>
             Start a treatment
           </Link>
           {cover && (
-            <Link href={`/t/${cover.slug}`} className={secondaryButton}>
+            <Link href={`/t/${cover.slug}`} className={`${secondaryButton} max-sm:hidden`}>
               See a finished one
             </Link>
           )}
         </div>
-        <p className="text-[15px] text-faint">No sign-up to build. A live build takes about 40 seconds.</p>
+        <p className="order-6 text-[15px] text-faint">No sign-up to build. A live build takes about 40 seconds.</p>
       </div>
-      {cover && fontId && <HeroCover cover={cover} fontId={fontId} />}
+      {cover && fontId && <HeroCover cover={cover} fontId={fontId} className="order-3" />}
     </section>
   );
 }
