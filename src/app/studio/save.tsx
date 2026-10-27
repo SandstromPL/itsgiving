@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import type { Treatment } from "@/lib/agent/types";
 import { SignInWindow, useAccount } from "./account";
+import { copyText } from "./clipboard";
 import { handOffBoard } from "./handoff";
 
 // Save, on a board the studio built: it keeps the treatment in the director's account (its seal shows the server
@@ -21,16 +22,6 @@ const outline = "rounded-full border border-foreground px-4 py-2.5 text-[15px] f
 
 /** A saved treatment's link, for sharing: the same page its owner opens. */
 export const savedUrl = (id: string) => `${window.location.origin}/s/${id}`;
-
-/** Copies text, quietly reporting whether the browser allowed it. */
-export async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function SaveControl({ treatment, seal, autoSave = false }: { treatment: Treatment; seal: string; autoSave?: boolean }) {
   const account = useAccount();

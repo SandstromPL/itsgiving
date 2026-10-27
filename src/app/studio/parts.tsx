@@ -136,6 +136,7 @@ export function Receipt({ qloo, mock, className = "" }: { qloo: QlooEvidence; mo
   const affinity = pct(qloo.affinity);
   return (
     <div
+      data-receipt={mock ? "mock" : "qloo"}
       className={`rounded-xl border border-dashed px-3.5 py-3 font-mono text-[12.5px] leading-[1.65] tabular-nums ${
         mock ? "border-[#e79ac0] bg-[#fff5fa] text-[#a3195b]" : "border-[#c9c1af] bg-[#fffdf6] text-[#2b2925]"
       } ${className}`}
