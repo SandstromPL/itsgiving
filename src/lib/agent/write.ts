@@ -35,6 +35,8 @@ export interface Draft {
   tone?: { ref: string; note: string }[];
   beats: { title: string; description: string; reference?: string | null }[];
   references?: { ref: string; why: string; borrow: string }[];
+  /** The cited film whose still becomes the cover. */
+  cover?: string | null;
   wardrobe?: { ref: string; look: string }[];
   locations?: { ref: string; scene: string }[];
   palette: { name: string; hex: string }[];
@@ -85,6 +87,9 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
             )
             .min(Math.min(2, references.length))
             .describe("2-6 film references."),
+          cover: refEnum(references)
+            .nullable()
+            .describe("The cited film whose look best fits the title and logline: a frame from it is the cover."),
         }
       : {}),
     ...(brands.length > 0
@@ -129,7 +134,9 @@ function flattenNote(note: unknown): unknown {
 
 /**
  * DeepSeek's JSON mode sometimes sends lighting or shot notes as objects. Flattening them before
- * validation keeps what it wrote and saves a whole repair call (15-35 s with thinking on).
+ * validation keeps what it wrote and saves a whole repair call (15-35 s with thinking on). A draft
+ * with references but no cover pick gets "none", which the board reads as its first film's still,
+ * rather than a repair for the one field that may be empty.
  */
 export function normalizeDraft(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
@@ -137,6 +144,7 @@ export function normalizeDraft(value: unknown): unknown {
   for (const key of ["lighting", "shots"]) {
     if (Array.isArray(draft[key])) draft[key] = draft[key].map(flattenNote);
   }
+  if (Array.isArray(draft.references) && draft.cover === undefined) draft.cover = null;
   return draft;
 }
 
@@ -182,7 +190,8 @@ export function writePrompt(ctx: WriteContext): string {
     "TASK",
     "Write the treatment. Cite films, brands and places by ref only in the ref fields; in the text, call them by name",
     "and never write refs (T1, R2, B1, L3) or price levels. For each reference say why it fits this audience and, in one",
-    "sentence, the specific look or technique to borrow. Wardrobe looks name garments, fabrics and colours. Location",
+    "sentence, the specific look or technique to borrow. For the cover, name the cited film whose look best fits the title",
+    "and logline: a frame from it is the cover. Wardrobe looks name garments, fabrics and colours. Location",
     "scenes say what happens there and stay true to the place's Qloo description. Palette: 4-6 named colours. Lighting",
     "and shot notes are plain sentences, concrete and doable on this budget.",
   );
@@ -324,6 +333,7 @@ export function mockDraft(ctx: WriteContext): Draft {
             why: `Ranks high with this audience${r.item.tags.length > 0 ? ` and shares ${r.item.tags.slice(0, 2).join(" and ").toLowerCase()}` : ""}.`,
             borrow: BORROW[i % BORROW.length],
           })),
+          cover: refs[0].ref,
         }
       : {}),
     ...(brands.length > 0

@@ -129,6 +129,11 @@ export interface Treatment {
   tone: TonePick[];
   beats: Beat[];
   references: Pick<"why" | "borrow">[];
+  /**
+   * The entity ID of the reference the writer chose for the cover: its still is the cover art (coverReference). Missing
+   * on treatments built before 2026-10-27 and when the writer named none of its references.
+   */
+  cover?: string;
   wardrobe: Pick<"look">[];
   locations: Pick<"scene">[];
   /** Missing on treatments built before the heatmap step, and when Qloo had no heatmap for the city. */

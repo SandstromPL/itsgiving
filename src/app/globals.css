@@ -330,6 +330,24 @@ body {
   background-size: 3px 3px;
 }
 
+/*
+ * A cover's still shows at full strength, like a poster: only its words get a dark ground. The block of words (title,
+ * logline, palette) carries it, from a soft edge just above the title down to the cover's foot, so it fits however
+ * many lines they take. Under every word it is at least 62% black: AA for the logline and 3:1 for the title even
+ * over a white frame. `--scrim-x` and `--scrim-b` are the cover's own padding, so the dark reaches its edges.
+ */
+.scrim-under {
+  position: relative;
+}
+.scrim-under::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: calc(-1 * var(--scrim-fade, 6rem)) calc(-1 * var(--scrim-x, 0px)) calc(-1 * var(--scrim-b, 0px));
+  background: linear-gradient(to bottom, transparent, rgb(10 9 8 / 0.62) var(--scrim-fade, 6rem), rgb(10 9 8 / 0.8));
+  pointer-events: none;
+}
+
 /* The one orchestrated moment on each page: a cover's letterbox opens, the homepage's on load, a board's when it
    lands. Reduced motion skips it (below). */
 @keyframes letterbox-open {

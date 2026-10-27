@@ -1,20 +1,37 @@
 "use client";
 
 import { useId } from "react";
+import { tmdbSize } from "@/lib/agent/options";
 import { useLingo } from "./lingo";
 import { TITLE_FONTS, titleFont, type TitleFont } from "./title-fonts";
 
-/** The cover's "Title card" button and the window it opens: pick a face, see the cover change behind it. */
+/** A reference film's still that can be the cover: the film's entity ID, its name, and the still itself. */
+export interface CoverStill {
+  id: string;
+  name: string;
+  src: string;
+}
+
+/**
+ * The cover's "Title card" button and the window it opens: pick the still behind the title (a frame from one of the
+ * reference films) and the title's face, and see the cover change behind it.
+ */
 export function TitleCardPicker({
   title,
   fontId,
   suggestion,
   onPick,
+  stills,
+  stillId,
+  onPickStill,
 }: {
   title: string;
   fontId: string;
   suggestion: { id: string; why: string };
   onPick: (id: string) => void;
+  stills: CoverStill[];
+  stillId?: string;
+  onPickStill: (id: string) => void;
 }) {
   const id = useId();
   const { t: lines, unc } = useLingo();
@@ -79,14 +96,50 @@ export function TitleCardPicker({
             <h2 id={`${id}-title`} className="type-head text-[2.1rem] leading-none text-[#121211]">
               {lines.titleWindow}
             </h2>
-            <p className="text-[15px] leading-6 text-[#4a4741]">Sets the title in a cinematic face. It carries into the PDF.</p>
-            <div className="rounded-xl border border-dashed border-[#c9c1af] bg-[#fffdf6] px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-[#2b2925]">
+            <p className="text-[15px] leading-6 text-[#4a4741]">
+              The still behind the title and the face it&apos;s set in. Both carry into the PDF.
+            </p>
+          </div>
+          {/* Stills are worth a choice only when there's more than one film to take a frame from. Each group is spaced by a
+              margin, not padding: a legend sits on its fieldset's top edge, above any padding. */}
+          {stills.length > 1 && (
+            <fieldset className="mt-5 flex flex-col px-5">
+              <legend className="mb-2.5 text-[14px] font-semibold text-[#4a4741]">Still, from a reference film</legend>
+              <div className="grid grid-cols-3 gap-2">
+                {stills.map((s) => (
+                  <label
+                    key={s.id}
+                    className="flex min-w-0 cursor-pointer flex-col gap-1.5 rounded-xl p-1 text-[#121211] has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-[#121211]"
+                  >
+                    <input
+                      type="radio"
+                      name={`${id}-still`}
+                      value={s.id}
+                      checked={s.id === stillId}
+                      onChange={() => onPickStill(s.id)}
+                      className="peer sr-only"
+                    />
+                    {/* eslint-disable-next-line @next/next/no-img-element -- TMDB's own small size; no optimizer config needed */}
+                    <img
+                      src={tmdbSize(s.src, "w300")}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-video w-full rounded-lg bg-[#eeebe4] object-cover ring-[#121211] peer-checked:ring-[3px]"
+                    />
+                    <span className="truncate text-[12.5px] leading-tight text-[#4a4741] peer-checked:font-bold peer-checked:text-[#121211]">
+                      {s.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          <fieldset className="mt-5 flex flex-col gap-2 px-5 pb-4">
+            <legend className="mb-2.5 text-[14px] font-semibold text-[#4a4741]">Typeface for the title</legend>
+            <div className="mb-1 rounded-xl border border-dashed border-[#c9c1af] bg-[#fffdf6] px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-[#2b2925]">
               <p className="font-semibold">why {label(suggested)} is suggested</p>
               <p>{suggestion.why}</p>
             </div>
-          </div>
-          <fieldset className="flex flex-col gap-2 px-5 py-4">
-            <legend className="sr-only">Title typeface</legend>
             {TITLE_FONTS.map((f) => (
               <label
                 key={f.id}

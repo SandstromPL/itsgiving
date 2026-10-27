@@ -79,7 +79,7 @@ const PLAIN: Lines = {
   shared: (whose) => `shared with ${whose} taste`,
   failTitle: "The treatment didn't finish",
   rateTitle: "Too many requests",
-  titleWindow: "Title typeface",
+  titleWindow: "Title card",
   interval: { title: "Intermission", line: "The second half of the treatment is next." },
   directorsCut: "Director's cut on",
   footer: "Every pick is backed by Qloo data.",

@@ -38,15 +38,15 @@ function HeroCover({ cover, fontId }: { cover: FeaturedCover; fontId: string }) 
     <Link
       href={`/t/${cover.slug}`}
       aria-label={`${cover.title}: open this finished treatment`}
-      className="letterbox-open surface-dark grain relative isolate flex min-h-[22rem] flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-6 sm:min-h-[27rem] sm:p-8"
+      className="letterbox-open surface-dark relative isolate flex min-h-[22rem] flex-col justify-between gap-8 overflow-hidden rounded-[2rem] p-6 sm:min-h-[27rem] sm:p-8"
       style={{ background: darkOf(cover.palette) }}
     >
       <span aria-hidden className="absolute inset-0 -z-10">
-        {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 size-full opacity-55" />}
-        <span className="absolute inset-0 bg-[linear-gradient(0deg,rgb(10_9_8/0.9)_0%,rgb(10_9_8/0.3)_58%,rgb(10_9_8/0.55)_100%)]" />
+        {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 size-full" />}
       </span>
-      <span className="self-start rounded-[19px] border border-edge px-3.5 py-2 text-[14px] text-dim">{cover.line}</span>
-      <span className="flex flex-col gap-4">
+      <span className="self-start rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim">{cover.line}</span>
+      {/* The still shows at full strength; the words bring their own dark (scrim-under). */}
+      <span className="scrim-under flex flex-col gap-4 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2rem] sm:[--scrim-x:2rem]">
         <span className="max-w-[14ch] text-balance" style={titleStyle(titleFont(fontId), "clamp(2.6rem, 4.6vw, 4.5rem)")}>
           {cover.title}
         </span>
@@ -118,7 +118,7 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
     );
   }
   return (
-    <section id="now-showing" aria-labelledby="featured-heading" className="surface-dark grain relative isolate bg-background">
+    <section id="now-showing" aria-labelledby="featured-heading" className="surface-dark relative isolate bg-background">
       <span aria-hidden className="beam print:hidden" />
       <div className="mx-auto flex w-full max-w-[80rem] flex-col gap-8 px-4 py-16 sm:px-8 sm:py-24">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
@@ -138,21 +138,17 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
                 className="press flex w-full flex-col overflow-hidden rounded-[26px] ring-1 ring-white/10 transition-transform duration-200 [--press:0.98] hover:-translate-y-1"
                 style={{ background: darkOf(cover.palette) }}
               >
-                <span className="relative isolate flex aspect-[4/5] w-full flex-col justify-end gap-3.5 p-5">
-                  {cover.still && (
-                    <Still src={tmdbSize(cover.still, "w780")} alt="" className="absolute inset-0 -z-10 size-full opacity-60" />
-                  )}
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 -z-10 bg-[linear-gradient(0deg,rgb(10_9_8/0.88)_0%,rgb(10_9_8/0.25)_62%,rgb(10_9_8/0.45)_100%)]"
-                  />
-                  {cover.tone && (
-                    <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
-                      {unc ? `${t.giving}: ${cover.tone}` : `${t.giving} ${cover.tone.toLowerCase()}`}
-                    </span>
-                  )}
-                  <span className={posterTitle}>{cover.title}</span>
-                  <span className="text-[15px] text-pretty text-dim">{cover.line}</span>
+                <span className="relative isolate flex aspect-[4/5] w-full flex-col justify-end p-5">
+                  {cover.still && <Still src={tmdbSize(cover.still, "w780")} alt="" className="absolute inset-0 -z-10 size-full" />}
+                  <span className="scrim-under flex flex-col gap-3.5 [--scrim-b:1.25rem] [--scrim-fade:4rem] [--scrim-x:1.25rem]">
+                    {cover.tone && (
+                      <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
+                        {unc ? `${t.giving}: ${cover.tone}` : `${t.giving} ${cover.tone.toLowerCase()}`}
+                      </span>
+                    )}
+                    <span className={posterTitle}>{cover.title}</span>
+                    <span className="text-[15px] text-pretty text-dim">{cover.line}</span>
+                  </span>
                 </span>
                 <span
                   aria-hidden

@@ -7,7 +7,7 @@ import {
   NUDGES,
   NUDGE_LABELS,
   audiencePhrase,
-  coverStill,
+  coverReference,
   excerpt,
   isIdentityTag,
   joinNames,
@@ -24,7 +24,7 @@ import { jumpOnClick } from "./jump";
 import { darkOf } from "./landing";
 import { useLingo } from "./lingo";
 import { QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
-import { TitleCardPicker } from "./title-card";
+import { TitleCardPicker, type CoverStill } from "./title-card";
 import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
@@ -143,49 +143,64 @@ function Also({ label, items, mock }: { label: string; items: CompactEntity[]; m
 function Cover({
   ref,
   t,
+  still,
   fontId,
   suggestion,
   onPickFont,
+  stills,
+  onPickStill,
 }: {
   ref?: Ref<HTMLElement>;
   t: Treatment;
+  /** The cover's still: the reference the director picked in the title-card window, or the writer's (coverReference). */
+  still?: CoverStill;
   fontId: string;
   suggestion: { id: string; why: string };
   onPickFont: (id: string) => void;
+  /** The references with a still, to choose among. */
+  stills: CoverStill[];
+  onPickStill: (id: string) => void;
 }) {
-  // A reference film's still, never its poster (or a mock placeholder): their own lettering would fight the title.
-  const still = coverStill(t);
   const who = treatmentWho(t);
   const subject = subjectPhrase(who.artists, who.films, t.brief.format);
   return (
     <header
       ref={ref}
       key={`${t.id}-${t.createdAt}`}
-      className="letterbox-open surface-dark grain relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10 print:min-h-[225mm]"
+      className="letterbox-open surface-dark relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10 print:min-h-[225mm]"
       style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
     >
+      {/* A reference film's still, never its poster (or a mock placeholder): their own lettering would fight the title. */}
       <div aria-hidden className="absolute inset-0 -z-10">
-        {still && <Still src={still} alt="" className="absolute inset-0 size-full opacity-50" />}
-        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgb(10_9_8/0.9)_0%,rgb(10_9_8/0.35)_55%,rgb(10_9_8/0.6)_100%)]" />
+        {still && <Still src={still.src} alt="" className="absolute inset-0 size-full" />}
       </div>
+      {/* The pills up top sit on the frame itself, so each brings its own dark: AA over a white frame. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-[19px] border border-edge px-3.5 py-2 text-[14px] text-dim">
+          <span className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim">
             {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
           </span>
           {who.standIns.length > 0 && (
             <span
               title={`Qloo doesn't have ${who.artists[0] ?? "the artist"}, so this audience stands in.`}
-              className="rounded-[19px] border border-edge px-3.5 py-2 text-[14px] text-dim"
+              className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim"
             >
               Audience read through {joinNames(who.standIns)}
             </span>
           )}
           {t.mock.qloo && <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>}
         </div>
-        <TitleCardPicker title={t.title} fontId={fontId} suggestion={suggestion} onPick={onPickFont} />
+        <TitleCardPicker
+          title={t.title}
+          fontId={fontId}
+          suggestion={suggestion}
+          onPick={onPickFont}
+          stills={stills}
+          stillId={still?.id}
+          onPickStill={onPickStill}
+        />
       </div>
-      <div className="flex flex-col gap-6">
+      <div className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]">
         <h1 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
           {t.title}
         </h1>
@@ -574,6 +589,11 @@ export function Board({
   // The suggestion follows each rework until the director picks a face themselves.
   const [picked, setPicked] = useState<string | null>(null);
   const fontId = picked ?? suggestion.id;
+  // The cover's still is the writer's pick until the director picks another; theirs holds across reworks while its film
+  // is still among the references.
+  const stills = t.references.flatMap((r): CoverStill[] => (r.still ? [{ id: r.entity.id, name: r.entity.name, src: r.still }] : []));
+  const [stillPick, setStillPick] = useState<string | null>(null);
+  const still = stills.find((s) => s.id === stillPick) ?? stills.find((s) => s.id === coverReference(t)?.entity.id);
   const stamp = dateStamp(t.createdAt);
   const cover = useRef<HTMLElement>(null);
   const article = useRef<HTMLElement>(null);
@@ -616,7 +636,16 @@ export function Board({
       )}
       {/* The cover and its tone line are the printed title page. */}
       <div className="flex flex-col gap-6 print:break-after-page">
-        <Cover ref={cover} t={t} fontId={fontId} suggestion={suggestion} onPickFont={setPicked} />
+        <Cover
+          ref={cover}
+          t={t}
+          still={still}
+          fontId={fontId}
+          suggestion={suggestion}
+          onPickFont={setPicked}
+          stills={stills}
+          onPickStill={setStillPick}
+        />
         <Giving t={t} mock={mock} whose={whose} />
         <Rework nudges={nudges} onToggle={onToggleNudge} running={running} take={take} note={reworkNote} save={save} />
       </div>

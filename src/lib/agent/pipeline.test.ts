@@ -13,7 +13,7 @@ import { clipSentences, closestTags, filmStills, parseTitle, runPipeline, type P
 import { describeBrief, planSchema } from "./plan";
 import { cachedTreatment, streamTreatment, type TreatmentService } from "./service";
 import type { AgentEvent, StepEvent } from "./types";
-import { refScrubber, writeSchema, type WriteContext } from "./write";
+import { normalizeDraft, refScrubber, writeSchema, type WriteContext } from "./write";
 
 const qloo = () => createQlooClient({ mode: "mock", baseUrl: "https://mock.qloo.invalid" });
 const mockLlm = (): LlmDeps => ({ mode: "mock", providers: [], budget: new DailyBudget(100), timeoutMs: 1000, cooldowns: new Cooldowns() });
@@ -90,6 +90,8 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     // Qloo evidence travels with each pick, separate from the LLM's notes.
     expect(t.references[0].qloo).toMatchObject({ tool: "reference_films", rank: expect.any(Number) });
     expect(t.references[0].notes.why).toBeTruthy();
+    // The template writer puts its first film on the cover.
+    expect(t.cover).toBe(t.references[0].entity.id);
     // Films and places ask for explainability, so each pick names the input that drove it. Films use the
     // entity signal only: on the live host, tag signals made that query run up to a minute and end in a 504.
     expect(t.references[0].qloo.because[0]?.name).toBe("Prateek Kuhad");
@@ -389,6 +391,32 @@ describe("runPipeline with a live provider", () => {
     expect(t.lighting).toEqual(["One tungsten fresnel through muslin — warm skin", "Practicals on dimmers."]);
   });
 
+  it("puts the cover on the cited film the writer chose, and on none it left uncited", async () => {
+    const choosing = (cover: (cited: { ref: string }[]) => string | null) =>
+      liveWith(scriptedProvider({ treatment: (mock) => ({ ...mock, cover: cover(mock.references as { ref: string }[]) }) }).provider);
+    const second = treatmentOf(
+      (
+        await run(
+          { artist: "Charli xcx", city: "New York" },
+          choosing((cited) => cited[1].ref),
+        )
+      ).outcome,
+    );
+    expect(second.cover).toBe(second.references[1].entity.id);
+    // The template cites the first four of more candidates, so R5 is a film Qloo returned that the board doesn't show.
+    expect(second.extras.references.length).toBeGreaterThan(0);
+    const uncited = treatmentOf(
+      (
+        await run(
+          { artist: "Charli xcx", city: "New York" },
+          choosing(() => "R5"),
+        )
+      ).outcome,
+    );
+    expect(uncited.llm.find((l) => l.step === "write")?.attempts[0].outcome).toBe("ok");
+    expect(uncited.cover).toBeUndefined();
+  });
+
   it("swaps refs the writer leaked into the prose for the names they stand for", async () => {
     const { provider } = scriptedProvider({
       treatment: (mock) => ({
@@ -611,6 +639,13 @@ describe("LLM schemas", () => {
     expect(strictModeViolations(toJsonSchema(writeSchema(ctx)))).toEqual([]);
   });
 
+  it("give a draft with films but no cover pick an empty one, rather than spend a repair call on it", () => {
+    expect(normalizeDraft({ title: "T", references: [] })).toEqual({ title: "T", references: [], cover: null });
+    expect(normalizeDraft({ references: [], cover: "R2" })).toEqual({ references: [], cover: "R2" });
+    // No films, no cover field: the schema has none to accept.
+    expect(normalizeDraft({ title: "T" })).toEqual({ title: "T" });
+  });
+
   it("only let the planner base the shoot in an area the heatmap returned", () => {
     const plan = {
       direction: "A quiet film about leaving.",
@@ -788,10 +823,16 @@ describe("identity tags, tag labels and stills", () => {
     expect(tagLabel("R&B")).toBe("R&B");
   });
 
-  it("sizes TMDB images and takes the cover's still from the first reference with one", () => {
+  it("sizes TMDB images and takes the cover's still from the writer's pick, else the first reference with one", () => {
     expect(tmdbSize("https://image.tmdb.org/t/p/w1280/a.jpg", "w780")).toBe("https://image.tmdb.org/t/p/w780/a.jpg");
-    expect(coverStill({ references: [{}, { still: "s2" }, { still: "s3" }] })).toBe("s2");
-    expect(coverStill({ references: [{}] })).toBeUndefined();
+    expect(tmdbSize("https://image.tmdb.org/t/p/w1280/a.jpg", "w300")).toBe("https://image.tmdb.org/t/p/w300/a.jpg");
+    const ref = (id: string, still?: string) => ({ entity: { id }, ...(still ? { still } : {}) });
+    const references = [ref("a"), ref("b", "s2"), ref("c", "s3")];
+    expect(coverStill({ references })).toBe("s2");
+    expect(coverStill({ cover: "c", references })).toBe("s3");
+    // A pick TMDB had no still for falls back like a treatment built before the writer picked.
+    expect(coverStill({ cover: "a", references })).toBe("s2");
+    expect(coverStill({ references: [ref("a")] })).toBeUndefined();
   });
 
   it("gets stills for the films TMDB knows, and goes without on its failures", async () => {

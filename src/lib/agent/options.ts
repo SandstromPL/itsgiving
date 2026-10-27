@@ -61,16 +61,24 @@ export function isIdentityTag(name: string): boolean {
 }
 
 /** A TMDB image at another of its sizes: covers take w1280, cards w780. */
-export function tmdbSize(url: string, size: "w780" | "w1280"): string {
+export function tmdbSize(url: string, size: "w300" | "w780" | "w1280"): string {
   return url.replace(/(image\.tmdb\.org\/t\/p\/)w\d+\//, `$1${size}/`);
 }
 
 /**
- * A treatment's cover still: the first reference film's still (TMDB's backdrop). Never a poster, whose own lettering
- * fights the title; with no still the cover is the palette alone.
+ * The reference film whose still (TMDB's backdrop) is a treatment's cover: the one the writer chose for it, else the
+ * first with a still (treatments built before the writer chose). Never a poster, whose own lettering fights the title;
+ * with no still the cover is the palette alone.
  */
-export function coverStill(t: { references: { still?: string }[] }): string | undefined {
-  return t.references.find((r) => r.still)?.still;
+export function coverReference<R extends { entity: { id: string }; still?: string }>(t: {
+  cover?: string;
+  references: R[];
+}): R | undefined {
+  return t.references.find((r) => r.still && r.entity.id === t.cover) ?? t.references.find((r) => r.still);
+}
+
+export function coverStill(t: { cover?: string; references: { entity: { id: string }; still?: string }[] }): string | undefined {
+  return coverReference(t)?.still;
 }
 
 const SMALL_WORDS = new Set(["a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"]);

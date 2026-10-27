@@ -941,6 +941,9 @@ function assemble(input: AssembleInput): Treatment {
     const still = input.stills.get(r.entity.id);
     return still ? { ...r, still } : r;
   });
+  // The writer's cover counts only among the films it cited: the cover is always one of the board's references.
+  const coverPick = ctx.references.find((r) => r.ref === draft.cover)?.item.id;
+  const cover = references.some((r) => r.entity.id === coverPick) ? coverPick : undefined;
   const wardrobe = cite(ctx.brands, run.brands.items, "styling_brands", draft.wardrobe, ["look"], 4);
   const locations = cite(ctx.places, run.places.items, "scout_locations", draft.locations, ["scene"], 4);
   const cited = new Set([...references, ...wardrobe, ...locations].map((p) => p.entity.id));
@@ -976,6 +979,7 @@ function assemble(input: AssembleInput): Treatment {
       };
     }),
     references,
+    cover,
     wardrobe,
     locations,
     base: run.base ? { chosen: run.base.area.ref, held: run.base.held, areas: input.areas, map: input.heatMap } : undefined,
