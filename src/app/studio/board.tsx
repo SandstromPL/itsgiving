@@ -9,12 +9,13 @@ import {
   audiencePhrase,
   coverReference,
   excerpt,
-  isIdentityTag,
   joinNames,
-  subjectPhrase,
   tagLabel,
   tmdbSize,
+  treatmentSubject,
   treatmentWho,
+  withYear,
+  withoutIdentity,
   type Nudge,
 } from "@/lib/agent/options";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
@@ -25,7 +26,7 @@ import { useCopied } from "./clipboard";
 import { EraLayer, useEra } from "./era-layer";
 import { jumpOnClick } from "./jump";
 import { landCover } from "./morph";
-import { darkOf } from "./landing";
+import { darkOf } from "./color";
 import { useLingo } from "./lingo";
 import { QlooTags, Still, Tape, Why, modelName } from "./parts";
 import { TitleCardPicker, type CoverStill, type EraPick } from "./title-card";
@@ -110,7 +111,7 @@ function Section({
 }
 
 function names(entities: CompactEntity[]): string {
-  return entities.map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`).join(", ");
+  return entities.map((e) => withYear(e.name, e.year)).join(", ");
 }
 
 /** Qloo evidence set in prose: mono, tungsten for Qloo, tape pink for the synthetic mock standing in for it. */
@@ -176,7 +177,7 @@ function Cover({
     if (morph) landCover(morph, stillLayer.current?.parentElement ?? null, stillLayer.current);
   }, [morph]);
   const who = treatmentWho(t);
-  const subject = subjectPhrase(who.artists, who.films, t.brief.format);
+  const subject = treatmentSubject(t);
   return (
     <header
       ref={ref}
@@ -309,7 +310,7 @@ function PaletteSwatches({ palette }: { palette: Treatment["palette"] }) {
 }
 
 /** The treatment's tone tags, without any that name who people are (isIdentityTag): older builds can carry them. */
-const toneOf = (t: Treatment) => t.tone.filter((tone) => !isIdentityTag(tone.tag.name));
+const toneOf = (t: Treatment) => withoutIdentity(t.tone, (tone) => tone.tag.name);
 
 /**
  * "it's giving": the tone tags Qloo found, with the ones the director's own films share highlighted. `whose` says
@@ -756,8 +757,8 @@ export function Board({
   const referenceGrid = fill(t.references.length, "first");
   const beatGrid = fill(t.beats.length, "last");
   const placeGrid = fill(t.locations.length, "first");
-  const overlap = t.audience.overlap.filter((tag) => !isIdentityTag(tag.name));
-  const tasteTags = t.audience.taste_tags.filter((tag) => !isIdentityTag(tag.name));
+  const overlap = withoutIdentity(t.audience.overlap);
+  const tasteTags = withoutIdentity(t.audience.taste_tags);
   const [reading, setReading] = useState(0);
   const placeCards = useRef<(HTMLLIElement | null)[]>([]);
   useEffect(() => {

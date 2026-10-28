@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { WEEKDAYS, compactEntity, entityList, entityUrn, type QlooParams } from "../qloo";
 import { mockEntityId } from "../qloo/mock/catalog";
+import { withYear } from "../text";
 import { VENUE_KIND_VALUES, defineTool, entityIds, plural, tagIds, take, venueTagIds } from "./shared";
 
 // The tools that fill a treatment: reference films, wardrobe and locations.
@@ -73,7 +74,7 @@ export const referenceFilms = defineTool({
         references.length > 0
           ? `${plural(references.length, "reference")}: ${references
               .slice(0, 5)
-              .map((r) => `${r.name}${r.year ? ` (${r.year})` : ""}`)
+              .map((r) => withYear(r.name, r.year))
               .join(", ")}.`
           : "No references matched; widen the era or raise max_popularity.",
       data: { references },

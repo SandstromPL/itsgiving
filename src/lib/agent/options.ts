@@ -1,8 +1,9 @@
 // Brief options shared by the server and the browser (no Node imports here).
 
+import { withYear } from "../text";
 import type { StepId, TreatmentWho } from "./types";
 
-export { excerpt, isIdentityTag } from "../text";
+export { excerpt, isIdentityTag, withYear, withoutIdentity } from "../text";
 
 /** Iterate chips: each one re-runs plan and write with a nudge. */
 export const NUDGES = ["darker", "more_90s", "deeper_cuts", "cheaper_locations"] as const;
@@ -40,6 +41,9 @@ export const IMPORT_LIMIT = 25;
 
 /** Artists that can stand in for one Qloo doesn't have. */
 export const STAND_IN_LIMIT = 3;
+
+/** The brief's other limits, shared by the server's schema (brief.ts) and the form, so the form catches what the server would refuse. */
+export const BRIEF_LIMITS = { touchstones: 5, directorFilms: 8, name: 80 } as const;
 
 /** The answer to "which one did you mean?" when it is none of Qloo's candidates. */
 export const NONE_PICK = "none";
@@ -107,6 +111,12 @@ export function treatmentWho(t: { who?: TreatmentWho; subjects: { name: string; 
   );
 }
 
+/** A treatment's subject line from the names it kept: "for Prateek Kuhad", or "after Past Lives, for fans of …". */
+export function treatmentSubject(t: Parameters<typeof treatmentWho>[0] & { brief: { format: Format } }): string {
+  const who = treatmentWho(t);
+  return subjectPhrase(who.artists, who.films, t.brief.format);
+}
+
 /** Qloo files some musicians only as people (Raftaar, 2026-10-26); either way, their fans are an audience. */
 const isMusician = (kind?: string) => kind === "artist" || kind === "person";
 
@@ -116,7 +126,7 @@ const isMusician = (kind?: string) => kind === "artist" || kind === "person";
  */
 export function audiencePhrase(subjects: { name: string; kind?: string; year?: number }[]): string {
   const artists = subjects.filter((s) => isMusician(s.kind)).map((s) => s.name);
-  const others = subjects.filter((s) => !isMusician(s.kind)).map((s) => (s.year ? `${s.name} (${s.year})` : s.name));
+  const others = subjects.filter((s) => !isMusician(s.kind)).map((s) => withYear(s.name, s.year));
   if (artists.length === 1 && others.length === 0) return `${artists[0]}'s audience`;
   const who = [...artists, ...others];
   return who.length > 0 ? `the audience for ${joinNames(who)}` : "this audience";

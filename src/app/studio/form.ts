@@ -1,5 +1,5 @@
 import type { BriefInput } from "@/lib/agent/brief";
-import { STAND_IN_LIMIT, type Budget, type Format, type Nudge, type Thinking } from "@/lib/agent/options";
+import { BRIEF_LIMITS, STAND_IN_LIMIT, joinNames, type Budget, type Format, type Nudge, type Thinking } from "@/lib/agent/options";
 import type { ImportedFilm } from "@/lib/agent/taste";
 
 // The brief form's state and the conversions between it and a brief. Kept apart from the component so
@@ -34,8 +34,8 @@ export const EMPTY_FORM: FormState = {
   thinking: "deep",
 };
 
-/** The server's limits (src/lib/agent/brief.ts), checked here so nothing is dropped or rejected silently. */
-export const LIMITS = { touchstones: 5, standIns: STAND_IN_LIMIT, directorFilms: 8, name: 80 } as const;
+/** The server's limits (the same constants src/lib/agent/brief.ts checks), so nothing is dropped or rejected silently. */
+export const LIMITS = { ...BRIEF_LIMITS, standIns: STAND_IN_LIMIT } as const;
 
 /** One title per line (or separated by semicolons); commas stay, since titles like "Paris, Texas" have them. */
 export function splitTitles(text: string): string[] {
@@ -75,7 +75,7 @@ export function briefLine(form: FormState): string {
   const where = form.city.trim() || "your city";
   return form.format === "music_video"
     ? `Music video${who ? ` for ${who}` : ""}, ${where}`
-    : `Short film${after.length > 0 ? ` after ${after.join(" and ")}` : ""}, ${where}`;
+    : `Short film${after.length > 0 ? ` after ${joinNames(after)}` : ""}, ${where}`;
 }
 
 /** An example brief as a chip: "Frank Ocean, New York" or "After In the Mood for Love, Mumbai". */

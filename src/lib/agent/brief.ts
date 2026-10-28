@@ -1,25 +1,36 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { normalizeName } from "../tools/shared";
-import { BUDGETS, FORMATS, IMPORT_LIMIT, NUDGES, STAND_IN_LIMIT, THINKING, type Budget, type Format, type Thinking } from "./options";
+import {
+  BRIEF_LIMITS,
+  BUDGETS,
+  FORMATS,
+  IMPORT_LIMIT,
+  NUDGES,
+  STAND_IN_LIMIT,
+  THINKING,
+  type Budget,
+  type Format,
+  type Thinking,
+} from "./options";
 
 export { BUDGETS, NUDGES, THINKING, type Budget, type Nudge, type Thinking } from "./options";
 
 // No control characters: names go into LLM prompts, and a line break could forge a prompt section.
 const noControl = (value: string) => !/\p{Cc}/u.test(value);
 const CONTROL_MESSAGE = "Remove line breaks and control characters.";
-const name = z.string().trim().min(1).max(80).refine(noControl, CONTROL_MESSAGE);
+const name = z.string().trim().min(1).max(BRIEF_LIMITS.name).refine(noControl, CONTROL_MESSAGE);
 
 export const briefSchema = z
   .strictObject({
     format: z.enum(Object.keys(FORMATS) as [Format, ...Format[]]).default("music_video"),
-    artist: z.string().trim().max(80).refine(noControl, CONTROL_MESSAGE).optional(),
+    artist: z.string().trim().max(BRIEF_LIMITS.name).refine(noControl, CONTROL_MESSAGE).optional(),
     /** Artists with a similar audience, read in the artist's place when Qloo doesn't have them (music videos only). */
     stand_ins: z.array(name).max(STAND_IN_LIMIT).default([]),
-    touchstones: z.array(name).max(5).default([]),
+    touchstones: z.array(name).max(BRIEF_LIMITS.touchstones).default([]),
     city: name,
     budget: z.enum(Object.keys(BUDGETS) as [Budget, ...Budget[]]).default("indie"),
-    director_films: z.array(name).max(8).default([]),
+    director_films: z.array(name).max(BRIEF_LIMITS.directorFilms).default([]),
     /** The director's taste imported from a TMDB list or IMDb links (src/lib/agent/taste.ts), looked up by IMDb ID. */
     director_imdb_ids: z
       .array(z.string().regex(/^tt\d{7,10}$/, "IMDb IDs look like tt0118694."))

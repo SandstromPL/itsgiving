@@ -1,18 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useId, type MouseEvent } from "react";
+import { useId } from "react";
+import { TMDB_NOTICE } from "@/lib/agent/options";
+import { accountsOn } from "@/lib/supabase/config";
 import { Mark } from "./eggs";
-import { jumpOnClick, onScreen } from "./jump";
 import { useLingo } from "./lingo";
+import { NAV, toExamples } from "./nav";
 
-/** The site's pages, in the header's order, then the saved list that otherwise sits in the account menu. */
-const PAGES = [
-  { href: "/#now-showing", label: "Examples" },
-  { href: "/studio", label: "Studio" },
-  { href: "/about", label: "About" },
-  { href: "/saved", label: "Saved treatments" },
-] as const;
+/** The header's sections, then the saved list that otherwise sits in the account menu (only when accounts are on). */
+const PAGES = [...NAV, ...(accountsOn ? [{ id: "saved", href: "/saved", label: "Saved treatments" }] : [])];
 
 /**
  * A link in a list: no underline at rest, since the list says what it is; on hover or focus one sweeps in from the
@@ -36,10 +33,6 @@ const inline = "underline decoration-line underline-offset-4 transition-colors h
 export function SiteFooter() {
   const { t } = useLingo();
   const pages = useId();
-  // On the homepage the strip is on this page, and Next does nothing for a link to the address it's already on.
-  const toExamples = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (location.pathname === "/") jumpOnClick(event, onScreen("now-showing"));
-  };
   return (
     <footer className="mx-auto w-full max-w-[80rem] px-4 pb-10 sm:px-8 print:hidden">
       <div className="grid gap-x-8 gap-y-8 border-t border-line pt-10 sm:grid-cols-2 sm:gap-y-10 lg:grid-cols-12">
@@ -62,7 +55,7 @@ export function SiteFooter() {
           <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[15px] text-dim sm:flex sm:flex-col">
             {PAGES.map((page) => (
               <li key={page.href}>
-                <Link href={page.href} onClick={page.href === "/#now-showing" ? toExamples : undefined} className={sweep}>
+                <Link href={page.href} onClick={page.id === "examples" ? toExamples : undefined} className={sweep}>
                   {page.label}
                 </Link>
               </li>
@@ -99,9 +92,7 @@ export function SiteFooter() {
             <dt className="text-right text-[14px] text-faint">Writing</dt>
             <dd className="text-[15px] font-semibold">DeepSeek, Gemini or Groq</dd>
           </dl>
-          <p className="mt-4 max-w-[46ch] text-[13px] leading-5 text-faint">
-            This product uses the TMDB API but is not endorsed or certified by TMDB.
-          </p>
+          <p className="mt-4 max-w-[46ch] text-[13px] leading-5 text-faint">{TMDB_NOTICE}</p>
         </div>
       </div>
 

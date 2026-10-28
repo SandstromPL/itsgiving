@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FORM, addFilm, exampleChip, formFromBrief, looksLikeImport, removeFilm, toBrief, validateForm } from "./form";
+import { EMPTY_FORM, addFilm, briefLine, exampleChip, formFromBrief, looksLikeImport, removeFilm, toBrief, validateForm } from "./form";
 
 describe("the brief by format", () => {
   const inMumbai = { ...EMPTY_FORM, city: "Mumbai" };
@@ -9,6 +9,15 @@ describe("the brief by format", () => {
     expect(validateForm({ ...inMumbai, format: "short_film", artist: "Prateek Kuhad" })).toMatchObject({ field: "touchstones" });
     expect(validateForm({ ...inMumbai, format: "short_film", touchstones: "Past Lives" })).toBeNull();
     expect(validateForm({ ...inMumbai, artist: "Chaar Diwaari", standIns: "A\nB\nC\nD" })).toMatchObject({ field: "standIns" });
+  });
+
+  it("names a short film's films the way a sentence lists them", () => {
+    const short = { ...inMumbai, format: "short_film" as const };
+    expect(briefLine({ ...short, touchstones: "Past Lives" })).toBe("Short film after Past Lives, Mumbai");
+    expect(briefLine({ ...short, touchstones: "Past Lives\nAftersun\nCourt" })).toBe(
+      "Short film after Past Lives, Aftersun and Court, Mumbai",
+    );
+    expect(briefLine({ ...inMumbai, artist: "Prateek Kuhad" })).toBe("Music video for Prateek Kuhad, Mumbai");
   });
 
   it("sends stand-ins only for a music video's artist, and fills them back in", () => {

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Treatment } from "@/lib/agent/types";
-import { isIdentityTag } from "@/lib/text";
+import { withoutIdentity } from "@/lib/text";
 import type { RankedTag } from "@/lib/tools/taste";
 
 // Era looks for a treatment's cover: one film tradition's craft worn over the house look, never in place of it (see
@@ -169,8 +169,7 @@ export interface EraSuggestion {
  * are never suggests one, even if it were listed.
  */
 export function suggestEraFrom(subgenres: RankedTag[] | undefined, mock: boolean): EraSuggestion | undefined {
-  for (const tag of subgenres ?? []) {
-    if (isIdentityTag(tag.name)) continue;
+  for (const tag of withoutIdentity(subgenres ?? [])) {
     const era = ERAS.find((e) => e.tags.includes(tag.id));
     if (!era) continue;
     const affinity = typeof tag.affinity === "number" ? ` (affinity ${tag.affinity.toFixed(3)})` : "";

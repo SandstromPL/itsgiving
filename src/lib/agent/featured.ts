@@ -5,7 +5,7 @@ import { qlooConfigFromEnv } from "../qloo";
 import { distanceM } from "../tools/heatmap";
 import { briefKey, briefSchema, normalizeBrief } from "./brief";
 import { EXAMPLES } from "./examples";
-import { FORMATS, audiencePhrase, coverReference, isIdentityTag, subjectPhrase, tagLabel, treatmentWho } from "./options";
+import { FORMATS, audiencePhrase, coverReference, tagLabel, treatmentSubject, withYear, withoutIdentity } from "./options";
 import type { QlooEvidence, ShootBase, Treatment } from "./types";
 
 // Featured treatments: the examples pre-built by `npm run featured` (scripts/featured.ts), so judges and
@@ -67,7 +67,12 @@ export function loadFeatured(file = FEATURED_FILE): FeaturedItem[] {
       memo = { file, mtimeMs, items: Array.isArray(parsed.items) ? parsed.items.filter(isItem) : [] };
     }
     return memo.items;
-  } catch {
+  } catch (error) {
+    // No file is the normal state of a server without keys. Anything else (a file the prebuild left broken, say) would
+    // otherwise look the same on the page, so it gets a log line.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(JSON.stringify({ evt: "featured_unreadable", file, why: String((error as Error).message ?? error).slice(0, 200) }));
+    }
     return [];
   }
 }
@@ -79,11 +84,11 @@ export function featuredCovers(items: FeaturedItem[] = loadFeatured()): Featured
       slug,
       title: t.title,
       logline: t.logline,
-      line: `${FORMATS[t.brief.format]} ${subjectPhrase(treatmentWho(t).artists, treatmentWho(t).films, t.brief.format)} / ${t.brief.city}`,
+      line: `${FORMATS[t.brief.format]} ${treatmentSubject(t)} / ${t.brief.city}`,
       palette: t.palette.map((c) => c.hex),
       still: cover?.still,
       evidence: cover && { name: cover.entity.name, qloo: cover.qloo, mock: t.mock.qloo },
-      tone: t.tone.find((tone) => !isIdentityTag(tone.tag.name))?.tag.name,
+      tone: withoutIdentity(t.tone, (tone) => tone.tag.name)[0]?.tag.name,
     };
   });
 }
@@ -143,7 +148,7 @@ export function featuredRun(items: FeaturedItem[] = loadFeatured()): FeaturedRun
     receipts.push({ kind, name, rank: qloo.rank, of: qloo.of, affinity: qloo.affinity ?? undefined, km });
   const first = <T extends { qloo: { rank: number } }>(list: T[]) => [...list].sort((a, b) => a.qloo.rank - b.qloo.rank)[0];
   const film = first(t.references);
-  if (film) add("film", `${film.entity.name}${film.entity.year ? ` (${film.entity.year})` : ""}`, film.qloo);
+  if (film) add("film", withYear(film.entity.name, film.entity.year), film.qloo);
   const brand = first(t.wardrobe);
   if (brand) add("brand", brand.entity.name, brand.qloo);
   const place = first(t.locations);
@@ -156,12 +161,11 @@ export function featuredRun(items: FeaturedItem[] = loadFeatured()): FeaturedRun
 
   return {
     slug: item.slug,
-    subject: subjectPhrase(treatmentWho(t).artists, treatmentWho(t).films, t.brief.format).replace(/^(for|after) /, ""),
+    subject: treatmentSubject(t).replace(/^(for|after) /, ""),
     audience: audiencePhrase(t.subjects),
     city: t.brief.city,
     mock: t.mock.qloo,
-    tones: t.tone
-      .filter((tone) => !isIdentityTag(tone.tag.name))
+    tones: withoutIdentity(t.tone, (tone) => tone.tag.name)
       .slice(0, 5)
       .map((tone) => ({ name: tagLabel(tone.tag.name), shared: tone.source === "overlap" })),
     leans: t.audience.leans[0],

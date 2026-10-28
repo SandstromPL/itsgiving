@@ -4,18 +4,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AccountButton } from "./account";
 import { Wordmark } from "./eggs";
-import { jumpOnClick, onScreen } from "./jump";
 import { UncSwitch } from "./lingo";
+import { NAV, toExamples, type Section } from "./nav";
 import { ThemeSwitch } from "./theme";
 
-/** The site's sections, the same in every header. The examples live on the homepage; a featured treatment is one. */
-const NAV = [
-  { id: "examples", href: "/#now-showing", label: "Examples" },
-  { id: "studio", href: "/studio", label: "Studio" },
-  { id: "about", href: "/about", label: "About" },
-] as const;
-
-export type Section = (typeof NAV)[number]["id"];
+export type { Section } from "./nav";
 
 /**
  * The header on every page: the wordmark, the same three links with the current section lit, the plain-copy switch
@@ -55,9 +48,7 @@ export function SiteHeader({
               <Link
                 key={item.id}
                 href={item.href}
-                // On the homepage the strip is on this page: Next does nothing for a link to the address it's already
-                // on, so the link jumps there itself, every time.
-                onClick={home && item.id === "examples" ? (event) => jumpOnClick(event, onScreen("now-showing")) : undefined}
+                onClick={item.id === "examples" ? toExamples : undefined}
                 // The examples link points at the homepage's strip, so on a featured treatment it's the current
                 // section rather than the current page.
                 aria-current={here ? (item.id === "examples" ? "true" : "page") : undefined}

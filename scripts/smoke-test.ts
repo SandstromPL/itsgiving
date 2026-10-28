@@ -27,6 +27,7 @@ import {
   type QlooResult,
 } from "../src/lib/qloo";
 import { venueTagIds } from "../src/lib/tools/shared";
+import { withYear } from "../src/lib/text";
 
 type Verdict = "PASS" | "WARN" | "FAIL" | "INFO";
 interface Check {
@@ -106,7 +107,7 @@ function names(entities: CompactEntity[], max = 6): string {
   return (
     entities
       .slice(0, max)
-      .map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`)
+      .map((e) => withYear(e.name, e.year))
       .join(", ") || "none"
   );
 }

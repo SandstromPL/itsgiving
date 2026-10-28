@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { featuredCovers, loadFeatured, type FeaturedCover } from "@/lib/agent/featured";
 import { llmConfigFromEnv } from "@/lib/llm/config";
 import { qlooConfigFromEnv } from "@/lib/qloo";
+import { darkHex } from "./studio/color";
 import { CameraMark } from "./studio/mark";
 
 // The card a shared link shows: the promise, and the featured treatments as posters when the server has them.
@@ -15,29 +16,6 @@ const INK = "#121211";
 const ACCENT = "#e4ff3a";
 const HEADLINE = ["your voice,", "their taste."];
 const STICKER = "for music-video and short-film directors";
-
-/** `a` mixed into `b` by `share`, as hex: the image renderer has no color-mix(). */
-function mix(a: string, b: string, share: number): string {
-  const rgb = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
-  const [x, y] = [rgb(a), rgb(b)];
-  return `#${x
-    .map((v, i) =>
-      Math.round(v * share + y[i] * (1 - share))
-        .toString(16)
-        .padStart(2, "0"),
-    )
-    .join("")}`;
-}
-
-/** The poster's colour, as on the homepage's posters: the palette's darkest, mixed toward ink. */
-function posterColour(palette: string[]): string {
-  const luminance = (hex: string) => {
-    const n = Number.parseInt(hex.slice(1, 7), 16);
-    return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
-  };
-  const darkest = [...palette].filter((hex) => /^#[0-9a-f]{6}$/i.test(hex)).sort((a, b) => luminance(a) - luminance(b))[0];
-  return darkest ? mix(darkest, INK, 0.55) : "#2a2926";
-}
 
 /**
  * Bricolage Grotesque at 800, cut to the characters the card uses. The renderer can't read WOFF2, and Google Fonts
@@ -80,7 +58,7 @@ function Poster({ cover, i }: { cover: FeaturedCover; i: number }) {
         justifyContent: "flex-end",
         borderRadius: 22,
         overflow: "hidden",
-        background: posterColour(cover.palette),
+        background: darkHex(cover.palette),
         transform: `rotate(${TILT[i]}deg)`,
         boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
       }}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { STEP_LABELS } from "@/lib/agent/options";
 import { accountsOn } from "@/lib/supabase/config";
 import { StartYourOwn } from "../studio/landing";
 import { SiteHeader } from "../studio/site-header";
@@ -63,27 +64,27 @@ const QLOO = [
 /** The run, in order. Qloo's steps show their calls on a receipt slip; the model's two steps speak in its serif. */
 const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] = [
   {
-    title: "Find the names in Qloo",
+    title: STEP_LABELS.resolve,
     text: "The artist, the films and the shoot city become Qloo entries. A name that could mean two titles is asked about, never guessed. Musicians Qloo files under people are found there, and an artist it doesn't have can be read through stand-in artists with a similar audience.",
     qloo: ["/search", "/entities"],
   },
   {
-    title: "Read the audience",
-    text: "What the fans over-index on, in Qloo's own words (moods, genres, styles), and the age and gender they lean to.",
-    qloo: ["/v2/insights, taste tags", "/v2/insights, demographics"],
+    title: STEP_LABELS.audience,
+    text: "What the fans over-index on, in Qloo's own words (moods, genres, styles), the age and gender they lean to, and the film subgenres they love, which suggest an era look for the cover.",
+    qloo: ["/v2/insights, taste tags", "/v2/insights, demographics", "/v2/insights, film subgenres"],
   },
   {
-    title: "Compare with your taste",
+    title: STEP_LABELS.overlap,
     text: "Add the films you love and Qloo compares them with the audience. What you share becomes the spine of the treatment: your voice, their taste.",
     qloo: ["/v2/analysis/compare"],
   },
   {
-    title: "Map where the fans are",
+    title: STEP_LABELS.heatmap,
     text: "Qloo's heatmap scores the shoot city tile by tile for this audience, and itsgiving names the three strongest areas.",
     qloo: ["/v2/insights, heatmap", "/search, areas nearby"],
   },
   {
-    title: "Plan the creative direction",
+    title: STEP_LABELS.plan,
     text: "A model picks the direction: the tone from Qloo's tags, a few style words, and which area to base the shoot in. It can only choose what Qloo returned.",
     model: "The model chooses, from Qloo's list.",
   },
@@ -93,7 +94,7 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
     qloo: ["/v2/tags, style words", "/v2/insights, films", "/v2/insights, brands", "/v2/insights, places"],
   },
   {
-    title: "Write the treatment",
+    title: STEP_LABELS.write,
     text: "The model writes the treatment and may cite only what Qloo returned. Every film, brand and place keeps its receipt: its rank for this audience, and its affinity.",
     model: "The model writes, citing only Qloo's picks.",
   },

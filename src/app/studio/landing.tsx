@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, type ReactNode } from "react";
 import type { FeaturedCover, FeaturedRun } from "@/lib/agent/featured";
-import { tmdbSize } from "@/lib/agent/options";
+import { STEP_LABELS, tmdbSize } from "@/lib/agent/options";
 import { ShootBaseBlock } from "./base-map";
+import { darkOf } from "./color";
 import { briefLine, splitTitles, type FormState } from "./form";
 import { useLingo } from "./lingo";
 import { morphToCover } from "./morph";
@@ -14,16 +15,6 @@ import { suggestTitleFontFrom, titleFont, titleStyle } from "./title-fonts";
 
 // The homepage, the pitch: what itsgiving is, finished treatments to open, and one real run explained. No form here;
 // the tool has its own page (/studio), and every featured treatment has its own (/t/<slug>).
-
-/** The darkest of a palette, mixed toward ink so white type always holds on it. */
-export function darkOf(palette: string[]): string {
-  const luminance = (hex: string) => {
-    const n = Number.parseInt(hex.replace("#", "").padEnd(6, "0").slice(0, 6), 16);
-    return 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
-  };
-  const darkest = [...palette].sort((a, b) => luminance(a) - luminance(b))[0] ?? "#121211";
-  return `color-mix(in srgb, ${darkest} 55%, #121211)`;
-}
 
 export const primaryButton =
   "press inline-flex min-h-14 items-center justify-center rounded-full bg-foreground px-7 text-[17px] font-bold text-background hover:opacity-90";
@@ -186,9 +177,10 @@ function PosterCard({ cover }: { cover: FeaturedCover }) {
   );
 }
 
-export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
+/** `live`: the server has its keys, so no covers means the build made none, not that it couldn't. */
+export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; live?: boolean }) {
   const { t, unc } = useLingo();
-  // Without featured treatments (a server without keys), the header's Examples link still needs somewhere to land.
+  // Without featured treatments, the header's Examples link still needs somewhere to land, and the page says why.
   if (covers.length === 0) {
     return (
       <section id="now-showing" aria-labelledby="featured-heading" className="mx-auto w-full max-w-[80rem] px-4 py-12 sm:px-8">
@@ -197,8 +189,9 @@ export function NowShowing({ covers }: { covers: FeaturedCover[] }) {
             {t.nowShowing}
           </h2>
           <p className="max-w-[60ch] text-[1.05rem] leading-[1.55] text-dim">
-            Featured treatments are built from live Qloo data when the site is deployed with its keys, and this server has none. The studio
-            still builds treatments.
+            {live
+              ? "Featured treatments are built from live Qloo data when the site is deployed, and this deploy hasn't built them yet. The studio still builds treatments."
+              : "Featured treatments are built from live Qloo data when the site is deployed with its keys, and this server has none. The studio still builds treatments."}
           </p>
         </div>
       </section>
@@ -292,7 +285,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
   const evidence = run.mock ? "text-tape" : "text-tungsten";
   const steps: { title: string; text: string; show: ReactNode }[] = [
     {
-      title: "Read the audience",
+      title: STEP_LABELS.audience,
       text: `Qloo reads what ${run.subject}'s audience over-indexes on: moods, genres, and the age and gender it leans to. It describes a group, never one person.`,
       show: (
         <div className="flex flex-col gap-3.5 rounded-[26px] border border-line bg-card p-6">
@@ -316,7 +309,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
       ),
     },
     {
-      title: "Map where the fans are",
+      title: STEP_LABELS.heatmap,
       text: `A heatmap of ${run.city} shows where those fans cluster. The strongest area becomes the shoot base, so the locations stay close together and the crew moves less.`,
       show: <ShootBaseBlock base={run.base} city={run.city} audience={run.audience} mock={run.mock} compact />,
     },
@@ -347,7 +340,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
       ),
     },
     {
-      title: "Write the treatment",
+      title: STEP_LABELS.write,
       text: `${run.writtenBy} writes the treatment around that evidence: ${run.qlooCalls} Qloo calls and ${run.modelCalls} model calls.`,
       show: (
         <Link href={`/t/${run.slug}`} className="surface-dark grain flex flex-col gap-4 rounded-[26px] bg-background p-6 sm:p-8">
@@ -390,8 +383,8 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
 }
 
 const STEPS = [
-  ["Read the audience", "Qloo shows what the audience of an artist or a film over-indexes on, and where it meets your own taste."],
-  ["Map where the fans are", "A heatmap of the city picks the neighbourhood to base the shoot in."],
+  [STEP_LABELS.audience, "Qloo shows what the audience of an artist or a film over-indexes on, and where it meets your own taste."],
+  [STEP_LABELS.heatmap, "A heatmap of the city picks the neighbourhood to base the shoot in."],
   ["Plan and write", "The model turns that evidence into a concept, beats, wardrobe and locations."],
   ["Bring receipts", "Every film, brand and place shows why Qloo picked it, kept apart from the writing."],
 ] as const;

@@ -329,7 +329,7 @@ export function RunStage({
         </div>
       </div>
       {/* One cell per pipeline step, like frames on a strip: a sequence, so it reads left to right. */}
-      <ol aria-hidden className="grid grid-cols-11 gap-1">
+      <ol aria-hidden className="grid gap-1" style={{ gridTemplateColumns: `repeat(${STEP_ORDER.length}, minmax(0, 1fr))` }}>
         {STEP_ORDER.map((id) => (
           <li key={id} title={STEP_LABELS[id]} className={`h-1.5 rounded-full ${STRIP_TONE[status(id)]}`} />
         ))}

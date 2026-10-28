@@ -7,7 +7,7 @@ import { VENUE_KIND_VALUES, normalizeName } from "../tools/shared";
 import type { RankedTag } from "../tools/taste";
 import type { ToolResult } from "../tools/types";
 import { pickKey, priceLevelMax, type Brief } from "./brief";
-import { NONE_PICK, STAND_IN_LIMIT, STEP_LABELS, isIdentityTag, joinNames, type Thinking } from "./options";
+import { NONE_PICK, STAND_IN_LIMIT, STEP_LABELS, joinNames, withYear, withoutIdentity, type Thinking } from "./options";
 import {
   DEEP_CUT_CEILING,
   SYSTEM_PROMPT,
@@ -148,7 +148,7 @@ function uniqueBy<T>(items: T[], key: (item: T) => string): T[] {
 }
 
 function names(entities: CompactEntity[]): string[] {
-  return entities.map((e) => `${e.name}${e.year ? ` (${e.year})` : ""}`);
+  return entities.map((e) => withYear(e.name, e.year));
 }
 
 /** How many names a credit carries: the run stage sets the newest credit large, so a few say it. */
@@ -212,7 +212,7 @@ export async function filmStills(films: CompactEntity[], tmdb: TmdbClient | unde
  * whose name contains the word (or vice versa), and fall back to the top hit.
  */
 export function closestTags(word: string, tags: CompactTag[], max = 2): CompactTag[] {
-  const safe = tags.filter((t) => t.id.startsWith("urn:tag:") && !UNSAFE_TAG.test(`${t.id} ${t.name}`) && !isIdentityTag(t.name));
+  const safe = withoutIdentity(tags.filter((t) => t.id.startsWith("urn:tag:") && !UNSAFE_TAG.test(`${t.id} ${t.name}`)));
   const wanted = normalizeName(word);
   const close = safe.filter((t) => {
     const name = normalizeName(t.name);
@@ -370,7 +370,7 @@ export async function runPipeline(
       if (resolution.among) {
         const m = resolution.match;
         notes.push(
-          `"${spec.input}" matched ${resolution.among} titles in Qloo; itsgiving used the far better-known ${m.name}${m.year ? ` (${m.year})` : ""}.`,
+          `"${spec.input}" matched ${resolution.among} titles in Qloo; itsgiving used the far better-known ${withYear(m.name, m.year)}.`,
         );
       }
       if (resolution.note) notes.push(resolution.note);
@@ -525,8 +525,8 @@ export async function runPipeline(
   if (heat.status === "error") notes.push(`The heatmap failed (${heat.summary}), so locations were scouted across the city.`);
   endHeatmap(heat.status === "ok" ? "done" : heat.status === "error" ? "error" : "warning", heat.summary);
   // Tags that name who people are (LGBT, a religion, a health condition) never become tone or evidence: see isIdentityTag.
-  const tasteTags = (audience.data?.taste_tags ?? []).filter((tag) => !isIdentityTag(tag.name));
-  const subgenres = (audience.data?.film_subgenres ?? []).filter((tag) => !isIdentityTag(tag.name));
+  const tasteTags = withoutIdentity(audience.data?.taste_tags ?? []);
+  const subgenres = withoutIdentity(audience.data?.film_subgenres ?? []);
   const leans = (audience.data?.demographics ?? []).map((d) =>
     subjects.length > 1 ? `${entityNames.get(d.entity_id) ?? "audience"}: ${d.leans}` : d.leans,
   );
@@ -536,7 +536,7 @@ export async function runPipeline(
 
   let overlap: CompactTag[] = [];
   if (endOverlap && shared) {
-    overlap = (shared.data?.shared_traits ?? []).filter((tag) => !isIdentityTag(tag.name));
+    overlap = withoutIdentity(shared.data?.shared_traits ?? []);
     endOverlap(shared.status === "ok" ? "done" : "warning", shared.summary);
   } else {
     emit({

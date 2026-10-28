@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { FORMATS, coverStill, subjectPhrase, treatmentWho } from "../agent/options";
+import { FORMATS, coverStill, treatmentSubject } from "../agent/options";
 import type { Treatment } from "../agent/types";
 
 // What a saved treatment looks like on the way in, and the few words kept beside it so a list never loads whole
@@ -38,8 +38,7 @@ export function takeKey(t: Pick<Treatment, "id" | "createdAt">): string {
 
 /** The line under a title in a list: "Music video for Prateek Kuhad, Mumbai". */
 export function summaryOf(t: Treatment): string {
-  const who = treatmentWho(t);
-  const subject = subjectPhrase(who.artists, who.films, t.brief.format);
+  const subject = treatmentSubject(t);
   return `${FORMATS[t.brief.format]}${subject ? ` ${subject}` : ""}, ${t.brief.city}`.slice(0, 300);
 }
 

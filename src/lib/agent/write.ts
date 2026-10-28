@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { CompactEntity } from "../qloo";
 import type { Brief } from "./brief";
-import { subjectPhrase } from "./options";
+import { subjectPhrase, withYear } from "./options";
 import { areaLabel, describeBrief, vibeOf, type ToneCandidate, type Vibe, type Who } from "./plan";
 import type { BaseArea } from "./types";
 
@@ -157,7 +157,7 @@ export function refScrubber(names: Map<string, string>): (text: string) => strin
 }
 
 function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): string {
-  const bits = [`${ref} ${item.name}${item.year ? ` (${item.year})` : ""}`];
+  const bits = [`${ref} ${withYear(item.name, item.year)}`];
   if (item.place) {
     if (item.place.neighborhood) bits[0] += `, ${item.place.neighborhood}`;
     if (item.place.price_level) bits.push(`price ${item.place.price_level}/4`);

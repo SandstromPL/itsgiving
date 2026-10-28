@@ -12,7 +12,7 @@ import {
   type InsightsResponse,
 } from "../qloo";
 import { mockEntityId } from "../qloo/mock/catalog";
-import { isIdentityTag } from "../text";
+import { withoutIdentity } from "../text";
 import { SEARCHABLE_KINDS, TAG_KIND_VALUES, defineTool, entityIds, plural, take } from "./shared";
 
 /**
@@ -20,8 +20,7 @@ import { SEARCHABLE_KINDS, TAG_KIND_VALUES, defineTool, entityIds, plural, take 
  * they are (the studio's run log). The data keeps every tag, and its users filter them themselves.
  */
 const summaryTags = (tags: { name: string }[]) =>
-  tags
-    .filter((t) => !isIdentityTag(t.name))
+  withoutIdentity(tags)
     .slice(0, 6)
     .map((t) => t.name)
     .join(", ");

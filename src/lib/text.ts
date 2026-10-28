@@ -34,3 +34,19 @@ const IDENTITY_TAG =
 export function isIdentityTag(name: string): boolean {
   return IDENTITY_TAG.test(name);
 }
+
+/**
+ * A list of Qloo tags without the ones that name who people are (isIdentityTag): every list that's shown, summed up or
+ * handed to a model goes through here, so a new place that shows tags can't forget the rule. `name` reads a tag's name
+ * when it isn't the item's own `name` (a tone line keeps it at `tag.name`).
+ */
+export function withoutIdentity<T extends { name: string }>(tags: readonly T[]): T[];
+export function withoutIdentity<T>(tags: readonly T[], name: (tag: T) => string): T[];
+export function withoutIdentity<T>(tags: readonly T[], name = (tag: T) => (tag as { name: string }).name): T[] {
+  return tags.filter((tag) => !isIdentityTag(name(tag)));
+}
+
+/** A film as "Title (Year)", or the bare title when the year is unknown: so many titles are shared that the year is part of the name. */
+export function withYear(name: string, year?: number | null): string {
+  return year ? `${name} (${year})` : name;
+}

@@ -10,7 +10,8 @@ import { suggestTitleFont } from "./studio/title-fonts";
  * featured treatments whose own page will open are offered (featuredItem).
  */
 export default function Home() {
-  const all = featuredOffered() ? loadFeatured() : [];
+  const live = featuredOffered();
+  const all = live ? loadFeatured() : [];
   const items = EXAMPLES.filter((example) => example.featured).flatMap((example) => featuredItem(example.slug, all) ?? []);
   const covers = featuredCovers(items);
   const run = featuredRun(items);
@@ -20,7 +21,7 @@ export default function Home() {
       <SiteHeader home />
       <main className="flex flex-1 flex-col">
         <Hero cover={covers[0]} fontId={first && suggestTitleFont(first.treatment).id} />
-        <NowShowing covers={covers.length > 1 ? covers.slice(1) : covers} />
+        <NowShowing covers={covers.length > 1 ? covers.slice(1) : covers} live={live} />
         {run ? <HowItWorks run={run} /> : <HowItWorksSteps />}
         <div className="mx-auto w-full max-w-[80rem] px-4 pb-20 sm:px-8">
           <StartYourOwn />

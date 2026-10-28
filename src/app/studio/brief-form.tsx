@@ -2,7 +2,17 @@
 
 import { useEffect, useId, useRef, useState, type Dispatch, type FormEvent, type ReactNode, type SetStateAction } from "react";
 import type { Example } from "@/lib/agent/examples";
-import { BUDGETS, FORMATS, IMPORT_LIMIT, THINKING, TMDB_NOTICE, type Budget, type Format, type Thinking } from "@/lib/agent/options";
+import {
+  BUDGETS,
+  FORMATS,
+  IMPORT_LIMIT,
+  THINKING,
+  TMDB_NOTICE,
+  withYear,
+  type Budget,
+  type Format,
+  type Thinking,
+} from "@/lib/agent/options";
 import type { TasteImport } from "@/lib/agent/taste";
 import {
   LIMITS,
@@ -30,7 +40,7 @@ const chip = "flex items-center gap-0.5 rounded-full border border-line bg-card 
 /** A field's accessibility wiring: marked invalid and pointed at the message when it is the one failing. */
 type Describe = (name: FieldName, hint?: string) => { "aria-invalid"?: boolean; "aria-describedby"?: string };
 
-const filmName = (film: { title: string; year?: number }) => `${film.title}${film.year ? ` (${film.year})` : ""}`;
+const filmName = (film: { title: string; year?: number }) => withYear(film.title, film.year);
 
 /** One line on what an import brought in and what it left out. */
 function importSummary(result: TasteImport): string {
