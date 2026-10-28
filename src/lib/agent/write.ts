@@ -19,6 +19,8 @@ export interface WriteContext extends Who {
   direction: string;
   tone: ToneCandidate[];
   references: Ref<CompactEntity>[];
+  /** Series the audience over-indexes on (S refs): references too, but never the cover. */
+  series: Ref<CompactEntity>[];
   brands: Ref<CompactEntity>[];
   places: Ref<CompactEntity>[];
   leans: string[];
@@ -51,7 +53,9 @@ const refEnum = (refs: Ref<unknown>[] | ToneCandidate[]) => z.enum(refs.map((r) 
 // maximums are stated in the descriptions and applied in code, so a model that
 // writes one shot too many isn't sent back for a repair.
 export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
-  const { tone, references, brands, places } = ctx;
+  const { tone, references, series, brands, places } = ctx;
+  // A beat or a reference may point at a film or a series; the cover is always a film's still.
+  const titles = [...references, ...series];
   return z.strictObject({
     title: text.describe("2-6 words."),
     logline: text.describe("One sentence."),
@@ -69,27 +73,31 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
         z.strictObject({
           title: text.describe("2-4 words."),
           description: text.describe("1-2 sentences."),
-          ...(references.length > 0 ? { reference: refEnum(references).nullable() } : {}),
+          ...(titles.length > 0 ? { reference: refEnum(titles).nullable() } : {}),
         }),
       )
       .min(3)
       .describe("3-6 beats in order."),
-    ...(references.length > 0
+    ...(titles.length > 0
       ? {
           references: z
             .array(
               z.strictObject({
-                ref: refEnum(references),
+                ref: refEnum(titles),
                 why: text,
                 // Not a list of options: Gemini read "palette, framing, movement or texture" as a menu and answered one word.
-                borrow: text.describe("One sentence: the specific look or technique to take from this film, and where to use it."),
+                borrow: text.describe("One sentence: the specific look or technique to take from this title, and where to use it."),
               }),
             )
-            .min(Math.min(2, references.length))
-            .describe("2-6 film references."),
-          cover: refEnum(references)
-            .nullable()
-            .describe("The cited film whose look best fits the title and logline: a frame from it is the cover."),
+            .min(Math.min(2, titles.length))
+            .describe(series.length > 0 ? "2-6 references: films, and at most 2 series." : "2-6 film references."),
+          ...(references.length > 0
+            ? {
+                cover: refEnum(references)
+                  .nullable()
+                  .describe("The cited film whose look best fits the title and logline: a frame from it is the cover."),
+              }
+            : {}),
         }
       : {}),
     ...(brands.length > 0
@@ -183,6 +191,7 @@ export function writePrompt(ctx: WriteContext): string {
   if (ctx.tone.length > 0) parts.push(`Tone tags: ${ctx.tone.map((t) => `${t.ref} ${t.tag.name}`).join("; ")}`);
   if (ctx.leans.length > 0) parts.push(`Audience skew: ${ctx.leans.join("; ")}`);
   if (ctx.references.length > 0) parts.push("Film references:", ...ctx.references.map((r) => entityLine(r, ctx)));
+  if (ctx.series.length > 0) parts.push("Series:", ...ctx.series.map((r) => entityLine(r, ctx)));
   if (ctx.brands.length > 0) parts.push("Wardrobe brands:", ...ctx.brands.map((r) => entityLine(r, ctx)));
   if (ctx.base) {
     parts.push(
@@ -193,10 +202,10 @@ export function writePrompt(ctx: WriteContext): string {
   parts.push(
     "",
     "TASK",
-    "Write the treatment. Cite films, brands and places by ref only in the ref fields; in the text, call them by name",
-    "and never write refs (T1, R2, B1, L3) or price levels. For each reference say why it fits this audience and, in one",
-    "sentence, the specific look or technique to borrow. For the cover, name the cited film whose look best fits the title",
-    "and logline: a frame from it is the cover. Wardrobe looks name garments, fabrics and colours. Location",
+    "Write the treatment. Cite films, series, brands and places by ref only in the ref fields; in the text, call them by",
+    "name and never write refs (T1, R2, S1, B1, L3) or price levels. For each reference say why it fits this audience and,",
+    "in one sentence, the specific look or technique to borrow; a series may be one or two of them. For the cover, name the",
+    "cited film whose look best fits the title and logline: a frame from it is the cover. Wardrobe looks name garments, fabrics and colours. Location",
     "scenes say what happens there and stay true to the place's Qloo description. Palette: 4-6 named colours. Lighting",
     "and shot notes are plain sentences, concrete and doable on this budget.",
   );
@@ -342,7 +351,7 @@ export function mockDraft(ctx: WriteContext): Draft {
     })),
     ...(refs.length > 0
       ? {
-          references: refs.slice(0, Math.max(2, Math.min(refs.length, 4))).map((r, i) => ({
+          references: [...refs.slice(0, Math.max(2, Math.min(refs.length, 4))), ...ctx.series.slice(0, 1)].map((r, i) => ({
             ref: r.ref,
             why: `Ranks high with this audience${r.item.tags.length > 0 ? ` and shares ${r.item.tags.slice(0, 2).join(" and ").toLowerCase()}` : ""}.`,
             borrow: BORROW[i % BORROW.length],

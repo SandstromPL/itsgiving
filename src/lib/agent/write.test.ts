@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CompactEntity } from "../qloo";
 import { briefSchema, normalizeBrief } from "./brief";
-import { writePrompt, type WriteContext } from "./write";
+import { writePrompt, writeSchema, type WriteContext } from "./write";
 
 const entity = (id: string, name: string, extra: Partial<CompactEntity> = {}): CompactEntity => ({ id, name, tags: [], ...extra });
 
@@ -14,6 +14,7 @@ function context(overrides: Partial<WriteContext> = {}): WriteContext {
     direction: "Two people keep almost meeting.",
     tone: [],
     references: [],
+    series: [],
     brands: [],
     places: [],
     leans: [],
@@ -51,5 +52,36 @@ describe("writePrompt", () => {
       }),
     );
     expect(prompt).toContain("On an indie budget, Louis Vuitton is a reference to rent or match, not to buy");
+  });
+});
+
+describe("writeSchema", () => {
+  const draft = (references: { ref: string }[], cover: string | null) => ({
+    title: "Almost",
+    logline: "Two people keep almost meeting.",
+    concept: "A concept.",
+    beats: [1, 2, 3].map((i) => ({ title: `Beat ${i}`, description: "Something happens.", reference: null })),
+    references: references.map((r) => ({ ...r, why: "It fits.", borrow: "Borrow the light." })),
+    cover,
+    palette: ["#111111", "#222222", "#333333"].map((hex) => ({ name: hex, hex })),
+    lighting: ["Soft.", "Low."],
+    shots: ["Wide.", "Close.", "Held."],
+  });
+  const ctx = context({
+    references: [
+      { ref: "R1", item: entity("f1", "Past Lives") },
+      { ref: "R2", item: entity("f2", "Aftersun") },
+    ],
+    series: [{ ref: "S1", item: entity("s1", "Normal People", { kind: "tv_show" }) }],
+  });
+
+  it("lets a reference be a film or a series, but the cover only a film", () => {
+    expect(writeSchema(ctx).safeParse(draft([{ ref: "R1" }, { ref: "S1" }], "R1")).success).toBe(true);
+    expect(writeSchema(ctx).safeParse(draft([{ ref: "R1" }, { ref: "S1" }], "S1")).success).toBe(false);
+    expect(writeSchema(ctx).safeParse(draft([{ ref: "R1" }, { ref: "S9" }], "R1")).success).toBe(false);
+  });
+
+  it("lists the series apart from the films in the prompt", () => {
+    expect(writePrompt(ctx)).toMatch(/Film references:\nR1 Past Lives\nR2 Aftersun\nSeries:\nS1 Normal People/);
   });
 });

@@ -133,6 +133,18 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     expect(plan).toContain(`Of the director's films, this audience likes, best first: ${fit[0].entity.name}`);
   });
 
+  it("finds series beside the films, and cites them as references ranked among the series", async () => {
+    const t = treatmentOf((await run({ artist: "Prateek Kuhad", city: "Mumbai" })).outcome);
+    const queries = (t.qloo.steps.references ?? []).map((p) => p.query["filter.type"]);
+    expect(queries).toEqual(expect.arrayContaining(["urn:entity:movie", "urn:entity:tv_show"]));
+    const series = t.references.filter((r) => r.entity.kind === "tv_show");
+    expect(series).toHaveLength(1);
+    expect(series[0].qloo).toMatchObject({ tool: "reference_films", rank: 1 });
+    expect(series[0].qloo.of).toBeLessThanOrEqual(6);
+    // The cover is a film's still, never a series'.
+    expect(t.references.find((r) => r.entity.id === t.cover)?.entity.kind).toBe("movie");
+  });
+
   it("leaves the scores out when there are no director films", async () => {
     const t = treatmentOf((await run({ artist: "Prateek Kuhad", city: "Mumbai" })).outcome);
     expect(t.directorFit).toBeUndefined();
@@ -662,6 +674,7 @@ describe("LLM schemas", () => {
     const ctx = {
       tone: [{ ref: "T1", tag: { id: "urn:tag:x", name: "x" }, source: "audience" }],
       references: [{ ref: "R1", item: entity }],
+      series: [{ ref: "S1", item: entity }],
       brands: [{ ref: "B1", item: entity }],
       places: [{ ref: "L1", item: entity }],
     } as unknown as WriteContext;

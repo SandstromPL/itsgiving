@@ -416,6 +416,13 @@ export const ENTITIES: MockEntity[] = [
   film("The Forgotten", 2004, 0.58, ["dark", "surreal"], [g("thriller"), g("science_fiction"), k("memory")], { disambiguation: "2004, Joseph Ruben" }),
   film("Mid90s", 2018, 0.75, ["nostalgic", "gritty", "rebellious", "urban"], [g("drama"), k("skateboarding"), k("coming_of_age")]),
   film("Euphoria", 2019, 0.93, ["neon", "dark", "rebellious", "maximalist"], [g("drama"), k("coming_of_age")], { subtype: TV }),
+  // Series the references step finds beside the films.
+  film("Little Things", 2016, 0.68, ["tender", "intimate", "warm", "urban"], [g("drama"), g("romance")], { subtype: TV }),
+  film("Made in Heaven", 2019, 0.8, ["maximalist", "romantic", "urban", "dark"], [g("drama")], { subtype: TV }),
+  film("Normal People", 2020, 0.88, ["tender", "melancholic", "intimate", "romantic"], [g("drama"), g("romance"), k("coming_of_age")], { subtype: TV }),
+  film("Fleabag", 2016, 0.9, ["playful", "melancholic", "urban", "intimate"], [g("drama"), k("heartbreak")], { subtype: TV }),
+  film("Russian Doll", 2019, 0.84, ["surreal", "urban", "nocturnal", "playful"], [g("drama"), k("memory")], { subtype: TV }),
+  film("Killing Eve", 2018, 0.9, ["dark", "playful", "maximalist", "urban"], [g("thriller"), g("crime")], { subtype: TV }),
 
   artist("Prateek Kuhad", 0.7, ["folk", "tender", "melancholic", "intimate", "warm"], [m("indie_folk")]),
   artist("When Chai Met Toast", 0.55, ["folk", "playful", "warm", "tender"], [m("indie_folk")]),

@@ -58,13 +58,35 @@ export function assemble(input: AssembleInput): Treatment {
         return [{ entity, qloo: evidence(list, tool, entity), notes }];
       });
 
-  // The schema only enforces minimums; the maximums the prompt asked for are applied here.
-  const references = cite(ctx.references, execution.references.items, "reference_films", draft.references, ["why", "borrow"], 6).map(
-    (r) => {
+  // The schema only enforces minimums; the maximums the prompt asked for are applied here. Films and series are cited
+  // against their own lists (a series is "2 of 6 series"), then kept in the writer's order.
+  const isSeries = (ref: string) => ctx.series.some((r) => r.ref === ref);
+  const order = (draft.references ?? []).map((p) => p.ref);
+  const refOf = new Map([...ctx.references, ...ctx.series].map((r) => [r.item.id, r.ref]));
+  const references = [
+    ...cite(
+      ctx.references,
+      execution.references.items,
+      "reference_films",
+      draft.references?.filter((p) => !isSeries(p.ref)),
+      ["why", "borrow"],
+      6,
+    ),
+    ...cite(
+      ctx.series,
+      execution.series.items,
+      "reference_films",
+      draft.references?.filter((p) => isSeries(p.ref)),
+      ["why", "borrow"],
+      2,
+    ),
+  ]
+    .sort((a, b) => order.indexOf(refOf.get(a.entity.id) ?? "") - order.indexOf(refOf.get(b.entity.id) ?? ""))
+    .slice(0, 6)
+    .map((r) => {
       const still = input.stills.get(r.entity.id);
       return still ? { ...r, still } : r;
-    },
-  );
+    });
   // The writer's cover counts only among the films it cited: the cover is always one of the board's references.
   const coverPick = ctx.references.find((r) => r.ref === draft.cover)?.item.id;
   const cover = references.some((r) => r.entity.id === coverPick) ? coverPick : undefined;
@@ -120,7 +142,7 @@ export function assemble(input: AssembleInput): Treatment {
     lighting: draft.lighting.slice(0, 4).map((l) => prose(l, 300)),
     shots: draft.shots.slice(0, 6).map((s) => prose(s, 300)),
     extras: {
-      references: uncited(execution.references.items),
+      references: uncited([...execution.references.items, ...execution.series.items]),
       brands: uncited(execution.brands.items),
       locations: uncited(execution.places.items),
     },

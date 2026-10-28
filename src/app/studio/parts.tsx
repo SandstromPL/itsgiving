@@ -195,11 +195,14 @@ export function Why({
   writtenBy,
   mock,
   facts = [],
+  of,
   className = "",
 }: {
   label: string;
   name: string;
   qloo: QlooEvidence;
+  /** What the ranked list holds, in words ("series"), where the tool's own list says otherwise. */
+  of?: string;
   read: { term: string; text: string }[];
   writtenBy: ProducedBy;
   /** True when the evidence came from the synthetic mock, not Qloo. */
@@ -238,7 +241,7 @@ export function Why({
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs leading-5 tabular-nums text-slip-ink">
               <dt className="text-faint">Rank</dt>
               <dd>
-                {qloo.rank} of {qloo.of} {LIST_OF[qloo.tool] ?? "picks"} for this audience
+                {qloo.rank} of {qloo.of} {of ?? LIST_OF[qloo.tool] ?? "picks"} for this audience
               </dd>
               {pct(qloo.affinity) && (
                 <>

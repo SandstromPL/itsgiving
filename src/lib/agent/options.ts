@@ -227,7 +227,7 @@ export const STEP_LABELS: Record<StepId, string> = {
   heatmap: "Map where the fans are",
   plan: "Plan the creative direction",
   tags: "Translate style words into Qloo tags",
-  references: "Pull reference films",
+  references: "Pull reference films and series",
   wardrobe: "Pick wardrobe brands",
   locations: "Scout locations",
   replan: "Re-plan the style words",

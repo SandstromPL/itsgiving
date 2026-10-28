@@ -360,51 +360,54 @@ export function Board({
       <Section
         id="references"
         title="References"
-        note={`Films this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the notes.`}
+        note={`${t.references.some((r) => r.entity.kind === "tv_show") ? "Films and series" : "Films"} this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the notes.`}
       >
         {t.references.length === 0 ? (
           <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
         ) : (
           <ul className={`grid gap-5 ${referenceGrid.grid} print:flex print:flex-col print:gap-4`}>
-            {t.references.map((r, i) => (
-              <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden ${referenceGrid.span(i)} ${printRow}`}>
-                <Still
-                  src={r.still ? tmdbSize(r.still, "w780") : r.entity.image}
-                  alt={r.still ? `Still from ${r.entity.name}` : `Poster for ${r.entity.name}`}
-                  className={`aspect-video w-full ${referenceGrid.wide(i)} print:aspect-video ${printPicture}`}
-                />
-                <div className="flex flex-1 flex-col gap-3.5 p-5 print:contents">
-                  <div className={printRead}>
-                    <div className="flex flex-col gap-1">
-                      <h3 className="type-head text-[1.7rem] leading-tight">
-                        {r.entity.name}
-                        {r.entity.year && (
-                          <span className="ml-2 text-[1.1rem] font-normal tracking-normal text-faint">{r.entity.year}</span>
-                        )}
-                      </h3>
-                      <QlooTags tags={r.qloo.tags} />
-                    </div>
-                    <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
-                    <p className={prose}>
-                      <span className="font-sans text-[13px] font-semibold text-faint">Borrow </span>
-                      {afterLabel("Borrow", r.notes.borrow)}
-                    </p>
-                  </div>
-                  <Why
-                    label="why this film"
-                    name={r.entity.name}
-                    qloo={r.qloo}
-                    read={[
-                      { term: "Why it fits", text: r.notes.why },
-                      { term: "What to borrow", text: r.notes.borrow },
-                    ]}
-                    writtenBy={t.writtenBy}
-                    mock={mock}
-                    className={`mt-auto ${printReceipt}`}
+            {t.references.map((r, i) => {
+              const series = r.entity.kind === "tv_show";
+              const year = series ? ["Series", r.entity.year].filter(Boolean).join(", ") : r.entity.year;
+              return (
+                <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden ${referenceGrid.span(i)} ${printRow}`}>
+                  <Still
+                    src={r.still ? tmdbSize(r.still, "w780") : r.entity.image}
+                    alt={r.still ? `Still from ${r.entity.name}` : `Poster for ${r.entity.name}`}
+                    className={`aspect-video w-full ${referenceGrid.wide(i)} print:aspect-video ${printPicture}`}
                   />
-                </div>
-              </li>
-            ))}
+                  <div className="flex flex-1 flex-col gap-3.5 p-5 print:contents">
+                    <div className={printRead}>
+                      <div className="flex flex-col gap-1">
+                        <h3 className="type-head text-[1.7rem] leading-tight">
+                          {r.entity.name}
+                          {year && <span className="ml-2 text-[1.1rem] font-normal tracking-normal text-faint">{year}</span>}
+                        </h3>
+                        <QlooTags tags={r.qloo.tags} />
+                      </div>
+                      <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
+                      <p className={prose}>
+                        <span className="font-sans text-[13px] font-semibold text-faint">Borrow </span>
+                        {afterLabel("Borrow", r.notes.borrow)}
+                      </p>
+                    </div>
+                    <Why
+                      label={series ? "why this series" : "why this film"}
+                      name={r.entity.name}
+                      qloo={r.qloo}
+                      of={series ? "series" : "films"}
+                      read={[
+                        { term: "Why it fits", text: r.notes.why },
+                        { term: "What to borrow", text: r.notes.borrow },
+                      ]}
+                      writtenBy={t.writtenBy}
+                      mock={mock}
+                      className={`mt-auto ${printReceipt}`}
+                    />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
         <Also label="Also high for this audience:" items={t.extras.references} mock={mock} />

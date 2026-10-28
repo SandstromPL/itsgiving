@@ -309,18 +309,19 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
     direction: plan.direction,
     tone,
     references: toRefs(execution.references.items, "R", 8),
+    series: toRefs(execution.series.items, "S", 4),
     brands: toRefs(execution.brands.items, "B", 6),
     places: toRefs(execution.places.items, "L", 6),
     leans: audience.leans,
     base: execution.base?.held ? execution.base.area : undefined,
     names: cast.entityNames,
   };
-  // The reference films' stills come from TMDB while the writer works, so they cost no time.
+  // The references' stills (films and series) come from TMDB while the writer works, so they cost no time.
   const pendingStills =
     deps.qloo.mode === "mock"
       ? Promise.resolve(new Map<string, string>())
       : filmStills(
-          writeContext.references.map((r) => r.item),
+          [...writeContext.references, ...writeContext.series].map((r) => r.item),
           deps.tmdb,
           signal,
         );
@@ -352,7 +353,9 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
   const scrub = refScrubber(
     new Map([
       ...candidates.map((c) => [c.ref, c.tag.name] as const),
-      ...[...writeContext.references, ...writeContext.brands, ...writeContext.places].map((r) => [r.ref, r.item.name] as const),
+      ...[...writeContext.references, ...writeContext.series, ...writeContext.brands, ...writeContext.places].map(
+        (r) => [r.ref, r.item.name] as const,
+      ),
     ]),
   );
   // After a fast write the stills may still be out: wait a moment at most, then go without.

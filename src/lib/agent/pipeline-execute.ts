@@ -24,6 +24,8 @@ export interface Execution {
   /** A tag search failed (rather than finding nothing), so a re-plan wouldn't help. */
   tagSearchFailed: boolean;
   references: Relaxed;
+  /** Series the audience over-indexes on, found beside the films in the references step. */
+  series: Relaxed;
   brands: Relaxed;
   places: Relaxed;
   /** The area the plan based the shoot in; held is false when locations had to come from the whole city. */
@@ -70,33 +72,37 @@ export async function executePlan(run: Run, plan: Plan, cast: Cast, areas: BaseA
   const base = areas.find((a) => a.ref === plan.base) ?? areas[0];
 
   const endTags = begin("tags", STEP_LABELS.tags);
-  // Reference films use the entity signal only, so they needn't wait for the tag search.
+  // References use the entity signal only, so they needn't wait for the tag search.
   emit({ type: "step", id: "references", status: "running", label: STEP_LABELS.references });
-  const pendingReferences = relax(
-    run,
-    "references",
-    "reference_films",
-    "references",
-    ladder(
-      // Entity signal only: on the live host, tone tags as signal.interests.tags made this query run
-      // 22-60 s and end in a Qloo 504. The tone tags still shape the writing.
-      {
-        signal_entity_ids: subjectIds,
-        kind: "movie",
-        from_year: plan.era_from ?? undefined,
-        to_year: plan.era_to ?? undefined,
-        max_popularity: ceiling,
-        exclude_ids: [...subjectIds, ...directorIds].slice(0, 50),
-        take: 10,
-      },
-      [
-        ["dropped the era", { from_year: undefined, to_year: undefined }, hasEra],
-        ["lifted the deep-cut ceiling", { max_popularity: undefined }, ceiling !== undefined],
-      ],
-    ),
-  );
+  // Entity signal only: on the live host, tone tags as signal.interests.tags made this query run 22-60 s and end in a
+  // Qloo 504. The tone tags still shape the writing. Series are searched the same way, beside the films.
+  const titles = (kind: "movie" | "tv_show", take: number) =>
+    relax(
+      run,
+      "references",
+      "reference_films",
+      "references",
+      ladder(
+        {
+          signal_entity_ids: subjectIds,
+          kind,
+          from_year: plan.era_from ?? undefined,
+          to_year: plan.era_to ?? undefined,
+          max_popularity: ceiling,
+          exclude_ids: [...subjectIds, ...directorIds].slice(0, 50),
+          take,
+        },
+        [
+          ["dropped the era", { from_year: undefined, to_year: undefined }, hasEra],
+          ["lifted the deep-cut ceiling", { max_popularity: undefined }, ceiling !== undefined],
+        ],
+      ),
+    );
+  const pendingReferences = titles("movie", 10);
+  const pendingSeries = titles("tv_show", 6);
   // Awaited below; this only keeps a failure while the tags are pending from going unhandled.
   pendingReferences.catch(() => {});
+  pendingSeries.catch(() => {});
   const [wardrobe, ambience] = await Promise.all([
     // Brand genre tags are hierarchical (urn:tag:genre:brand:fashion:...), so filter by what they apply to, not by type.
     findTags(run, plan.wardrobe_words, { applies_to: "brand" }),
@@ -120,8 +126,9 @@ export async function executePlan(run: Run, plan: Plan, cast: Cast, areas: BaseA
     emit({ type: "step", id, status: "running", label });
   }
 
-  const [references, brands, places] = await Promise.all([
+  const [references, series, brands, places] = await Promise.all([
     pendingReferences,
+    pendingSeries,
     relax(
       run,
       "wardrobe",
@@ -167,7 +174,23 @@ export async function executePlan(run: Run, plan: Plan, cast: Cast, areas: BaseA
   // The base held when the first rung (near it) was enough, or was all there was.
   const held = base !== undefined && places.items.length > 0 && places.relaxations.length === 0;
 
-  report(run, "references", "films", STEP_LABELS.references, "Reference films", references, (items) => names(items).slice(0, 4).join(", "));
+  // One step, two searches: what had to give for the series goes into the notes, and its finds into the summary.
+  if (series.relaxations.length > 0 && series.items.length > 0) {
+    run.notes.push(
+      `Series: ${series.firstCount ? `only ${series.firstCount} matched at first` : "nothing matched at first"}, so itsgiving ${series.relaxations.join(", then ")}.`,
+    );
+  }
+  if (series.error) run.notes.push(`${STEP_LABELS.references}: series: ${series.error}`);
+  const withSeries = series.items.length > 0 ? `; series: ${names(series.items).slice(0, 3).join(", ")}` : "";
+  report(
+    run,
+    "references",
+    "films",
+    STEP_LABELS.references,
+    "Reference films",
+    references,
+    (items) => `${names(items).slice(0, 4).join(", ")}${withSeries}`,
+  );
   report(run, "wardrobe", "brands", STEP_LABELS.wardrobe, "Wardrobe brands", brands, (items) => names(items).slice(0, 5).join(", "));
   report(
     run,
@@ -189,6 +212,7 @@ export async function executePlan(run: Run, plan: Plan, cast: Cast, areas: BaseA
     missedWords: { wardrobe: wardrobe.missed, ambience: ambience.missed },
     tagSearchFailed: wardrobe.errored || ambience.errored,
     references,
+    series,
     brands,
     places,
     base: base ? { area: base, held } : undefined,
