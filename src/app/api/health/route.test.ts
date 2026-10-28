@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 describe("GET /api/health", () => {
-  it("answers as before, and asks Qloo at most once a minute", async () => {
+  it("answers as before, and asks Qloo at most once every five minutes", async () => {
     const info = vi.spyOn(qloo, "info").mockImplementation(answered);
     const first = await get();
     expect(first.status).toBe(200);
@@ -41,11 +41,11 @@ describe("GET /api/health", () => {
     expect(Object.keys(body.llm)).toEqual(["mode", "chain", "dailyCallsLeft"]);
     expect(body.llm.chain.at(-1)).toBe("mock:itsgiving-template");
 
-    vi.setSystemTime(clock + 59_999);
+    vi.setSystemTime(clock + 5 * 60_000 - 1);
     expect(await (await get()).json()).toEqual(body);
     expect(info).toHaveBeenCalledTimes(1);
 
-    vi.setSystemTime(clock + 60_000);
+    vi.setSystemTime(clock + 5 * 60_000);
     expect((await get()).status).toBe(200);
     expect(info).toHaveBeenCalledTimes(2);
   });

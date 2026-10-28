@@ -1,6 +1,6 @@
 // Response shapes as documented on docs.qloo.com. Several endpoints have
-// conflicting docs (see research/qloo-api-reference.md §17), so most fields
-// are optional and readers should go through ./normalize.ts.
+// conflicting docs (the OpenAPI pages, the guides and the live API disagree),
+// so most fields are optional and readers should go through ./normalize.ts.
 
 export type ParamScalar = string | number | boolean;
 export type ParamValue = ParamScalar | readonly ParamScalar[] | null | undefined;

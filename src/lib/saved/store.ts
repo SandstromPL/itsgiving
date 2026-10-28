@@ -35,7 +35,7 @@ function db(): SupabaseClient {
 }
 
 function fail(what: string, error: { message: string; code?: string }): never {
-  throw new SavedStoreError(`${what}: ${error.code ?? ""} ${error.message}`.trim());
+  throw new SavedStoreError([`${what}:`, error.code, error.message].filter(Boolean).join(" "));
 }
 
 type Row = {

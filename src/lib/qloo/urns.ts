@@ -1,5 +1,5 @@
 // Qloo URN vocabulary. Values follow docs.qloo.com and the official harness;
-// see research/qloo-api-reference.md §3–4 for the conflicts noted inline.
+// where the two disagree, the conflict is noted inline.
 
 export const ENTITY_TYPES = {
   artist: "urn:entity:artist",

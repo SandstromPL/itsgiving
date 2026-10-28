@@ -12,11 +12,13 @@ type QlooCheck =
   { ok: true; provenance: Provenance } | { ok: false; error: { kind: QlooErrorKind; status?: number; message: string; hint?: string } };
 
 /**
- * The last Qloo check, kept a minute: a monitor polling this route spends one Qloo call a minute at most on each
- * server instance, not one per poll, from the key's 50,000 a month. The call itself is kept, so requests that arrive
- * while it runs wait for the same answer instead of each making their own.
+ * The last Qloo check, kept five minutes: a monitor polling this route every minute spends at most one Qloo call
+ * every five minutes on each server instance (about 8,600 a month), not one per poll (43,000), from the key's 50,000
+ * a month. The call itself is kept, so requests that arrive while it runs wait for the same answer instead of each
+ * making their own.
  */
-const checks = new TtlCache<Promise<QlooCheck>>(1, 60_000);
+const CHECK_MS = 5 * 60_000;
+const checks = new TtlCache<Promise<QlooCheck>>(1, CHECK_MS);
 
 async function checkQloo(qloo: QlooClient): Promise<QlooCheck> {
   try {
