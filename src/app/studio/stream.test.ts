@@ -98,6 +98,15 @@ describe("streamTreatment (the browser's reader)", () => {
     }
   });
 
+  it("keeps an event's lines together when a CRLF between them is cut in two", async () => {
+    // One event over two data lines (the spec joins them with a newline): cut after the CR, the old reader saw a blank
+    // line there, split the event and called it garbled.
+    const twoLines = 'data: {"type":"done"\r\ndata: }\r\n\r\n';
+    const cut = twoLines.indexOf("\r") + 1;
+    serve([bytes(twoLines.slice(0, cut)), bytes(twoLines.slice(cut))]);
+    expect(await read()).toEqual([{ type: "done" }]);
+  });
+
   it("says what went wrong: the route's own words, a dropped connection, a garbled frame", async () => {
     vi.stubGlobal(
       "fetch",

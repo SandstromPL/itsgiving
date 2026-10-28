@@ -58,8 +58,11 @@ export async function streamTreatment(brief: BriefInput, onEvent: (event: AgentE
         throw new StreamError("The connection dropped before the treatment finished. Try again.", String(err));
       }
       if (chunk.done) break;
-      // Proxies may rewrite line endings; the SSE spec allows CRLF, CR and LF.
-      buffer += chunk.value.replace(/\r\n?/g, "\n");
+      // Proxies may rewrite line endings; the SSE spec allows CRLF, CR and LF. A CR at the very end may be the first half
+      // of a CRLF the network cut in two, so it waits for the next chunk rather than becoming a line of its own.
+      buffer += chunk.value;
+      const cr = buffer.endsWith("\r") ? "\r" : "";
+      buffer = buffer.slice(0, buffer.length - cr.length).replace(/\r\n?/g, "\n") + cr;
       let boundary = buffer.indexOf("\n\n");
       while (boundary !== -1) {
         const frame = buffer.slice(0, boundary);
