@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { TtlCache } from "../lru";
 
 // Qloo allows private server-side caching with no time limit, but cached
 // responses must never be committed to the public repo (QLOO_CACHE_DIR is
@@ -11,35 +12,20 @@ export interface QlooCache {
   set(key: string, value: unknown): Promise<void>;
 }
 
+/** This process's copy of recent responses: an LRU of `maxEntries`, each kept `ttlMs`. */
 export class MemoryCache implements QlooCache {
-  private readonly entries = new Map<string, { value: unknown; expires: number }>();
+  private readonly entries: TtlCache<unknown>;
 
-  constructor(
-    private readonly ttlMs = 60 * 60 * 1000,
-    private readonly maxEntries = 500,
-  ) {}
+  constructor(ttlMs = 60 * 60 * 1000, maxEntries = 500) {
+    this.entries = new TtlCache(maxEntries, ttlMs);
+  }
 
   async get(key: string): Promise<unknown | undefined> {
-    const entry = this.entries.get(key);
-    if (!entry) return undefined;
-    if (entry.expires < Date.now()) {
-      this.entries.delete(key);
-      return undefined;
-    }
-    // Refresh recency so the Map's insertion order works as an LRU.
-    this.entries.delete(key);
-    this.entries.set(key, entry);
-    return entry.value;
+    return this.entries.get(key);
   }
 
   async set(key: string, value: unknown): Promise<void> {
-    this.entries.delete(key);
-    this.entries.set(key, { value, expires: Date.now() + this.ttlMs });
-    while (this.entries.size > this.maxEntries) {
-      const oldest = this.entries.keys().next().value;
-      if (oldest === undefined) break;
-      this.entries.delete(oldest);
-    }
+    this.entries.set(key, value);
   }
 }
 
