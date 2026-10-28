@@ -1,68 +1,38 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  BUDGETS,
-  FORMATS,
   NUDGES,
   NUDGE_LABELS,
   audiencePhrase,
   coverReference,
   excerpt,
-  joinNames,
   tagLabel,
   tmdbSize,
-  treatmentSubject,
-  treatmentWho,
-  withYear,
   withoutIdentity,
   type Nudge,
 } from "@/lib/agent/options";
 import type { LlmStep, Treatment } from "@/lib/agent/types";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
-import { cssString } from "@/lib/text";
 import { ShootBaseBlock, locationPins } from "./base-map";
-import { useCopied } from "./clipboard";
-import { EraLayer, useEra } from "./era-layer";
-import { jumpOnClick } from "./jump";
-import { landCover } from "./morph";
-import { darkOf } from "./color";
+import { useEra } from "./era-layer";
 import { useLingo } from "./lingo";
 import { QlooTags, Still, Tape, Why, modelName } from "./parts";
-import { TitleCardPicker, type CoverStill, type EraPick } from "./title-card";
-import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
-import { CheckIcon } from "./icons";
+import { type CoverStill } from "./title-card";
+import { suggestTitleFont } from "./title-fonts";
 import { evidenceTone, outlineButton, paperEvidence } from "./ui";
+import { listWithYears } from "@/lib/text";
+import { Cover, PaletteSwatches } from "./cover";
+import { SectionBar } from "./section-bar";
+import { FilmEdge, Interval, dateStamp } from "./board-cut";
+import { printPicture, printRead, printReceipt, printRow, usePrintTitle } from "./board-print";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
-
-/** The treatment's sections, in reading order, for the section bar under the cover. */
-const SECTIONS = [
-  ["concept", "Concept"],
-  ["references", "References"],
-  ["beats", "Beats"],
-  ["wardrobe", "Wardrobe"],
-  ["locations", "Locations"],
-  ["camera", "Camera and light"],
-  ["palette", "Palette"],
-  ["audience", "Audience"],
-  ["credits", "Credits"],
-] as const;
 
 /** itsgiving's own writing is set in the serif; the tool, labels and Qloo's evidence stay in the interface faces. */
 const prose = "font-serif text-[1.25rem] leading-[1.38]";
 /** A card is never cut across two printed pages. */
 const card = "rounded-[26px] border border-line bg-card print:break-inside-avoid";
-
-/**
- * On paper a film or a place is one row: its picture with Qloo's receipt under it on the left, the writing on the right
- * (the card's `read` part, which on screen is no box at all). The third row takes whatever height the writing needs past
- * them; a place's map link sits in the fourth, under the writing.
- */
-const printRow = "print:grid print:grid-cols-[40%_minmax(0,1fr)] print:grid-rows-[auto_auto_1fr_auto]";
-const printPicture = "print:col-start-1 print:row-start-1";
-const printRead = "contents print:col-start-2 print:row-span-3 print:row-start-1 print:flex print:flex-col print:gap-3 print:p-5";
-const printReceipt = "print:col-start-1 print:row-start-2 print:m-4";
 
 /**
  * A grid of n cards with no hole in its last row: two columns, three from xl when the count allows, and one card (the
@@ -112,10 +82,6 @@ function Section({
   );
 }
 
-function names(entities: CompactEntity[]): string {
-  return entities.map((e) => withYear(e.name, e.year)).join(", ");
-}
-
 function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boolean; shared?: boolean }) {
   return (
     <ul className="flex flex-wrap gap-2">
@@ -137,168 +103,8 @@ function Also({ label, items, mock }: { label: string; items: CompactEntity[]; m
   if (items.length === 0) return null;
   return (
     <p className="text-[15px] leading-6 text-dim">
-      {label} <span className={`font-mono text-[13px] ${evidenceTone(mock)}`}>{names(items)}</span>
+      {label} <span className={`font-mono text-[13px] ${evidenceTone(mock)}`}>{listWithYears(items)}</span>
     </p>
-  );
-}
-
-function Cover({
-  ref,
-  t,
-  still,
-  fontId,
-  suggestion,
-  onPickFont,
-  stills,
-  onPickStill,
-  morph,
-  era,
-}: {
-  ref?: Ref<HTMLElement>;
-  t: Treatment;
-  /** The cover's still: the reference the director picked in the title-card window, or the writer's (coverReference). */
-  still?: CoverStill;
-  fontId: string;
-  suggestion: { id: string; why: string };
-  onPickFont: (id: string) => void;
-  /** The references with a still, to choose among. */
-  stills: CoverStill[];
-  onPickStill: (id: string) => void;
-  /** On an example's own page, its slug: a homepage poster's still may grow into this cover (morph.ts). */
-  morph?: string;
-  /** The film tradition's look the cover wears, if any (eras.ts). */
-  era: EraPick;
-}) {
-  const stillLayer = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (morph) landCover(morph, stillLayer.current?.parentElement ?? null, stillLayer.current);
-  }, [morph]);
-  const who = treatmentWho(t);
-  const subject = treatmentSubject(t);
-  return (
-    <header
-      ref={ref}
-      key={`${t.id}-${t.createdAt}`}
-      className="letterbox-open surface-dark relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10 print:min-h-[225mm]"
-      style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
-    >
-      {/* A reference film's still, never its poster (or a mock placeholder): their own lettering would fight the title. */}
-      <div ref={stillLayer} aria-hidden className="absolute inset-0 -z-10">
-        {still && <Still src={still.src} alt="" loading="eager" className="absolute inset-0 size-full" />}
-      </div>
-      {/* The pills up top sit on the frame itself, so each brings its own dark: AA over a white frame. */}
-      <div data-morph="top" className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim">
-            {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
-          </span>
-          {who.standIns.length > 0 && (
-            <span
-              title={`Qloo doesn't have ${who.artists[0] ?? "the artist"}, so this audience stands in.`}
-              className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim"
-            >
-              Audience read through {joinNames(who.standIns)}
-            </span>
-          )}
-          {t.mock.qloo && <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>}
-        </div>
-        <TitleCardPicker
-          title={t.title}
-          fontId={fontId}
-          suggestion={suggestion}
-          onPick={onPickFont}
-          stills={stills}
-          stillId={still?.id}
-          onPickStill={onPickStill}
-          era={era}
-        />
-      </div>
-      <EraLayer id={era.id} title={t.title} />
-      <div
-        data-morph="words"
-        className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]"
-      >
-        <h1 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
-          {t.title}
-        </h1>
-        <p className="max-w-[40ch] font-serif text-[clamp(1.4rem,2.4vw,1.9rem)] leading-[1.2] text-pretty italic">{t.logline}</p>
-        <CoverPalette palette={t.palette} />
-      </div>
-    </header>
-  );
-}
-
-const check = <CheckIcon size={13} />;
-
-/** The cover's colours, each a chip that copies its hex: "Copied" sits over the name, so the row doesn't shift. */
-function CoverPalette({ palette }: { palette: Treatment["palette"] }) {
-  const { copied, copy } = useCopied();
-  return (
-    <>
-      <ul aria-label="Palette" className="flex flex-wrap gap-2">
-        {palette.map((c) => (
-          <li key={c.hex}>
-            <button
-              type="button"
-              title={c.hex}
-              aria-label={`Copy ${c.name}, ${c.hex}`}
-              onClick={() => copy(c.hex)}
-              className="flex cursor-pointer items-center gap-2 rounded-full bg-black/40 py-1.5 pr-3.5 pl-1.5 text-[13px] hover:bg-black/60"
-            >
-              <span aria-hidden className="size-[22px] rounded-full ring-1 ring-white/25" style={{ background: c.hex }} />
-              <span className="relative whitespace-nowrap">
-                <span className={copied === c.hex ? "invisible" : undefined}>{c.name}</span>
-                {copied === c.hex && <span className="absolute inset-y-0 left-0 flex items-center gap-1">{check}Copied</span>}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p role="status" className="sr-only">
-        {copied ? `Copied ${copied}` : ""}
-      </p>
-    </>
-  );
-}
-
-/** The palette, each colour a button that copies its hex, which colourists paste straight into a grade or a deck. */
-function PaletteSwatches({ palette }: { palette: Treatment["palette"] }) {
-  const { copied, copy } = useCopied();
-  return (
-    <>
-      <ul className="grid grid-cols-3 gap-4 sm:grid-cols-6">
-        {palette.map((c) => (
-          <li key={c.hex}>
-            <button
-              type="button"
-              aria-label={`Copy ${c.name}, ${c.hex}`}
-              onClick={() => copy(c.hex)}
-              className="block w-full cursor-pointer rounded-[20px] text-left [--press:0.98]"
-            >
-              <span
-                aria-hidden
-                className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10 print:aspect-[3/2]"
-                style={{ background: c.hex }}
-              />
-              <span className="mt-2 block text-[15px] leading-tight font-semibold">{c.name}</span>
-              <span className="flex items-center gap-1 font-mono text-[13px] text-faint">
-                {copied === c.hex ? (
-                  <>
-                    {check}
-                    Copied
-                  </>
-                ) : (
-                  c.hex
-                )}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p role="status" className="sr-only">
-        {copied ? `Copied ${copied}` : ""}
-      </p>
-    </>
   );
 }
 
@@ -408,282 +214,6 @@ function Rework({
       <p className="px-3 text-[13px] text-faint">{note}</p>
     </div>
   );
-}
-
-/**
- * One sticky bar under the cover: the sections to jump to, the one being read lit, and a thin line that fills as the
- * reader goes down the board. Once the cover has scrolled away, the way back and the title join it on the left (inert
- * until then, so the keyboard never lands on them unseen). Its background runs to the window's edges.
- */
-function SectionBar({
-  t,
-  fontId,
-  take,
-  running,
-  cover,
-  article,
-  back,
-}: {
-  t: Treatment;
-  fontId: string;
-  take: number;
-  running: boolean;
-  cover: RefObject<HTMLElement | null>;
-  article: RefObject<HTMLElement | null>;
-  back: ReactNode;
-}) {
-  const lingo = useLingo().t;
-  const [stuck, setStuck] = useState(false);
-  const [current, setCurrent] = useState<string | null>(null);
-  const line = useRef<HTMLSpanElement>(null);
-  // On a narrow screen the tabs scroll sideways: the lit one is kept in view, and a fade marks the side with more.
-  const tabs = useRef<HTMLElement>(null);
-  const [more, setMore] = useState({ before: false, after: false });
-  const measure = () => {
-    const nav = tabs.current;
-    if (!nav) return;
-    const before = nav.scrollLeft > 2;
-    const after = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2;
-    setMore((was) => (was.before === before && was.after === after ? was : { before, after }));
-  };
-  useEffect(() => {
-    const nav = tabs.current;
-    const link = nav?.querySelector<HTMLElement>('[aria-current="location"]');
-    if (!nav || !link || nav.scrollWidth <= nav.clientWidth) return;
-    const offset = link.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    nav.scrollTo({ left: offset - (nav.clientWidth - link.offsetWidth) / 2, behavior: reduce ? "auto" : "smooth" });
-  }, [current]);
-
-  // The lit tab's pill is one element under the tabs. After a click it slides to the tab the jump lights (translate,
-  // and scaleX only while it moves); the scrollspy moves it at once, since nothing but this bar follows the scroll.
-  const pill = useRef<HTMLSpanElement>(null);
-  const placed = useRef<{ x: number; w: number } | null>(null);
-  const slide = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [sliding, setSliding] = useState(false);
-  const place = useCallback((animate: boolean) => {
-    const el = pill.current;
-    const link = tabs.current?.querySelector<HTMLElement>('[aria-current="location"]');
-    if (!el) return;
-    if (!link) {
-      el.style.opacity = "0";
-      placed.current = null;
-      return;
-    }
-    const from = placed.current;
-    const to = { x: link.offsetLeft, w: link.offsetWidth };
-    const y = link.offsetTop;
-    Object.assign(el.style, {
-      opacity: "1",
-      width: `${to.w}px`,
-      height: `${link.offsetHeight}px`,
-      transform: `translate(${to.x}px, ${y}px)`,
-    });
-    placed.current = to;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (animate && from && !reduce && (from.x !== to.x || from.w !== to.w)) {
-      el.animate(
-        [{ transform: `translate(${from.x}px, ${y}px) scaleX(${from.w / to.w})` }, { transform: `translate(${to.x}px, ${y}px)` }],
-        { duration: 260, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
-      );
-    }
-  }, []);
-  useLayoutEffect(() => place(slide.current !== undefined), [current, place]);
-  useEffect(() => {
-    const nav = tabs.current;
-    if (!nav) return;
-    // A font arriving late re-sizes the tabs, not the bar: watch the tabs themselves.
-    const resized = new ResizeObserver(() => place(false));
-    for (const link of nav.querySelectorAll("a")) resized.observe(link);
-    return () => {
-      resized.disconnect();
-      clearTimeout(slide.current);
-    };
-  }, [place]);
-  const slideNext = () => {
-    clearTimeout(slide.current);
-    setSliding(true);
-    slide.current = setTimeout(() => {
-      slide.current = undefined;
-      setSliding(false);
-    }, 400);
-  };
-
-  useEffect(() => {
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      setStuck((cover.current?.getBoundingClientRect().bottom ?? 1) < 0);
-      let reading: string | null = null;
-      for (const [id] of SECTIONS) {
-        const heading = article.current?.querySelector(`#${id}`);
-        if (heading && heading.getBoundingClientRect().top <= 120) reading = id;
-      }
-      setCurrent(reading);
-      const box = article.current?.getBoundingClientRect();
-      if (box && line.current) {
-        const progress = Math.min(1, Math.max(0, -box.top / Math.max(1, box.height - window.innerHeight)));
-        line.current.style.transform = `scaleX(${progress})`;
-      }
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    schedule();
-    measure();
-    window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule);
-    window.addEventListener("resize", measure);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      window.removeEventListener("resize", measure);
-    };
-  }, [cover, article]);
-  const edge = (fade: boolean) => (fade ? "transparent" : "#000");
-  const mask =
-    more.before || more.after
-      ? `linear-gradient(to right, ${edge(more.before)}, #000 1.75rem, #000 calc(100% - 1.75rem), ${edge(more.after)})`
-      : undefined;
-
-  return (
-    <div className="sticky top-0 z-30 bg-background shadow-[0_0_0_100vmax_var(--background)] [clip-path:inset(0_-100vmax)] print:hidden">
-      <div className="flex items-center gap-3 py-2">
-        <div
-          inert={!stuck}
-          className={`flex min-w-0 shrink items-center gap-2.5 transition-opacity duration-200 ${stuck ? "opacity-100" : "opacity-0"}`}
-        >
-          {back}
-          <span className="hidden min-w-0 truncate leading-tight sm:block" style={titleStyle(titleFont(fontId), "1.45rem")}>
-            {t.title}
-          </span>
-          {take > 1 && (
-            <span className="hidden shrink-0 rounded-md border border-edge px-2 py-0.5 font-mono text-[12px] text-dim sm:inline">
-              {lingo.take(take)}
-            </span>
-          )}
-          {running && (
-            <span className="flex shrink-0 items-center gap-2 text-[13px] font-semibold">
-              <span aria-hidden className="size-2 rounded-full bg-foreground motion-safe:animate-pulse" />
-              <span className="hidden sm:inline">{lingo.cookingAgain}</span>
-            </span>
-          )}
-        </div>
-        <nav
-          ref={tabs}
-          aria-label="Treatment sections"
-          onScroll={measure}
-          // A trackpad swipe past the last tab stays in the bar, rather than becoming the browser's Back (which in the
-          // studio would leave the board).
-          className="quiet-scroll relative isolate -mx-1 ml-auto flex min-w-0 gap-1 overflow-x-auto overscroll-x-contain px-1"
-          style={{ maskImage: mask, WebkitMaskImage: mask }}
-        >
-          <span
-            ref={pill}
-            aria-hidden
-            className="pointer-events-none absolute top-0 left-0 -z-10 origin-left rounded-full bg-foreground opacity-0"
-          />
-          {SECTIONS.map(([id, label]) => (
-            <a
-              key={id}
-              href={`#${id}`}
-              onClick={(event) => {
-                slideNext();
-                jumpOnClick(event, article.current?.querySelector<HTMLElement>(`#${id}`));
-              }}
-              aria-current={current === id ? "location" : undefined}
-              // While the pill slides in, the lit label turns light as it arrives, never before.
-              style={sliding && current === id ? { transitionDelay: "140ms" } : undefined}
-              className="shrink-0 rounded-full px-3 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim transition-colors duration-150 hover:text-foreground aria-[current=location]:text-background"
-            >
-              {label}
-            </a>
-          ))}
-        </nav>
-      </div>
-      <div aria-hidden className="h-0.5 bg-line">
-        <span ref={line} className="block h-full origin-left bg-foreground" style={{ transform: "scaleX(0)" }} />
-      </div>
-    </div>
-  );
-}
-
-/** A strip of film under the beats, edge-printed with the house stock and the beat numbers. Director's cut only. */
-function FilmEdge({ count }: { count: number }) {
-  const holes = "mx-2.5 h-2.5 rounded-[3px] bg-[repeating-linear-gradient(90deg,#f2f0ea_0_14px,transparent_14px_26px)]";
-  return (
-    <div aria-hidden className="flex flex-col gap-2 rounded-2xl bg-[#1b1a17] py-2.5 print:hidden">
-      <span className={holes} />
-      <span className="truncate px-4 font-mono text-[14px] tracking-[0.14em] text-[#f2b33d]">
-        ITSGIVING 400 {Array.from({ length: count }, (_, i) => `▸ ${i + 1}`).join(" ")}
-      </span>
-      <span className={holes} />
-    </div>
-  );
-}
-
-/** Halfway down the board, an interval card, the way a Hindi film breaks for chai. Director's cut only. */
-function Interval() {
-  const lingo = useLingo().t;
-  return (
-    <aside
-      aria-label={lingo.interval.title}
-      className="flex flex-col items-center gap-2 rounded-[28px] bg-[#7a1238] px-6 py-10 text-center print:hidden"
-    >
-      <p
-        className="text-[clamp(2.75rem,6vw,4rem)] leading-none tracking-[0.04em] text-[#ffe7a3]"
-        style={{ fontFamily: "var(--font-tc-yatra), serif" }}
-      >
-        {lingo.interval.title}
-      </p>
-      <p className="text-[16px] text-[#fff3d6]">{lingo.interval.line}</p>
-    </aside>
-  );
-}
-
-/**
- * A digicam's date stamp, 'YY MM DD, for the day the treatment was built. In UTC, so a board rendered on the server
- * (a featured page) reads the same in every visitor's browser.
- */
-function dateStamp(iso: string): string {
-  const d = new Date(iso);
-  const two = (n: number) => String(n).padStart(2, "0");
-  return `'${two(d.getUTCFullYear() % 100)} ${two(d.getUTCMonth() + 1)} ${two(d.getUTCDate())}`;
-}
-
-/**
- * Printing names the pages after the treatment. Chrome takes the PDF's file name from the tab's title, and the running
- * footer (globals.css) can only take words from a style rule, so both get the title as printing starts; the tab's own
- * title comes back after. Only the board on screen answers: Next keeps pages it has left in the document, hidden.
- */
-function usePrintTitle(title: string, article: RefObject<HTMLElement | null>) {
-  useEffect(() => {
-    let tab: string | null = null;
-    const before = () => {
-      if (!article.current?.getClientRects().length) return;
-      tab = document.title;
-      document.title = `${title} (itsgiving treatment)`;
-      let footer = document.getElementById("print-footer");
-      if (!footer) {
-        footer = document.createElement("style");
-        footer.id = "print-footer";
-        document.head.append(footer);
-      }
-      // In Chrome this later rule beats the stylesheet's :first one, so the cover page's empty footer comes again after it.
-      footer.textContent = `@page { @bottom-left { content: ${cssString(title)}; } } @page :first { @bottom-left { content: ""; } }`;
-    };
-    const after = () => {
-      if (tab !== null) document.title = tab;
-      tab = null;
-    };
-    window.addEventListener("beforeprint", before);
-    window.addEventListener("afterprint", after);
-    return () => {
-      window.removeEventListener("beforeprint", before);
-      window.removeEventListener("afterprint", after);
-    };
-  }, [title, article]);
 }
 
 export function Board({
@@ -1132,7 +662,7 @@ export function Board({
                 <>
                   <dt className="text-faint">{own ? "Your taste" : "Director's taste"}</dt>
                   <dd>
-                    {names(t.director.slice(0, 8))}
+                    {listWithYears(t.director.slice(0, 8))}
                     {t.director.length > 8 ? ` and ${t.director.length - 8} more` : ""}
                   </dd>
                 </>

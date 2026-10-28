@@ -173,7 +173,7 @@ function PosterCard({ cover }: { cover: FeaturedCover }) {
 
 /** `live`: the server has its keys, so no covers means the build made none, not that it couldn't. */
 export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; live?: boolean }) {
-  const { t, unc } = useLingo();
+  const { t } = useLingo();
   // Without featured treatments, the header's Examples link still needs somewhere to land, and the page says why.
   if (covers.length === 0) {
     return (
@@ -216,17 +216,7 @@ export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; 
               aria-label={`${t.nextUp.title}: start a treatment`}
               className="press flex w-full flex-col overflow-hidden rounded-[26px] bg-frame transition-transform duration-200 [--press:0.98] [outline:2px_dashed_var(--accent)] [outline-offset:-10px] hover:-translate-y-1"
             >
-              <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
-                <span className="font-mono text-[12px] text-dim">{t.nextUp.label}</span>
-                <span className="flex flex-col gap-3">
-                  <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
-                    {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
-                  </span>
-                  <span className={posterTitle}>{t.nextUp.title}</span>
-                  <span className="text-[15px] text-dim">Your artist or film, your city</span>
-                </span>
-              </span>
-              <span aria-hidden className="h-3 w-full bg-[#2a2926]" />
+              <BlankPosterBody label={t.nextUp.label} title={t.nextUp.title} line="Your artist or film, your city" />
             </Link>
           </li>
         </ul>
@@ -235,12 +225,32 @@ export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; 
   );
 }
 
+/** A poster still to be made, in the dashed frame: its label, the "it's giving… ?" sticker, a title and a line. */
+function BlankPosterBody({ label, title, titleClass = "", line }: { label: string; title: string; titleClass?: string; line: string }) {
+  const { t, unc } = useLingo();
+  return (
+    <>
+      <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
+        <span className="font-mono text-[12px] text-dim">{label}</span>
+        <span className="flex flex-col gap-3">
+          <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
+            {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
+          </span>
+          <span className={`${posterTitle} ${titleClass}`}>{title}</span>
+          <span className="text-[15px] text-dim">{line}</span>
+        </span>
+      </span>
+      <span aria-hidden className="h-3 w-full bg-[#2a2926]" />
+    </>
+  );
+}
+
 /**
  * The brief as a poster before it is built: the artist (or the films a short is after) and the city, filled in as the
  * director types, beside the studio's form. It repeats the form, so screen readers skip it.
  */
 export function YourPoster({ form }: { form: FormState }) {
-  const { t, unc } = useLingo();
+  const { t } = useLingo();
   const isVideo = form.format === "music_video";
   const who = form.artist.trim();
   const after = splitTitles(form.touchstones);
@@ -251,17 +261,12 @@ export function YourPoster({ form }: { form: FormState }) {
       aria-hidden
       className="surface-dark flex flex-col overflow-hidden rounded-[26px] bg-frame [outline:2px_dashed_var(--accent)] [outline-offset:-10px]"
     >
-      <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
-        <span className="font-mono text-[12px] text-dim">{t.yourPoster}</span>
-        <span className="flex flex-col gap-3">
-          <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
-            {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
-          </span>
-          <span className={`${posterTitle} ${(isVideo ? who : after.length > 0) ? "text-foreground" : "text-faint"}`}>{title}</span>
-          <span className="text-[15px] text-dim">{briefLine(form)}</span>
-        </span>
-      </span>
-      <span className="h-3 w-full bg-[#2a2926]" />
+      <BlankPosterBody
+        label={t.yourPoster}
+        title={title}
+        titleClass={(isVideo ? who : after.length > 0) ? "text-foreground" : "text-faint"}
+        line={briefLine(form)}
+      />
     </div>
   );
 }

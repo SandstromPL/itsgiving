@@ -8,6 +8,7 @@ import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
 import { accountsOn } from "@/lib/supabase/config";
 import { Board } from "./board";
+import { useBoardHistory } from "./board-history";
 import { BriefForm } from "./brief-form";
 import { useReceipts } from "./eggs";
 import { briefLine, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
@@ -21,83 +22,17 @@ import { Picker } from "./picker";
 import { SaveControl } from "./save";
 import { studioSession, type RunInput } from "./session";
 import { SiteHeader } from "./site-header";
-import { StreamError, streamTreatment } from "./stream";
+import { useRunStream } from "./run-stream";
 import { RunStage, Timeline, replaySteps } from "./timeline";
+import { Toast, useToast } from "./toast";
 import { backButton, pillButton, stopButton } from "./ui";
 
 type Phase = "idle" | "running" | "needs_input" | "done" | "error";
-
-/**
- * The server reports progress at least every few seconds, even while a model thinks (TIMING and TICK_MS
- * in pipeline.ts), so this much silence means the connection is gone.
- */
-const STALL_MS = 75_000;
-
-/**
- * A board gets its own history entry (same URL, this marker in its state), so the browser's Back button returns
- * to the brief and Forward reopens the board. Next.js keeps its own fields alongside it.
- */
-const BOARD_ENTRY = "board";
-const onBoardEntry = () => window.history.state?.itsgiving === BOARD_ENTRY;
-
-/**
- * The history entry the page is on, by its Navigation API key, or null where the browser has no Navigation API.
- * Coming back to the entry the studio was left on means Back or Forward; a link to the studio makes a new one.
- */
-const entryKey = () =>
-  (window as Window & { navigation?: { currentEntry?: { key: string } | null } }).navigation?.currentEntry?.key ?? null;
 
 const STUDIO_TITLE = "Studio: itsgiving";
 
 const stopRunningSteps = (summary: string) => (steps: StepEvent[]) =>
   steps.map((s): StepEvent => (s.status === "running" ? { ...s, status: "error", summary } : s));
-
-interface ToastNote {
-  title: string;
-  line: string;
-  open: boolean;
-}
-
-/** How long the toast stays, counted only while the tab is in view. */
-const TOAST_MS = 6000;
-
-/**
- * A fresh treatment lands with a short toast; the live region already announced it, so this is for the eyes. It's
- * always there, closed until a treatment lands: it rises from the corner a moment after the board (once its letterbox
- * has begun to open), sinks back out keeping its words, and lets taps through to whatever is under it.
- */
-function Toast({ toast }: { toast: ToastNote | null }) {
-  return (
-    <div
-      aria-hidden
-      data-open={toast?.open || undefined}
-      className="pointer-events-none fixed right-4 bottom-4 z-40 flex max-w-[min(25rem,calc(100vw-2rem))] translate-y-[calc(100%+1rem)] items-center gap-3.5 rounded-[20px] bg-ink px-4 py-3.5 text-white opacity-0 shadow-[6px_6px_0_rgb(0_0_0/0.15)] transition-[opacity,translate] duration-200 data-open:translate-y-0 data-open:opacity-100 data-open:delay-400 data-open:duration-300 print:hidden"
-    >
-      {toast && (
-        <>
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#121211"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M5 12l5 5 9-10" />
-            </svg>
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-[19px] leading-tight font-extrabold tracking-[-0.03em]">{toast.title}</span>
-            <span className="truncate text-[14px] text-[#d9d5cc]">{toast.line}</span>
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
 
 function FailCard({ problem, onRetry }: { problem: string; onRetry?: () => void }) {
   const { t } = useLingo();
@@ -139,7 +74,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   /** The board was handed back after signing in to save it: SaveControl saves it once the session is known. */
   const [saveOnOpen, setSaveOnOpen] = useState(false);
   /** The board, or the brief around it: a treatment stays in memory when the director steps back out. */
-  const [view, setView] = useState<"studio" | "board">("studio");
+  const { view, showBoard, leaveBoard } = useBoardHistory();
+  const stream = useRunStream();
   /** The run in flight (or last attempted), and the run that produced the board. */
   const [pending, setPending] = useState<RunInput | null>(saved.board?.shown ?? null);
   const [shown, setShown] = useState<RunInput | null>(saved.board?.shown ?? null);
@@ -151,23 +87,13 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const [startedAt, setStartedAt] = useState(0);
   /** Which take of the brief is on the board: 1, then one more per rework. */
   const [take, setTake] = useState(saved.board?.take ?? 1);
-  const [toast, setToast] = useState<ToastNote | null>(null);
-  const active = useRef<AbortController | null>(null);
-  const stopActive = useRef<() => void>(() => {});
+  const [toast, setToast] = useToast();
   const focusTitle = useRef(false);
   const failedBefore = useRef(false);
   /** A rework a featured page asked for, run once its board has opened. */
   const pendingNudge = useRef<Nudge | null>(null);
   /** The latest run(), for the rework one run starts as it lands; kept current after each render. */
   const runLatest = useRef<(input: RunInput) => Promise<void>>(async () => {});
-  /** Where they were on the board when they stepped out, for Forward; null when the board should open at its top. */
-  const boardSpot = useRef<number | null>(null);
-  /** Set when the director steps back out of a board, so the brief can focus the way back in. */
-  const leftBoard = useRef(false);
-  const viewNow = useRef(view);
-  /** Where the page is, and in which history entry: kept when the director leaves for another page. */
-  const spot = useRef<{ y: number; key: string | null }>({ y: 0, key: null });
-  const leftAt = useRef<{ y: number; key: string | null } | null>(null);
   const running = phase === "running";
   const onBoard = treatment !== null && view === "board";
   useReceipts(treatment);
@@ -189,64 +115,6 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     return () => document.removeEventListener("visibilitychange", show);
   }, [running, onBoard, treatment]);
 
-  // Back and Forward move between the brief and the board, each kept where the director left it. The page puts them
-  // back itself: the browser's own restoring would land after it, at wherever the entry was first written. Only on
-  // this page's entries: the homepage and featured pages keep the browser's own.
-  useEffect(() => {
-    window.history.scrollRestoration = "manual";
-    // Back or Forward from another page lands on this page's entry, which the browser won't restore: this does. The
-    // traversal's own events can't say so, since Next has shown the page again before they fire.
-    const left = leftAt.current;
-    if (left?.key && left.key === entryKey()) window.scrollTo({ top: left.y });
-    spot.current = { y: window.scrollY, key: entryKey() };
-    // Only this page's own scrolling: leaving for "/#now-showing" scrolls the next page before this page lets go.
-    const onScroll = () => {
-      if (window.location.pathname === "/studio") spot.current = { y: window.scrollY, key: entryKey() };
-    };
-    const onPop = (event: PopStateEvent) => {
-      // An entry with no state comes from a plain "#id" jump (the address bar, say): a place on this view, not a move
-      // between the brief and the board.
-      if (event.state === null) return;
-      const next = onBoardEntry() ? "board" : "studio";
-      if (next === viewNow.current) return;
-      if (next === "studio") {
-        boardSpot.current = window.scrollY;
-        leftBoard.current = true;
-      }
-      setView(next);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("popstate", onPop);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("popstate", onPop);
-      leftAt.current = spot.current;
-      // The mode is kept per history entry, and this runs once the next page's entry is current: that page keeps the
-      // browser's own restoring. (Putting back the mode found on arrival leaked "manual": arriving by Back, the
-      // studio's entry still holds it.)
-      window.history.scrollRestoration = "auto";
-    };
-  }, []);
-
-  useEffect(() => {
-    viewNow.current = view;
-    if (view === "board") {
-      if (boardSpot.current !== null) window.scrollTo({ top: boardSpot.current });
-      boardSpot.current = null;
-    } else if (leftBoard.current) {
-      // Back at the brief from a board: the top of the page, with focus on the way back in.
-      leftBoard.current = false;
-      window.scrollTo({ top: 0 });
-      document.getElementById("reopen-board")?.focus({ preventScroll: true });
-    }
-    // A board or the brief can be a new history entry without any scrolling to note it.
-    spot.current = { y: window.scrollY, key: entryKey() };
-  }, [view]);
-
-  // Leaving the page mid-run shouldn't keep spending model quota and credit. Next keeps a page it leaves (hidden, for
-  // Back), so this stops the run as Stop does: coming back finds it stopped, not failed.
-  useEffect(() => () => stopActive.current(), []);
-
   // Move focus to the treatment's title once it renders, new or reopened (it also scrolls it into view).
   useEffect(() => {
     if (!treatment || view !== "board" || !focusTitle.current) return;
@@ -255,42 +123,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     onScreen("treatment-title")?.focus();
   }, [treatment, view]);
 
-  // The toast's time runs only while the tab is in view: a director who looked away during the run (the tab's title
-  // says "Ready:") still sees it on coming back.
-  useEffect(() => {
-    if (!toast?.open) return;
-    let left = TOAST_MS;
-    let since = 0;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const run = () => {
-      since = Date.now();
-      timer = setTimeout(() => setToast((note) => note && { ...note, open: false }), left);
-    };
-    const onVisibility = () => {
-      if (!document.hidden) return run();
-      clearTimeout(timer);
-      left -= Date.now() - since;
-    };
-    if (!document.hidden) run();
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [toast]);
-
   const run = async (input: RunInput) => {
-    active.current?.abort();
-    const controller = new AbortController();
-    active.current = controller;
-    let finished = false;
-    let stalled = false;
-    let stopped = false;
     const began = Date.now();
-    stopActive.current = () => {
-      stopped = true;
-      controller.abort();
-    };
 
     setPending(input);
     setFormProblem(null);
@@ -300,12 +134,6 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     setStartedAt(began);
     setPhase("running");
     setStatus("Building the treatment…");
-
-    const stall = () => {
-      stalled = true;
-      controller.abort();
-    };
-    let watchdog = setTimeout(stall, STALL_MS);
 
     const fail = (message: string) => {
       failedBefore.current = true;
@@ -326,9 +154,6 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     };
 
     const onEvent = (event: AgentEvent) => {
-      if (active.current !== controller) return; // a newer run has taken over
-      clearTimeout(watchdog);
-      watchdog = setTimeout(stall, STALL_MS);
       switch (event.type) {
         case "start":
           setModes({ qloo: event.qlooMode, llm: event.llmMode });
@@ -343,23 +168,17 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
           });
           break;
         case "needs_input":
-          finished = true;
           setQuestion({ message: event.message, items: event.items });
           setPhase("needs_input");
           setStatus(`itsgiving needs your choice. ${event.message}`);
           break;
         case "treatment": {
-          finished = true;
           focusTitle.current = true;
           setTreatment(event.treatment);
           setSeal(event.seal ?? null);
           setSaveOnOpen(false);
           // A board opened from the brief gets its history entry; a rework replaces the board in place.
-          if (!onBoardEntry()) {
-            boardSpot.current = null;
-            window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
-          }
-          setView("board");
+          showBoard("unless-there");
           setShown(input);
           setPhase("done");
           if (event.cached) setSteps(replaySteps(event.treatment));
@@ -381,7 +200,6 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
           break;
         }
         case "error":
-          finished = true;
           if (event.field === "stand_ins") askOnField({ field: "standIns", message: event.message });
           else fail(event.message);
           break;
@@ -390,26 +208,15 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
       }
     };
 
-    try {
-      await streamTreatment(toBrief(input.form, input.picks, input.nudges), onEvent, controller.signal);
-      if (active.current === controller && !finished) fail("The connection closed before the treatment finished. Try again.");
-    } catch (err) {
-      if (active.current !== controller) return;
-      if (stopped) {
+    await stream.start(toBrief(input.form, input.picks, input.nudges), onEvent, {
+      fail,
+      stopped: () => {
         pendingNudge.current = null;
         setPhase(treatment ? "done" : "idle");
         setSteps(stopRunningSteps("Stopped."));
         setStatus("Stopped.");
-      } else if (stalled) {
-        fail("The server went quiet for over a minute, so itsgiving stopped waiting. Try again.");
-      } else {
-        if (err instanceof StreamError && err.detail) console.error(err.detail);
-        else if (!(err instanceof StreamError)) console.error(err);
-        fail(err instanceof StreamError ? err.message : "Something went wrong while building the treatment. Try again.");
-      }
-    } finally {
-      clearTimeout(watchdog);
-    }
+      },
+    });
   };
 
   useEffect(() => {
@@ -461,10 +268,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     setPending(input);
     setPhase("done");
     setTake(1);
-    boardSpot.current = null;
-    window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
     focusTitle.current = true;
-    setView("board");
+    showBoard("new");
     window.scrollTo({ top: 0 });
     setStatus(`Opened ${handed.title}.`);
     if (nudge) {
@@ -473,22 +278,9 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     }
   };
 
-  /** Back to the brief, through the browser's history when the board has its entry, so Back and Forward agree. */
-  const leaveBoard = () => {
-    if (onBoardEntry()) {
-      window.history.back();
-    } else {
-      boardSpot.current = window.scrollY;
-      leftBoard.current = true;
-      setView("studio");
-    }
-  };
-
   const reopenBoard = () => {
-    boardSpot.current = null;
-    window.history.pushState({ itsgiving: BOARD_ENTRY }, "");
     focusTitle.current = true;
-    setView("board");
+    showBoard("new");
     window.scrollTo({ top: 0 });
   };
 
@@ -551,7 +343,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 <span aria-hidden className="size-2.5 rounded-full bg-foreground motion-safe:animate-pulse" />
                 <span className="font-bold">{lingo.cookingAgain}</span>
                 {current && <span className="text-[15px] text-dim">{current}</span>}
-                <button type="button" onClick={() => stopActive.current()} className={stopButton}>
+                <button type="button" onClick={stream.stop} className={stopButton}>
                   Stop
                 </button>
               </div>
@@ -583,7 +375,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-line bg-card py-2 pr-2 pl-5 sm:rounded-full">
               <span className="font-bold">{briefLine(pending.form)}</span>
               <span className="text-[15px] text-dim">{THINKING[pending.form.thinking].label} thinking</span>
-              <button type="button" onClick={() => stopActive.current()} className={stopButton}>
+              <button type="button" onClick={stream.stop} className={stopButton}>
                 Stop
               </button>
             </div>
@@ -627,7 +419,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                   form={form}
                   onChange={setForm}
                   onSubmit={() => startOver(form)}
-                  onStop={() => stopActive.current()}
+                  onStop={stream.stop}
                   running={running}
                   problem={formProblem}
                   examples={TRY}

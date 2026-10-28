@@ -46,6 +46,11 @@ export function withoutIdentity<T>(tags: readonly T[], name = (tag: T) => (tag a
   return tags.filter((tag) => !isIdentityTag(name(tag)));
 }
 
+/** Several films as "Title (Year), Title (Year)". */
+export function listWithYears(items: readonly { name: string; year?: number | null }[]): string {
+  return items.map((item) => withYear(item.name, item.year)).join(", ");
+}
+
 /** A film as "Title (Year)", or the bare title when the year is unknown: so many titles are shared that the year is part of the name. */
 export function withYear(name: string, year?: number | null): string {
   return year ? `${name} (${year})` : name;

@@ -37,6 +37,55 @@ const option =
   "cursor-pointer rounded-full px-3 py-2.5 text-center text-[15px] text-dim hover:text-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
 const chip = "flex items-center gap-0.5 rounded-full border border-line bg-card py-0.5 pr-0.5 pl-3 text-[13px]";
 
+/** A labelled field: the label, then whatever the field holds (its control, a hint, its message). */
+function Field({ id, label: text, children }: { id: string; label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={label}>
+        {text}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/** A choice of two as a switch: radios named `name`, the chosen one a solid pill. */
+function Segmented<T extends string>({
+  name,
+  value,
+  options,
+  onChange,
+  describedBy,
+}: {
+  name: string;
+  value: T;
+  options: [T, ReactNode][];
+  onChange: (value: T) => void;
+  describedBy?: string;
+}) {
+  return (
+    <div className={track}>
+      {options.map(([key, text]) => (
+        <label
+          key={key}
+          className={`${option} has-checked:bg-foreground has-checked:font-bold has-checked:text-background has-checked:hover:text-background`}
+        >
+          <input
+            type="radio"
+            name={name}
+            value={key}
+            checked={value === key}
+            onChange={() => onChange(key)}
+            aria-describedby={describedBy}
+            className="sr-only"
+          />
+          {text}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 /** A field's accessibility wiring: marked invalid and pointed at the message when it is the one failing. */
 type Describe = (name: FieldName, hint?: string) => { "aria-invalid"?: boolean; "aria-describedby"?: string };
 
@@ -275,10 +324,7 @@ export function BriefForm({
   }, [problem]);
 
   const artist = (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={`${ids}-artist`} className={label}>
-        {isVideo ? "Artist" : "Music its audience loves (optional)"}
-      </label>
+    <Field id={`${ids}-artist`} label={isVideo ? "Artist" : "Music its audience loves (optional)"}>
       <input
         id={`${ids}-artist`}
         className={field}
@@ -294,14 +340,11 @@ export function BriefForm({
         </p>
       )}
       {message("artist")}
-    </div>
+    </Field>
   );
 
   const standIns = (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={`${ids}-standins`} className={label}>
-        Stand-in artists (optional)
-      </label>
+    <Field id={`${ids}-standins`} label="Stand-in artists (optional)">
       <textarea
         id={`${ids}-standins`}
         className={`${field} resize-y`}
@@ -316,14 +359,11 @@ export function BriefForm({
         carry the audience, and the treatment keeps your artist&apos;s name.
       </p>
       {message("standIns")}
-    </div>
+    </Field>
   );
 
   const touchstones = (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={`${ids}-touchstones`} className={label}>
-        {isVideo ? "Reference films (optional)" : "Films it's after"}
-      </label>
+    <Field id={`${ids}-touchstones`} label={isVideo ? "Reference films (optional)" : "Films it's after"}>
       <textarea
         id={`${ids}-touchstones`}
         className={`${field} resize-y`}
@@ -340,7 +380,7 @@ export function BriefForm({
         Feature films only: Qloo doesn&apos;t list short films.
       </p>
       {message("touchstones")}
-    </div>
+    </Field>
   );
 
   return (
@@ -360,32 +400,17 @@ export function BriefForm({
 
       <fieldset>
         <legend className="sr-only">Format</legend>
-        <div className={track}>
-          {(Object.keys(FORMATS) as Format[]).map((format) => (
-            <label
-              key={format}
-              className={`${option} has-checked:bg-foreground has-checked:font-bold has-checked:text-background has-checked:hover:text-background`}
-            >
-              <input
-                type="radio"
-                name="format"
-                value={format}
-                checked={form.format === format}
-                onChange={() => set("format", format)}
-                className="sr-only"
-              />
-              {FORMATS[format]}
-            </label>
-          ))}
-        </div>
+        <Segmented
+          name="format"
+          value={form.format}
+          options={(Object.keys(FORMATS) as Format[]).map((format) => [format, FORMATS[format]])}
+          onChange={(format) => set("format", format)}
+        />
       </fieldset>
 
       {isVideo ? artist : touchstones}
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={`${ids}-city`} className={label}>
-          Shoot city
-        </label>
+      <Field id={`${ids}-city`} label="Shoot city">
         <input
           id={`${ids}-city`}
           className={field}
@@ -395,7 +420,7 @@ export function BriefForm({
           autoComplete="address-level2"
           {...describe("city")}
         />
-      </div>
+      </Field>
       {message("city")}
 
       <div className="overflow-hidden rounded-[20px] border border-line">
@@ -456,25 +481,13 @@ export function BriefForm({
           </div>
           <fieldset className="flex flex-col gap-1.5">
             <legend className={`mb-1.5 ${label}`}>Thinking</legend>
-            <div className={track}>
-              {(Object.keys(THINKING) as Thinking[]).map((thinking) => (
-                <label
-                  key={thinking}
-                  className={`${option} has-checked:bg-foreground has-checked:font-bold has-checked:text-background has-checked:hover:text-background`}
-                >
-                  <input
-                    type="radio"
-                    name="thinking"
-                    value={thinking}
-                    checked={form.thinking === thinking}
-                    onChange={() => set("thinking", thinking)}
-                    aria-describedby={`${ids}-thinking-hint`}
-                    className="sr-only"
-                  />
-                  {t.thinking[thinking]}
-                </label>
-              ))}
-            </div>
+            <Segmented
+              name="thinking"
+              value={form.thinking}
+              options={(Object.keys(THINKING) as Thinking[]).map((thinking) => [thinking, t.thinking[thinking]])}
+              onChange={(thinking) => set("thinking", thinking)}
+              describedBy={`${ids}-thinking-hint`}
+            />
             <p id={`${ids}-thinking-hint`} className={hint}>
               {THINKING[form.thinking].label} thinking:{" "}
               {THINKING[form.thinking].hint.charAt(0).toLowerCase() + THINKING[form.thinking].hint.slice(1)}
