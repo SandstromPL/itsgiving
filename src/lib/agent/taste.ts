@@ -43,20 +43,6 @@ export function getTasteDeps(): TasteDeps {
   return { tmdb: new TmdbClient(tmdbConfigFromEnv()), qloo: getQlooClient() };
 }
 
-async function inPool<T, R>(items: T[], size: number, work: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(size, items.length) }, async () => {
-      while (next < items.length) {
-        const i = next++;
-        results[i] = await work(items[i]);
-      }
-    }),
-  );
-  return results;
-}
-
 export async function importTaste(text: string, deps: TasteDeps, signal?: AbortSignal): Promise<TasteImport> {
   const listId = tmdbListId(text);
   const pasted = imdbIdsIn(text);
@@ -64,8 +50,8 @@ export async function importTaste(text: string, deps: TasteDeps, signal?: AbortS
   let wanted: { imdb?: string; title: string; year?: number }[];
   if (listId) {
     const list = await deps.tmdb.list(listId, IMPORT_LIMIT, signal);
-    // Six at a time stays well under TMDB's 40 requests a second.
-    const ids = await inPool(list.items, 6, (item) => deps.tmdb.imdbId(item, signal));
+    // The client keeps six requests in flight at most, well under TMDB's 40 a second.
+    const ids = await Promise.all(list.items.map((item) => deps.tmdb.imdbId(item, signal)));
     source = { kind: "tmdb", id: list.id, name: list.name, total: list.total };
     wanted = list.items.map((item, i) => ({ imdb: ids[i], title: item.title, year: item.year }));
   } else if (pasted.length > 0) {

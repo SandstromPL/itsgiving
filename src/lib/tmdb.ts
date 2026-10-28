@@ -1,14 +1,18 @@
 import { request } from "node:https";
 import { defaultSleep, type FetchLike } from "./qloo";
 
-// The Movie Database, used for two things. It turns a director's public TMDB list into IMDb IDs, which Qloo looks up
-// exactly (/entities with external.imdb.ids), so an imported film never needs the ambiguity picker. And it gives a
-// reference film's still: Qloo's image of a film is its poster, whose own lettering fights a treatment's title.
+// The Movie Database, used for three things. It turns a director's public TMDB list into IMDb IDs, which Qloo looks up
+// exactly (/entities with external.imdb.ids), so an imported film never needs the ambiguity picker. It gives a
+// reference film's still: Qloo's image of a film is its poster, whose own lettering fights a treatment's title. And it
+// names people, which Qloo doesn't: a reference's characters, for a treatment's characters to be drawn from, and the
+// parts an actor is known for.
 // Server-side only: the key never reaches the browser. Checked against developer.themoviedb.org on 2026-10-25: list
 // details are GET /3/list/{id} (paged), IMDb IDs come from GET /3/{movie|tv}/{id}/external_ids, the limit is about 40
 // requests a second, and a read access token goes in a Bearer header while a v3 API key goes in the api_key query
 // parameter. GET /3/find/{imdb_id}?external_source=imdb_id gives a film's backdrop_path (live, 2026-10-26: film frames
-// without lettering, e.g. Darlings, Riceboy Sleeps), served from image.tmdb.org/t/p/{size}{path}.
+// without lettering, e.g. Darlings, Riceboy Sleeps), served from image.tmdb.org/t/p/{size}{path}. Live, 2026-10-29: a
+// film's characters come from /3/movie/{id}/credits, a series' from /3/tv/{id}/aggregate_credits (each actor's parts
+// across its seasons), and an actor's parts from /3/person/{id}/combined_credits.
 
 export const TMDB_BASE_URL = "https://api.themoviedb.org";
 export const TMDB_IMAGE_URL = "https://image.tmdb.org/t/p";
@@ -114,6 +118,46 @@ function toItem(raw: RawItem): TmdbListItem[] {
   return [{ tmdbId: raw.id, kind, title, ...(year > 1800 ? { year } : {}) }];
 }
 
+/** A film or series as TMDB knows it, found by its IMDb ID. */
+export interface TmdbFound {
+  kind: "movie" | "tv";
+  tmdbId: number;
+  /** A 1280 px frame without lettering, when TMDB has one. */
+  still?: string;
+}
+
+/** One of a title's characters as TMDB credits it: Anna, played by Jessie Buckley. */
+export interface TmdbCharacter {
+  name: string;
+  actor: string;
+}
+
+/** A part an actor is known for, as TMDB credits it. */
+export interface KnownRole {
+  character: string;
+  title: string;
+  year?: number;
+}
+
+/** At most this many requests in flight per client: six stays well under TMDB's 40 requests a second. */
+const IN_FLIGHT = 6;
+
+/** Credits that aren't a part to draw on: playing oneself, hosting, narrating, a voice, an uncredited extra. */
+const NOT_A_PART = /^(self|himself|herself|themselves|narrator|host|guest|various)\b|\((voice|uncredited)\)/i;
+
+/** TMDB's genres for news, reality and talk shows: an appearance on one isn't a part. */
+const NOT_A_SHOW = new Set([10763, 10764, 10767]);
+
+/** A character's name as credited, tidied, or undefined when the credit isn't a part. */
+function partName(raw: unknown): string | undefined {
+  const name = typeof raw === "string" ? raw.replace(/\s+/g, " ").trim() : "";
+  return name && !NOT_A_PART.test(name) ? name.slice(0, 60).trim() : undefined;
+}
+
+function stillUrl(path: unknown): string | undefined {
+  return typeof path === "string" && /^\/[\w-]+\.(jpg|png|webp)$/.test(path) ? `${TMDB_IMAGE_URL}/w1280${path}` : undefined;
+}
+
 function problemFor(status: number): string {
   if (status === 401) return "TMDB rejected this server's key. Check TMDB_API_KEY.";
   if (status === 404) return "TMDB has no public list with that ID. Check the link, and that the list is public.";
@@ -122,10 +166,26 @@ function problemFor(status: number): string {
 }
 
 export class TmdbClient {
+  private active = 0;
+  private readonly waiting: (() => void)[] = [];
+
   constructor(private readonly options: TmdbConfig & { fetch?: FetchLike; timeoutMs?: number }) {}
 
   get configured(): boolean {
     return Boolean(this.options.apiKey);
+  }
+
+  /** Runs `work` once fewer than IN_FLIGHT requests are out. A finished request hands its place to the next in line. */
+  private async inTurn<T>(work: () => Promise<T>): Promise<T> {
+    if (this.active < IN_FLIGHT) this.active++;
+    else await new Promise<void>((resolve) => this.waiting.push(resolve));
+    try {
+      return await work();
+    } finally {
+      const next = this.waiting.shift();
+      if (next) next();
+      else this.active--;
+    }
   }
 
   private async get<T>(path: string, params: Record<string, string | number>, signal?: AbortSignal): Promise<T> {
@@ -140,10 +200,12 @@ export class TmdbClient {
       const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 8_000);
       let response: Response;
       try {
-        response = await (this.options.fetch ?? ipv4Fetch)(`${this.options.baseUrl}${path}?${query}`, {
-          headers: { Accept: "application/json", ...(bearer ? { Authorization: `Bearer ${key}` } : {}) },
-          signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-        });
+        response = await this.inTurn(() =>
+          (this.options.fetch ?? ipv4Fetch)(`${this.options.baseUrl}${path}?${query}`, {
+            headers: { Accept: "application/json", ...(bearer ? { Authorization: `Bearer ${key}` } : {}) },
+            signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+          }),
+        );
       } catch (err) {
         signal?.throwIfAborted();
         if (attempt < 2 && !timeout.aborted) {
@@ -192,16 +254,79 @@ export class TmdbClient {
     return data.imdb_id && /^tt\d{7,10}$/.test(data.imdb_id) ? data.imdb_id : undefined;
   }
 
-  /** A film's (or series') backdrop by its IMDb ID, as a 1280 px image URL, if TMDB has one. */
-  async backdrop(imdbId: string, signal?: AbortSignal): Promise<string | undefined> {
+  /** A film or series by its IMDb ID, with its still, if TMDB has it. */
+  async find(imdbId: string, signal?: AbortSignal): Promise<TmdbFound | undefined> {
     if (!/^tt\d{7,10}$/.test(imdbId)) return undefined;
-    type Found = { backdrop_path?: string | null };
+    type Found = { id?: number; backdrop_path?: string | null };
     const data = await this.get<{ movie_results?: Found[]; tv_results?: Found[] }>(
       `/3/find/${imdbId}`,
       { external_source: "imdb_id" },
       signal,
     );
-    const path = (data.movie_results?.[0] ?? data.tv_results?.[0])?.backdrop_path;
-    return path && /^\/[\w-]+\.(jpg|png|webp)$/.test(path) ? `${TMDB_IMAGE_URL}/w1280${path}` : undefined;
+    const movie = data.movie_results?.[0];
+    const hit = movie ?? data.tv_results?.[0];
+    if (typeof hit?.id !== "number") return undefined;
+    const still = stillUrl(hit.backdrop_path);
+    return { kind: movie ? "movie" : "tv", tmdbId: hit.id, ...(still ? { still } : {}) };
+  }
+
+  /** A film's (or series') backdrop by its IMDb ID, as a 1280 px image URL, if TMDB has one. */
+  async backdrop(imdbId: string, signal?: AbortSignal): Promise<string | undefined> {
+    return (await this.find(imdbId, signal))?.still;
+  }
+
+  /** A title's top-billed characters, up to three, one per actor: a series' across its seasons. */
+  async characters(title: TmdbFound, signal?: AbortSignal): Promise<TmdbCharacter[]> {
+    type Member = { name?: string; character?: string; order?: number; roles?: { character?: string }[] };
+    const path = title.kind === "movie" ? `/3/movie/${title.tmdbId}/credits` : `/3/tv/${title.tmdbId}/aggregate_credits`;
+    const data = await this.get<{ cast?: Member[] }>(path, {}, signal);
+    const characters: TmdbCharacter[] = [];
+    for (const member of [...(data.cast ?? [])].sort((a, b) => (a.order ?? 999) - (b.order ?? 999))) {
+      const name = partName(member.character ?? member.roles?.[0]?.character);
+      const actor = member.name?.trim();
+      if (!name || !actor || characters.some((c) => c.actor === actor)) continue;
+      characters.push({ name, actor });
+      if (characters.length === 3) break;
+    }
+    return characters;
+  }
+
+  /**
+   * The two parts a person is best known for, by their IMDb ID (nm…): leads or close to them in films (billed in the
+   * first four) and regular parts in series (three episodes or more), the titles with the most TMDB votes first.
+   * Playing oneself, voices, uncredited parts and talk, news or reality shows don't count.
+   */
+  async roles(imdbId: string, signal?: AbortSignal): Promise<KnownRole[]> {
+    if (!/^nm\d{7,10}$/.test(imdbId)) return [];
+    const found = await this.get<{ person_results?: { id?: number }[] }>(`/3/find/${imdbId}`, { external_source: "imdb_id" }, signal);
+    const id = found.person_results?.[0]?.id;
+    if (typeof id !== "number") return [];
+    type Credit = {
+      media_type?: string;
+      title?: string;
+      name?: string;
+      character?: string;
+      order?: number;
+      episode_count?: number;
+      vote_count?: number;
+      release_date?: string;
+      first_air_date?: string;
+      genre_ids?: number[];
+    };
+    const data = await this.get<{ cast?: Credit[] }>(`/3/person/${id}/combined_credits`, {}, signal);
+    const parts = (data.cast ?? [])
+      .filter((c) => !c.genre_ids?.some((g) => NOT_A_SHOW.has(g)))
+      .filter((c) => (c.media_type === "tv" ? (c.episode_count ?? 0) >= 3 : (c.order ?? 0) <= 3))
+      .sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
+    const roles: KnownRole[] = [];
+    for (const credit of parts) {
+      const character = partName(credit.character);
+      const title = (credit.title ?? credit.name)?.trim().slice(0, 80);
+      if (!character || !title || roles.some((r) => r.title === title)) continue;
+      const year = Number((credit.release_date ?? credit.first_air_date ?? "").slice(0, 4));
+      roles.push({ character, title, ...(year > 1800 ? { year } : {}) });
+      if (roles.length === 2) break;
+    }
+    return roles;
   }
 }

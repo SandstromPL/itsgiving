@@ -39,6 +39,16 @@ describe("compactEntity", () => {
     expect(compactEntity(newer).external?.imdb).toBe("tt0118694");
   });
 
+  it("reads a person's IMDb ID, which Qloo files as imdb_id", () => {
+    const person = {
+      name: "Paul Mescal",
+      entity_id: "P",
+      subtype: "urn:entity:person",
+      external: { instagram_username: [{ id: "paul.mescal" }], imdb_id: [{ id: "nm8958770" }] },
+    };
+    expect(compactEntity(person).external).toEqual({ imdb: "nm8958770" });
+  });
+
   it("keeps the useful fields and drops verbose ones", () => {
     const compact = compactEntity({
       name: "Balthazar",
@@ -205,6 +215,27 @@ describe("compactEntity details a director can use", () => {
       genres: ["Indie Rock", "Indie Folk"],
       themes: ["Heartbreak", "Memory", "Nostalgia"],
     });
+  });
+
+  it("keeps a film's archetypes and character traits, without traits that say who people are", () => {
+    const tag = (type: string) => (name: string) => ({ id: `urn:tag:${name}`, name, type });
+    const compact = compactEntity({
+      name: "Fingernails",
+      entity_id: "F1",
+      subtype: "urn:entity:movie",
+      tags: [
+        ...["The triangle", "The test", "The lover", "Forbidden love"].map(tag("urn:tag:archetype:qloo")),
+        ...["Queer", "Conflicted", "Empathetic", "Reflective", "Passionate"].map(tag("urn:tag:character:qloo")),
+        tag("urn:tag:style:qloo")("Moody"),
+      ],
+    });
+    expect(compact.film).toEqual({
+      archetypes: ["The triangle", "The test", "The lover"],
+      traits: ["Conflicted", "Empathetic", "Reflective"],
+    });
+    expect(compactEntity({ name: "Plain", entity_id: "F2", subtype: "urn:entity:movie" }).film).toBeUndefined();
+    const brand = { name: "A brand", entity_id: "F3", subtype: "urn:entity:brand", tags: [tag("urn:tag:archetype:qloo")("The lover")] };
+    expect(compactEntity(brand).film).toBeUndefined();
   });
 
   it("keeps nothing personal about a person", () => {

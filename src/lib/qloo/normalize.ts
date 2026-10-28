@@ -161,6 +161,16 @@ export interface CompactArtist {
   themes?: string[];
 }
 
+/**
+ * What Qloo says about a film's or series' people: its archetypes ("The lover", "The confidant") and character traits
+ * ("Reflective", "Haunted"). They describe the title as a whole, never one character in it.
+ */
+export interface CompactFilm {
+  archetypes?: string[];
+  /** Without traits that say who people are (isIdentityTag). */
+  traits?: string[];
+}
+
 export interface CompactEntity {
   id: string;
   name: string;
@@ -177,6 +187,8 @@ export interface CompactEntity {
   place?: CompactPlace;
   brand?: CompactBrand;
   artist?: CompactArtist;
+  film?: CompactFilm;
+  /** `imdb` is a title's ID (tt…) or a person's (nm…). */
   external?: { imdb?: string; spotify?: string; letterboxd?: string };
 }
 
@@ -380,10 +392,19 @@ export function compactEntity(entity: QlooEntity, options: { maxTags?: number; m
     });
   }
 
+  if (kind === "movie" || kind === "tv_show") {
+    compact.film = filled({
+      archetypes: tagNames(entity.tags ?? [], "urn:tag:archetype:qloo", 3),
+      traits: tagNames(withoutIdentity(entity.tags ?? []), "urn:tag:character:qloo", 3),
+    });
+  }
+
   // Live responses have carried external IDs in two places: a top-level `external` of [{id}] lists (2026-10-24) and
-  // `properties.external` of {id, user_rating, ...} objects (from 2026-10-25). Read both.
-  const externalId = (key: string) => firstExternalId(entity.external, key) ?? firstExternalId(props.external, key);
-  const external = { imdb: externalId("imdb"), spotify: externalId("spotify"), letterboxd: externalId("letterboxd") };
+  // `properties.external` of {id, user_rating, ...} objects (from 2026-10-25). Read both. A person's IMDb ID comes as
+  // `imdb_id` (live, 2026-10-28).
+  const externalId = (...keys: string[]) =>
+    keys.map((key) => firstExternalId(entity.external, key) ?? firstExternalId(props.external, key)).find(Boolean);
+  const external = { imdb: externalId("imdb", "imdb_id"), spotify: externalId("spotify"), letterboxd: externalId("letterboxd") };
   if (external.imdb || external.spotify || external.letterboxd) compact.external = external;
 
   return compact;
