@@ -66,6 +66,7 @@
   --accent: #e4ff3a; /* the highlighter, always under ink text */
   --slip: #fffdf6; /* receipt paper */
   --slip-edge: #c9c1af;
+  --slip-ink: #2b2925;
 }
 
 /* The dark room, chosen in the header: a warm charcoal, a step above the dark frames inside it. */
@@ -112,6 +113,9 @@
 }
 
 @theme inline {
+  /* Ink in either theme: type on the highlighter, the ink tiles and buttons on paper. */
+  --color-ink: var(--light-foreground);
+  --color-slip-ink: var(--slip-ink);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -130,11 +134,6 @@
   --color-tape-wash: var(--tape-wash);
   --color-safelight: var(--safelight);
   --color-safelight-wash: var(--safelight-wash);
-  /* The dark design's names, still used by the development-only tool playground. */
-  --color-paper: var(--foreground);
-  --color-ink: var(--background);
-  --color-graphite: var(--card);
-  --color-raised: var(--field);
   --font-sans: var(--font-bricolage), system-ui, sans-serif;
   --font-serif: var(--font-instrument), Georgia, serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
@@ -296,6 +295,24 @@ body {
     opacity: 0;
   }
 }
+/* The windows are white paper with the light room's inks in either theme, so inside them the ordinary tokens mean
+   the light values: text-dim, border-line and the rest, with no hex copied in. */
+[popover]:is(.why, .window, .dialog, .menu) {
+  --background: var(--light-background);
+  --foreground: var(--light-foreground);
+  --card: var(--light-card);
+  --field: var(--light-field);
+  --track: var(--light-track);
+  --line: var(--light-line);
+  --edge: var(--light-edge);
+  --dim: var(--light-dim);
+  --faint: var(--light-faint);
+  --tungsten: var(--light-tungsten);
+  --tape: var(--light-tape);
+  --tape-wash: var(--light-tape-wash);
+  --safelight: var(--light-safelight);
+  --safelight-wash: var(--light-safelight-wash);
+}
 /* The account menu drops from the header's right-hand corner, where its button is. */
 [popover].menu {
   position: fixed;
@@ -430,8 +447,8 @@ body {
   mask-image: linear-gradient(#000 0%, #000 40%, transparent 96%);
 }
 
-/* Decorations kept for the director's cut (eggs.tsx sets data-cut on <html>): the INTERVAL card, the film edge, the
-   clapper, the date stamps on location photos. Off by default, so a board reads calmly. */
+/* Decorations kept for the director's cut (eggs.tsx sets data-cut on <html>): the INTERVAL card, the film edge and
+   the date stamps on location photos. Off by default, so a board reads calmly. */
 .cut-only {
   display: none;
 }

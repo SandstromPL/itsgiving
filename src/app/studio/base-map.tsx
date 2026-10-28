@@ -337,7 +337,7 @@ function HeatMap({
                 title={p.name}
                 className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full font-bold ring-2 ring-frame ${
                   on
-                    ? "z-10 size-[30px] bg-accent text-[13px] text-[#121211] shadow-[0_0_0_6px_rgb(228_255_58/0.3)]"
+                    ? "z-10 size-[30px] bg-accent text-[13px] text-ink shadow-[0_0_0_6px_rgb(228_255_58/0.3)]"
                     : "size-[20px] bg-foreground text-[11px] text-frame"
                 }`}
                 style={at(placed[i])}
@@ -347,7 +347,7 @@ function HeatMap({
               {on && (
                 <span
                   aria-hidden
-                  className="absolute z-10 truncate rounded-md bg-[#f2f0ea] px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-[#121211]"
+                  className="absolute z-10 truncate rounded-md bg-(--light-background) px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-ink"
                   style={{
                     ...at(placed[i]),
                     transform: left ? "translate(calc(-100% - 20px), -50%)" : "translate(20px, -50%)",

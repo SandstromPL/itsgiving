@@ -25,13 +25,13 @@ export const backButton = "-ml-1.5 grid size-10 shrink-0 place-items-center roun
 export const stopButton = "ml-auto min-h-10 rounded-full border border-foreground px-4 text-sm font-semibold";
 
 /** Done, on a paper window: ink in either theme, since the window is paper in both. */
-export const paperButton = "rounded-full bg-[#121211] px-5 py-3 text-[15px] font-bold text-white";
+export const paperButton = "rounded-full bg-ink px-5 py-3 text-[15px] font-bold text-white";
 
 /** A receipt slip's paper, edge and ink: pink when the mock stands in for Qloo, so mock numbers never pass as Qloo's. */
-export const slip = (mock: boolean) => (mock ? "border-[#e79ac0] bg-[#fff5fa] text-[#a3195b]" : "border-slip-edge bg-slip text-[#2b2925]");
+export const slip = (mock: boolean) => (mock ? "border-[#e79ac0] bg-[#fff5fa] text-[#a3195b]" : "border-slip-edge bg-slip text-slip-ink");
 
 /** The highlighter behind a rank on a slip, pink for the mock. */
-export const rankMark = (mock: boolean) => `${mock ? "bg-[#ffd6ea]" : "bg-accent"} text-[#121211]`;
+export const rankMark = (mock: boolean) => `${mock ? "bg-[#ffd6ea]" : "bg-accent"} text-ink`;
 
 /** Qloo evidence in the page's own colours: tungsten for Qloo, tape pink for the mock standing in for it. */
 export const evidenceTone = (mock: boolean) => (mock ? "text-tape" : "text-tungsten");

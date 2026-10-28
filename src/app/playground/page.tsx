@@ -22,18 +22,21 @@ export default function PlaygroundPage() {
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-12 sm:px-8">
       <header className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-100">Tool playground</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tool playground</h1>
           <span
             className={`rounded px-2 py-0.5 text-xs font-medium ${
-              mode === "live" ? "bg-emerald-500/15 text-emerald-300" : "bg-pink-300/15 text-pink-200"
+              mode === "live" ? "border border-line text-dim" : "bg-tape-wash text-tape"
             }`}
           >
             {mode === "live" ? "Live Qloo" : "Mock data"}
           </span>
         </div>
-        <p className="max-w-2xl text-sm leading-6 text-stone-400">
+        <p className="max-w-2xl text-sm leading-6 text-dim">
           Run each of the agent&apos;s Qloo tools by hand and see the requests behind the result. Development only.{" "}
-          <Link href="/" className="text-amber-300 underline underline-offset-4 hover:text-amber-200">
+          <Link
+            href="/studio"
+            className="font-semibold text-foreground underline decoration-line underline-offset-4 hover:decoration-foreground"
+          >
             Back to the treatment builder
           </Link>
         </p>

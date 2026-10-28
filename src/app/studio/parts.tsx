@@ -220,57 +220,57 @@ export function Why({
           <p className="type-head text-[1.75rem] leading-tight">{name}</p>
           <section className="mt-4">
             <h3 className={`font-mono text-xs font-semibold ${evidence}`}>{mock ? "Mock data (synthetic, not Qloo)" : "From Qloo"}</h3>
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs leading-5 tabular-nums text-[#2b2925]">
-              <dt className="text-[#5e5a52]">Rank</dt>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs leading-5 tabular-nums text-slip-ink">
+              <dt className="text-faint">Rank</dt>
               <dd>
                 {qloo.rank} of {qloo.of} {LIST_OF[qloo.tool] ?? "picks"} for this audience
               </dd>
               {pct(qloo.affinity) && (
                 <>
-                  <dt className="text-[#5e5a52]">Affinity</dt>
+                  <dt className="text-faint">Affinity</dt>
                   <dd>{pct(qloo.affinity)} (only comparable within this list)</dd>
                 </>
               )}
               {typeof qloo.popularity === "number" && (
                 <>
-                  <dt className="text-[#5e5a52]">Popularity</dt>
+                  <dt className="text-faint">Popularity</dt>
                   <dd>{ordinal(Math.round(qloo.popularity * 100))} percentile</dd>
                 </>
               )}
               {qloo.because.length > 0 && (
                 <>
-                  <dt className="text-[#5e5a52]">Driven by</dt>
+                  <dt className="text-faint">Driven by</dt>
                   <dd>{qloo.because.map((b) => `${b.name} (${b.score.toFixed(2)})`).join(", ")}</dd>
                 </>
               )}
               {qloo.tags.length > 0 && (
                 <>
-                  <dt className="text-[#5e5a52]">Tags</dt>
+                  <dt className="text-faint">Tags</dt>
                   <dd>{qloo.tags.slice(0, 6).map(tagLabel).join(", ")}</dd>
                 </>
               )}
               {note && (
                 <>
-                  <dt className="text-[#5e5a52]">Atmosphere</dt>
+                  <dt className="text-faint">Atmosphere</dt>
                   <dd>{note}</dd>
                 </>
               )}
             </dl>
-            <p className="mt-2 text-xs leading-5 text-[#5e5a52]">
+            <p className="mt-2 text-xs leading-5 text-faint">
               Aggregate audience affinity: what fans of the input over-index on, not a fact about any one person.
             </p>
           </section>
-          <section className="mt-5 border-t border-[#dad5ca] pt-4">
+          <section className="mt-5 border-t border-line pt-4">
             <h3 className="text-xs font-semibold">itsgiving&apos;s read</h3>
             <dl className="mt-2 flex flex-col gap-2">
               {read.map((r) => (
                 <div key={r.term}>
-                  <dt className="text-xs text-[#5e5a52]">{r.term}</dt>
+                  <dt className="text-xs text-faint">{r.term}</dt>
                   <dd className="font-serif text-lg leading-snug">{r.text}</dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-2 text-xs text-[#5e5a52]">Interpretation by {modelName(writtenBy)}.</p>
+            <p className="mt-2 text-xs text-faint">Interpretation by {modelName(writtenBy)}.</p>
           </section>
           {/* autoFocus moves focus into the popover when it opens; closing returns it to the invoker. */}
           <button
@@ -278,7 +278,7 @@ export function Why({
             popoverTarget={id}
             popoverTargetAction="hide"
             autoFocus
-            className="mt-5 rounded-full bg-[#121211] px-5 py-2.5 text-sm font-bold text-white"
+            className="mt-5 rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white"
           >
             Close
           </button>

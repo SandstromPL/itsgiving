@@ -10,10 +10,10 @@ export interface ToolInfo {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  ok: "bg-emerald-500/15 text-emerald-300",
-  empty: "bg-stone-500/20 text-stone-300",
-  needs_input: "bg-amber-500/15 text-amber-300",
-  error: "bg-rose-500/15 text-rose-300",
+  ok: "bg-foreground text-background",
+  empty: "bg-track text-dim",
+  needs_input: "border border-dashed border-edge text-foreground",
+  error: "bg-safelight-wash text-safelight",
 };
 
 export function Playground({ tools }: { tools: ToolInfo[] }) {
@@ -66,66 +66,63 @@ export function Playground({ tools }: { tools: ToolInfo[] }) {
               key={t.name}
               onClick={() => select(t.name)}
               className={`rounded-full border px-3 py-1 font-mono text-xs transition ${
-                t.name === name ? "border-amber-300 bg-amber-300 text-stone-950" : "border-stone-700 text-stone-300 hover:border-stone-500"
+                t.name === name ? "border-foreground bg-foreground text-background" : "border-line text-dim hover:border-edge"
               }`}
             >
               {t.name}
             </button>
           ))}
         </div>
-        <p className="text-sm leading-6 text-stone-400">{tool?.description}</p>
+        <p className="text-sm leading-6 text-dim">{tool?.description}</p>
         <textarea
           aria-label="Tool input (JSON)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           spellCheck={false}
           rows={12}
-          className="w-full resize-y rounded-lg border border-stone-800 bg-stone-900 p-3 font-mono text-xs text-stone-200 outline-none focus:border-stone-600"
+          className="w-full resize-y rounded-lg border border-line bg-field p-3 font-mono text-xs text-foreground outline-none focus:border-edge"
         />
         <button
           onClick={run}
           disabled={running}
-          className="self-start rounded-lg bg-stone-100 px-4 py-2 text-sm font-medium text-stone-950 transition hover:bg-white disabled:opacity-50"
+          className="self-start rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
         >
           {running ? "Running…" : "Run tool"}
         </button>
-        {error && <p className="text-sm text-rose-300">{error}</p>}
+        {error && <p className="text-sm text-safelight">{error}</p>}
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
-        {!result && <p className="text-sm text-stone-500">Run a tool to see its result and the Qloo requests behind it.</p>}
+        {!result && <p className="text-sm text-faint">Run a tool to see its result and the Qloo requests behind it.</p>}
         {result && (
           <>
             <div className="flex flex-wrap items-center gap-3">
               <span className={`rounded px-2 py-0.5 font-mono text-xs ${STATUS_STYLES[result.status] ?? ""}`}>{result.status}</span>
-              <span className="font-mono text-xs uppercase tracking-wider text-stone-500">{result.mode} data</span>
+              <span className="font-mono text-xs text-faint">{result.mode} data</span>
             </div>
-            <p className="text-sm leading-6 text-stone-200">{result.summary}</p>
-            {result.error?.hint && <p className="text-sm text-amber-300">Hint: {result.error.hint}</p>}
+            <p className="text-sm leading-6 text-foreground">{result.summary}</p>
+            {result.error?.hint && <p className="text-sm text-foreground">Hint: {result.error.hint}</p>}
             {result.warnings.length > 0 && (
-              <ul className="list-disc pl-5 text-xs leading-5 text-amber-300/90">
+              <ul className="list-disc pl-5 text-xs leading-5 text-dim">
                 {result.warnings.map((w) => (
                   <li key={w}>{w}</li>
                 ))}
               </ul>
             )}
             <section>
-              <h3 className="mb-2 font-mono text-xs uppercase tracking-wider text-stone-500">Qloo requests ({result.provenance.length})</h3>
+              <h3 className="mb-2 font-mono text-xs text-faint">Qloo requests ({result.provenance.length})</h3>
               <ul className="flex flex-col gap-1">
                 {result.provenance.map((p, i) => (
-                  <li
-                    key={i}
-                    className="overflow-x-auto whitespace-nowrap rounded bg-stone-900 px-2 py-1 font-mono text-[11px] text-stone-400"
-                  >
-                    <span className="text-stone-200">GET {p.path}</span> {new URLSearchParams(p.query).toString()}{" "}
-                    <span className="text-stone-500">
+                  <li key={i} className="overflow-x-auto whitespace-nowrap rounded bg-field px-2 py-1 font-mono text-[11px] text-dim">
+                    <span className="text-foreground">GET {p.path}</span> {new URLSearchParams(p.query).toString()}{" "}
+                    <span className="text-faint">
                       → {p.status} · {p.cached ? "cached" : `${p.durationMs}ms`}
                     </span>
                   </li>
                 ))}
               </ul>
             </section>
-            <pre className="max-h-[32rem] overflow-auto rounded-lg border border-stone-800 bg-stone-900 p-3 font-mono text-[11px] leading-5 text-stone-300">
+            <pre className="max-h-[32rem] overflow-auto rounded-lg border border-line bg-field p-3 font-mono text-[11px] leading-5 text-dim">
               {JSON.stringify(result.data, null, 2)}
             </pre>
           </>

@@ -102,7 +102,7 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
       {/* On a phone the column opens up (`contents`) so the cover can sit between the headline and the paragraph: the
           first screen then holds a finished treatment and its receipt as well as the pitch. */}
       <div className="contents sm:flex sm:flex-col sm:gap-7">
-        <span className="order-1 -rotate-3 self-start justify-self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-[#121211]">
+        <span className="order-1 -rotate-3 self-start justify-self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-ink">
           for music-video and short-film directors
         </span>
         <h1 className="order-2 type-poster text-[3.9rem] sm:text-[clamp(4.25rem,8vw,7.5rem)]">
@@ -154,7 +154,7 @@ function PosterCard({ cover }: { cover: FeaturedCover }) {
         </span>
         <span className="scrim-under flex flex-col gap-3.5 [--scrim-b:1.25rem] [--scrim-fade:4rem] [--scrim-x:1.25rem]">
           {cover.tone && (
-            <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
+            <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
               {unc ? `${t.giving}: ${cover.tone}` : `${t.giving} ${cover.tone.toLowerCase()}`}
             </span>
           )}
@@ -219,7 +219,7 @@ export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; 
               <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
                 <span className="font-mono text-[12px] text-dim">{t.nextUp.label}</span>
                 <span className="flex flex-col gap-3">
-                  <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
+                  <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
                     {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
                   </span>
                   <span className={posterTitle}>{t.nextUp.title}</span>
@@ -254,7 +254,7 @@ export function YourPoster({ form }: { form: FormState }) {
       <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
         <span className="font-mono text-[12px] text-dim">{t.yourPoster}</span>
         <span className="flex flex-col gap-3">
-          <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-[#121211]">
+          <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
             {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
           </span>
           <span className={`${posterTitle} ${(isVideo ? who : after.length > 0) ? "text-foreground" : "text-faint"}`}>{title}</span>
@@ -290,7 +290,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
                 key={tone.name}
                 className={
                   tone.shared
-                    ? "rounded-full bg-accent px-4 py-2 text-[16px] font-bold text-[#121211]"
+                    ? "rounded-full bg-accent px-4 py-2 text-[16px] font-bold text-ink"
                     : "rounded-full border border-line bg-field px-4 py-2 text-[16px]"
                 }
               >

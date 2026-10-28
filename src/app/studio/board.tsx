@@ -123,7 +123,7 @@ function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boole
         <li
           key={tag.id}
           className={`rounded-full px-3 py-1.5 font-mono text-[13px] ${
-            shared ? "bg-accent font-semibold text-[#121211]" : `border border-dashed border-slip-edge bg-slip ${paperEvidence(mock)}`
+            shared ? "bg-accent font-semibold text-ink" : `border border-dashed border-slip-edge bg-slip ${paperEvidence(mock)}`
           }`}
         >
           {tagLabel(tag.name)}
@@ -328,7 +328,7 @@ function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string
             key={x.tag.id}
             className={
               mark && x.source === "overlap"
-                ? "rounded-full bg-accent px-4 py-2.5 text-[17px] font-bold text-[#121211]"
+                ? "rounded-full bg-accent px-4 py-2.5 text-[17px] font-bold text-ink"
                 : "rounded-full border border-line bg-card px-4 py-2.5 text-[17px]"
             }
           >
@@ -989,7 +989,7 @@ export function Board({
                       {t.base?.map && map && (
                         <span
                           className={`absolute top-3 left-3 grid size-8 place-items-center rounded-full text-[14px] font-bold ${
-                            pinned && reading === i ? "bg-accent text-[#121211]" : "bg-[#121211] text-white"
+                            pinned && reading === i ? "bg-accent text-ink" : "bg-ink text-white"
                           }`}
                         >
                           <span className="sr-only">Location </span>

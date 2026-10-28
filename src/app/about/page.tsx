@@ -118,7 +118,7 @@ export default function About() {
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-24 px-4 pt-10 pb-20 sm:px-8 sm:pt-14">
         <section aria-labelledby="who-heading" className="flex flex-col gap-10">
           <div className="flex flex-col gap-6">
-            <span className="self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-[#121211]">About itsgiving</span>
+            <span className="self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-ink">About itsgiving</span>
             <h1 id="who-heading" className="type-poster text-[clamp(3.5rem,7vw,6rem)]">
               who it&apos;s for
             </h1>

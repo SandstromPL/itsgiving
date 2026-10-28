@@ -415,7 +415,7 @@ export function BriefForm({
             </span>
           </span>
           <span className="flex items-center gap-2.5">
-            {extras > 0 && <span className="rounded-full bg-accent px-2.5 py-1 text-[12px] font-bold text-[#121211]">{extras} added</span>}
+            {extras > 0 && <span className="rounded-full bg-accent px-2.5 py-1 text-[12px] font-bold text-ink">{extras} added</span>}
             <svg
               aria-hidden
               width="18"

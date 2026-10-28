@@ -64,10 +64,8 @@ export function Picker({
                 <input type="radio" name={item.key} value={candidate.id} required className="sr-only" />
                 <Still src={candidate.image} alt="" className="aspect-video w-20 shrink-0 rounded-lg" />
                 <span className="min-w-0">
-                  <span className="block truncate text-[16px] font-bold text-foreground group-has-checked:text-[#121211]">
-                    {candidate.name}
-                  </span>
-                  <span className="block truncate text-[13px] text-dim group-has-checked:text-[#4a4741]">
+                  <span className="block truncate text-[16px] font-bold text-foreground group-has-checked:text-ink">{candidate.name}</span>
+                  <span className="block truncate text-[13px] text-dim group-has-checked:text-(--light-dim)">
                     {[candidate.disambiguation ?? candidate.year, candidate.kind?.replace("_", " ")].filter(Boolean).join(", ")}
                   </span>
                 </span>
@@ -80,8 +78,8 @@ export function Picker({
                   ×
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[16px] font-bold text-foreground group-has-checked:text-[#121211]">None of these</span>
-                  <span className="block text-[13px] text-dim group-has-checked:text-[#4a4741]">
+                  <span className="block text-[16px] font-bold text-foreground group-has-checked:text-ink">None of these</span>
+                  <span className="block text-[13px] text-dim group-has-checked:text-(--light-dim)">
                     {item.role === "artist" ? "They aren't in Qloo" : "Leave it out"}
                   </span>
                 </span>

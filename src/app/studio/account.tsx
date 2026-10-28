@@ -94,14 +94,14 @@ export function SignInWindow({ id, title = "Sign in", next, before }: { id: stri
       setProblem(failed);
     }
   };
-  const provider = "flex min-h-13 items-center justify-center gap-3 rounded-full border-2 border-[#121211] px-5 text-[16px] font-bold";
+  const provider = "flex min-h-13 items-center justify-center gap-3 rounded-full border-2 border-ink px-5 text-[16px] font-bold";
   return (
     <div id={id} popover="auto" className="dialog" role="dialog" aria-labelledby={`${id}-title`}>
       <div className="flex flex-col gap-4 p-6">
         <h2 id={`${id}-title`} className="type-head text-[2rem] leading-none">
           {title}
         </h2>
-        <p className="text-[15px] leading-6 text-[#4a4741]">
+        <p className="text-[15px] leading-6 text-dim">
           Building a treatment needs no account. Signed in, you can keep the ones you make and share them by link.
         </p>
         <div className="flex flex-col gap-2.5">
@@ -109,7 +109,7 @@ export function SignInWindow({ id, title = "Sign in", next, before }: { id: stri
             type="button"
             onClick={() => go("google")}
             disabled={busy !== null}
-            className={`${provider} bg-white text-[#121211] hover:bg-[#f7f5f0]`}
+            className={`${provider} bg-white text-ink hover:bg-field`}
           >
             <GoogleMark />
             {busy === "google" ? "Opening Google…" : "Continue with Google"}
@@ -118,18 +118,18 @@ export function SignInWindow({ id, title = "Sign in", next, before }: { id: stri
             type="button"
             onClick={() => go("github")}
             disabled={busy !== null}
-            className={`${provider} bg-[#121211] text-white hover:opacity-90`}
+            className={`${provider} bg-ink text-white hover:opacity-90`}
           >
             <GitHubMark />
             {busy === "github" ? "Opening GitHub…" : "Continue with GitHub"}
           </button>
         </div>
         {problem && (
-          <p role="alert" className="text-[15px] font-semibold text-[#b42318]">
+          <p role="alert" className="text-[15px] font-semibold text-safelight">
             {problem}
           </p>
         )}
-        <p className="text-[13px] leading-5 text-[#5e5a52]">
+        <p className="text-[13px] leading-5 text-faint">
           itsgiving keeps your name and email from Google or GitHub, and the treatments you save. None of it goes to Qloo or the AI models,
           and you can delete it all from Your treatments.
         </p>
@@ -137,7 +137,7 @@ export function SignInWindow({ id, title = "Sign in", next, before }: { id: stri
           type="button"
           popoverTarget={id}
           popoverTargetAction="hide"
-          className="self-start rounded-full px-1 py-2 text-[15px] font-semibold underline decoration-[#8c867b] underline-offset-4 hover:decoration-[#121211]"
+          className="self-start rounded-full px-1 py-2 text-[15px] font-semibold underline decoration-edge underline-offset-4 hover:decoration-ink"
         >
           Not now
         </button>
@@ -206,13 +206,13 @@ export function AccountButton({ className = "" }: { className?: string }) {
         popoverTarget={`${id}-menu`}
         aria-label={`Account: ${account.name}`}
         title={account.name}
-        className={`grid size-11 place-items-center rounded-full border border-foreground bg-accent text-[17px] font-extrabold text-[#121211] sm:size-12 ${className}`}
+        className={`grid size-11 place-items-center rounded-full border border-foreground bg-accent text-[17px] font-extrabold text-ink sm:size-12 ${className}`}
       >
         {initial}
       </button>
       <div id={`${id}-menu`} popover="auto" className="menu" aria-label="Account">
         <div className="flex flex-col gap-1 p-2">
-          <p className="truncate px-3 pt-2 pb-1 text-[13px] text-[#5e5a52]">{account.email ?? account.name}</p>
+          <p className="truncate px-3 pt-2 pb-1 text-[13px] text-faint">{account.email ?? account.name}</p>
           <MenuLink href="/saved" menu={`${id}-menu`}>
             Your treatments
           </MenuLink>
@@ -224,7 +224,7 @@ export function AccountButton({ className = "" }: { className?: string }) {
               document.getElementById(`${id}-menu`)?.hidePopover();
               router.refresh();
             }}
-            className="rounded-xl px-3 py-2.5 text-left text-[15px] font-semibold hover:bg-[#f2f0ea]"
+            className="rounded-xl px-3 py-2.5 text-left text-[15px] font-semibold hover:bg-background"
           >
             Sign out
           </button>
@@ -239,7 +239,7 @@ function MenuLink({ href, menu, children }: { href: string; menu: string; childr
     <Link
       href={href}
       onClick={() => document.getElementById(menu)?.hidePopover()}
-      className="rounded-xl px-3 py-2.5 text-[15px] font-semibold hover:bg-[#f2f0ea]"
+      className="rounded-xl px-3 py-2.5 text-[15px] font-semibold hover:bg-background"
     >
       {children}
     </Link>

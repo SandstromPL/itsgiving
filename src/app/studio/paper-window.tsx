@@ -23,25 +23,25 @@ export function PaperWindow({
 }) {
   return (
     <div id={id} ref={ref} popover="auto" className="window" role="dialog" aria-labelledby={`${id}-title`} onToggle={onToggle}>
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-[#121211] bg-[#f7f5f0] py-1 pr-1 pl-4">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-ink bg-field py-1 pr-1 pl-4">
         <span aria-hidden className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full border-2 border-[#121211]" />
-          <span className="size-2.5 rounded-full border-2 border-[#121211]" />
-          <span className="size-2.5 rounded-full border-2 border-[#121211] bg-[#121211]" />
+          <span className="size-2.5 rounded-full border-2 border-ink" />
+          <span className="size-2.5 rounded-full border-2 border-ink" />
+          <span className="size-2.5 rounded-full border-2 border-ink bg-ink" />
         </span>
-        <span className="font-mono text-[13px] text-[#2b2925]">{label}</span>
+        <span className="font-mono text-[13px] text-slip-ink">{label}</span>
         <button
           type="button"
           popoverTarget={id}
           popoverTargetAction="hide"
           aria-label="Close"
-          className="grid size-11 place-items-center rounded-xl text-[#121211] hover:bg-[#eeebe4]"
+          className="grid size-11 place-items-center rounded-xl text-ink hover:bg-track"
         >
           <CloseIcon />
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
-      <div className="flex shrink-0 justify-end border-t border-[#dad5ca] px-5 pt-3.5 pb-5">
+      <div className="flex shrink-0 justify-end border-t border-line px-5 pt-3.5 pb-5">
         <button type="button" popoverTarget={id} popoverTargetAction="hide" className={paperButton}>
           Done
         </button>

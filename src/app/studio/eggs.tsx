@@ -54,16 +54,13 @@ export function DirectorsCut() {
         <div className="absolute inset-x-0 bottom-0 h-[9vh] bg-black" />
         <div className="absolute inset-0 bg-[radial-gradient(rgb(0_0_0/0.07)_1px,transparent_1.2px)] bg-[length:3px_3px]" />
       </div>
-      <p
-        role="status"
-        className="fixed top-[calc(9vh+1rem)] right-4 z-[61] rotate-2 rounded-xl bg-accent px-3.5 py-2 font-bold text-[#121211]"
-      >
+      <p role="status" className="fixed top-[calc(9vh+1rem)] right-4 z-[61] rotate-2 rounded-xl bg-accent px-3.5 py-2 font-bold text-ink">
         {t.directorsCut}
       </p>
       <button
         type="button"
         onClick={onExit}
-        className="fixed right-4 bottom-[calc(9vh+1rem)] z-[61] rounded-full bg-[#121211] px-4 py-2.5 text-sm font-bold text-white"
+        className="fixed right-4 bottom-[calc(9vh+1rem)] z-[61] rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white"
       >
         Exit director&apos;s cut
       </button>
@@ -78,7 +75,7 @@ export function Mark({ name }: { name: string }) {
   return (
     <>
       {/* An ink tile in either room: in the dark one its edge keeps it visible. */}
-      <span aria-hidden className="grid h-[26px] w-[34px] shrink-0 place-items-center rounded-lg bg-[#121211] ring-1 ring-edge/60">
+      <span aria-hidden className="grid h-[26px] w-[34px] shrink-0 place-items-center rounded-lg bg-ink ring-1 ring-edge/60">
         <CameraMark height={17} />
       </span>
       <span aria-hidden className="text-[27px] leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
