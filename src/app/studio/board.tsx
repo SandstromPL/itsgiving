@@ -192,9 +192,12 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
                       <dd className="max-w-[64ch] font-serif text-[1.15rem] leading-snug">
                         {c[key]}
                         {key === "arc" && c.beats.length > 0 && (
-                          <span className="ml-2 font-sans text-[13px] text-faint">
-                            {c.beats.length > 1 ? "Beats" : "Beat"} {joinNames(c.beats.map(String))}
-                          </span>
+                          <>
+                            {" "}
+                            <span className="ml-1 font-sans text-[13px] whitespace-nowrap text-faint">
+                              {c.beats.length > 1 ? "Beats" : "Beat"} {joinNames(c.beats.map(String))}
+                            </span>
+                          </>
                         )}
                       </dd>
                     </div>
