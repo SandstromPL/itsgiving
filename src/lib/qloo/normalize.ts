@@ -1,4 +1,4 @@
-import type { AudiencesResponse, QlooAudience, QlooEntity, QlooTag, TagsResponse } from "./types";
+import type { QlooEntity, QlooTag, TagsResponse } from "./types";
 import { excerpt } from "../text";
 import { kindFromUrn, type EntityKind } from "./urns";
 
@@ -31,16 +31,6 @@ export function tagList(data: TagsResponse | unknown): QlooTag[] {
   const results = isRecord(data) ? data.results : undefined;
   if (Array.isArray(results)) return results as QlooTag[];
   if (isRecord(results) && Array.isArray(results.tags)) return results.tags as QlooTag[];
-  return [];
-}
-
-export function audienceList(data: AudiencesResponse | unknown): QlooAudience[] {
-  const results = isRecord(data) ? data.results : undefined;
-  if (Array.isArray(results)) return results as QlooAudience[];
-  if (isRecord(results)) {
-    if (Array.isArray(results.audiences)) return results.audiences as QlooAudience[];
-    if (Array.isArray(results.entities)) return results.entities as QlooAudience[];
-  }
   return [];
 }
 
