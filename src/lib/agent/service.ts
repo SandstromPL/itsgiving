@@ -5,7 +5,7 @@ import { TmdbClient, tmdbConfigFromEnv } from "../tmdb";
 import { briefKey, type Brief } from "./brief";
 import { loadFeatured, type FeaturedItem } from "./featured";
 import { TIMING, runPipeline } from "./pipeline";
-import { forBrowser } from "./redact";
+import { eventForBrowser, forBrowser } from "./redact";
 import { sealerFromEnv } from "./seal";
 import type { AgentEvent, Treatment } from "./types";
 import { RateLimiter, TtlCache } from "./guards";
@@ -104,11 +104,16 @@ export async function streamTreatment(
     if (signal.aborted) reject(signal.reason);
     signal.addEventListener("abort", () => reject(signal.reason), { once: true });
   });
-  const pipeline = runPipeline(brief, { qloo: service.qloo, llm: service.llm, tmdb: service.tmdb }, emit, {
-    id: key,
-    signal,
-    deadline: started + runMs,
-  });
+  const pipeline = runPipeline(
+    brief,
+    { qloo: service.qloo, llm: service.llm, tmdb: service.tmdb },
+    (event) => emit(eventForBrowser(event)),
+    {
+      id: key,
+      signal,
+      deadline: started + runMs,
+    },
+  );
   pipeline.catch(() => {}); // if the race is lost, its later rejection is expected
   stopped.catch(() => {});
   try {

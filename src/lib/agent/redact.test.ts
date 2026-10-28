@@ -101,7 +101,7 @@ describe("the step events", () => {
   // Known leak, reported rather than fixed here: the plan, re-plan and write steps send their LLM trace
   // (StepEvent.llm, from runPipeline's llm()) as it is, messages included, and only the treatment event goes through
   // forBrowser. The studio never shows the messages, but they're in the stream. Make this an ordinary `it` once fixed.
-  it.fails("never carry a model's error text either", async () => {
+  it("never carry a model's error text either", async () => {
     const steps = (await stream(service())).filter((e) => e.type === "step");
     for (const step of steps) expect(sseFrame(step)).not.toContain(PROVIDER_TEXT);
   });
