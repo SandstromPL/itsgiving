@@ -133,12 +133,12 @@ const NOTE = [
   "type receipts() to list the Qloo calls behind the treatment on screen.",
 ].join("\n");
 
-/** A note in DevTools for whoever opens it, printed once a visit (layout.tsx). */
 /** receipts() on a page with no treatment on screen: the note names it on every page, so it answers on every page. */
 function noReceipts() {
   return "No treatment on screen. Open one (an example, or a build in the studio) and call receipts() again.";
 }
 
+/** A note in DevTools for whoever opens it, printed once a visit (layout.tsx). */
 export function ConsoleNote() {
   useEffect(() => {
     console.log(`%c${NOTE}`, "font-family: monospace; line-height: 1.5");
@@ -148,21 +148,23 @@ export function ConsoleNote() {
   return null;
 }
 
-/** receipts() in DevTools lists the Qloo calls behind the board on screen. */
+/** receipts() in DevTools lists the Qloo calls behind the board on screen; with none yet (the studio's brief), it says so. */
 export function useReceipts(treatment: Treatment | null) {
   useEffect(() => {
+    if (!treatment) {
+      Object.assign(window, { receipts: noReceipts });
+      return;
+    }
     const receipts = () => {
-      const rows = treatment
-        ? Object.entries(treatment.qloo.steps).flatMap(([step, calls]) =>
-            (calls ?? []).map((call) => ({
-              step,
-              request: `GET ${call.path}`,
-              status: call.status,
-              ms: call.durationMs,
-              cached: call.cached,
-            })),
-          )
-        : [];
+      const rows = Object.entries(treatment.qloo.steps).flatMap(([step, calls]) =>
+        (calls ?? []).map((call) => ({
+          step,
+          request: `GET ${call.path}`,
+          status: call.status,
+          ms: call.durationMs,
+          cached: call.cached,
+        })),
+      );
       console.table(rows);
       return `${rows.length} Qloo calls`;
     };
