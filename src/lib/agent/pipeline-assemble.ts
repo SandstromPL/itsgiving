@@ -17,7 +17,7 @@ export interface Written {
   writeContext: WriteContext;
   /** Swaps refs the model leaked into prose for the names they stand for. */
   scrub: (text: string) => string;
-  /** Reference films' stills by entity ID (filmStills). */
+  /** Reference films' stills by entity ID (TMDB, from the run's lookups). */
   stills: Map<string, string>;
 }
 

@@ -8,9 +8,8 @@ import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type Bri
 import { RateLimiter, TtlCache, clientIp } from "./guards";
 import { distanceM } from "../tools/heatmap";
 import { cssString } from "../text";
-import { TmdbError, type TmdbClient } from "../tmdb";
 import { NONE_PICK, coverStill, excerpt, isIdentityTag, subjectPhrase, tagLabel, tmdbSize } from "./options";
-import { clipSentences, closestTags, filmStills, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
+import { clipSentences, closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { describeBrief, planSchema } from "./plan";
 import { cachedTreatment, streamTreatment, type TreatmentService } from "./service";
 import type { AgentEvent, StepEvent } from "./types";
@@ -954,33 +953,5 @@ describe("identity tags, tag labels and stills", () => {
     // A pick TMDB had no still for falls back like a treatment built before the writer picked.
     expect(coverStill({ cover: "a", references })).toBe("s2");
     expect(coverStill({ references: [ref("a")] })).toBeUndefined();
-  });
-
-  it("gets stills for the films TMDB knows, and goes without on its failures", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const tmdb = {
-      configured: true,
-      backdrop: async (imdb: string) => {
-        if (imdb === "tt2")
-          throw new TmdbError("Couldn't reach TMDB. Try again.", undefined, Object.assign(new Error("connect"), { code: "ETIMEDOUT" }));
-        return imdb === "tt1" ? "still-1" : undefined;
-      },
-    } as unknown as TmdbClient;
-    const films = [
-      { id: "A", name: "A", external: { imdb: "tt1" } },
-      { id: "B", name: "B", external: { imdb: "tt2" } },
-      { id: "C", name: "C" },
-    ] as CompactEntity[];
-    expect([...(await filmStills(films, tmdb))]).toEqual([["A", "still-1"]]);
-    expect(warn).toHaveBeenCalledOnce();
-    // The warning says why, down to the network's own code.
-    expect(JSON.parse(warn.mock.calls[0][0] as string)).toEqual({
-      evt: "tmdb_stills",
-      failed: 1,
-      of: 3,
-      why: ["Couldn't reach TMDB. Try again. ETIMEDOUT"],
-    });
-    expect((await filmStills(films, undefined)).size).toBe(0);
-    warn.mockRestore();
   });
 });

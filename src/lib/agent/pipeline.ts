@@ -1,12 +1,11 @@
 import { describeKind, generateJson, type LlmResult, type Reasoning } from "../llm";
-import { defaultSleep, type CompactEntity } from "../qloo";
-import type { TmdbClient } from "../tmdb";
+import type { CompactEntity } from "../qloo";
 import type { Brief } from "./brief";
 import { STEP_LABELS, withYear, type Thinking } from "./options";
 import { assemble, type Written } from "./pipeline-assemble";
 import { readAudience, type Audience } from "./pipeline-audience";
-import { executePlan, type Execution } from "./pipeline-execute";
-import { findPeople, type People } from "./pipeline-people";
+import { WRITER_REFS, executePlan, type Execution } from "./pipeline-execute";
+import { WRITER_FACES, findPeople, type People } from "./pipeline-people";
 import { resolveCast, type Cast } from "./pipeline-resolve";
 import { clip, startRun, toCredit, type PipelineDeps, type PipelineOutcome, type Run } from "./pipeline-run";
 import {
@@ -63,40 +62,6 @@ export function clipSentences(text: string, max: number): string {
   if (clean.length <= max) return clean;
   const end = clean.lastIndexOf(". ", max - 1);
   return end > max / 2 ? clean.slice(0, end + 1) : clip(clean, max);
-}
-
-/** An error's message and, where the network gave one, its code (ETIMEDOUT, ECONNRESET): what a log needs to say why. */
-function failureReason(err: unknown): string {
-  const code = (e: unknown) => (e && typeof e === "object" && "code" in e && typeof e.code === "string" ? e.code : undefined);
-  const cause = err instanceof Error ? err.cause : undefined;
-  const why = code(err) ?? code(cause) ?? (cause instanceof Error ? code(cause.cause) : undefined);
-  return [err instanceof Error ? err.message : String(err), why].filter(Boolean).join(" ");
-}
-
-/**
- * Stills for the reference films the writer may cite, keyed by entity ID: TMDB's backdrop of each film it knows by IMDb
- * ID. A film without one keeps Qloo's poster on its card, and a failure only costs the stills, never the treatment. The
- * warning says why they failed, not only how many.
- */
-export async function filmStills(films: CompactEntity[], tmdb: TmdbClient | undefined, signal?: AbortSignal): Promise<Map<string, string>> {
-  const stills = new Map<string, string>();
-  if (!tmdb?.configured) return stills;
-  let failed = 0;
-  const reasons = new Set<string>();
-  await Promise.all(
-    films.map(async (film) => {
-      if (!film.external?.imdb) return;
-      try {
-        const still = await tmdb.backdrop(film.external.imdb, signal);
-        if (still) stills.set(film.id, still);
-      } catch (err) {
-        failed++;
-        reasons.add(failureReason(err));
-      }
-    }),
-  );
-  if (failed > 0) console.warn(JSON.stringify({ evt: "tmdb_stills", failed, of: films.length, why: [...reasons].slice(0, 3) }));
-  return stills;
 }
 
 /** Apply nudges the code can guarantee, and tidy what the model returned. */
@@ -315,9 +280,9 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
     ...cast.who,
     direction: plan.direction,
     tone,
-    references: toRefs(execution.references.items, "R", 8),
-    series: toRefs(execution.series.items, "S", 4),
-    casting: toRefs(people.casting.items, "P", 8),
+    references: toRefs(execution.references.items, "R", WRITER_REFS.films),
+    series: toRefs(execution.series.items, "S", WRITER_REFS.series),
+    casting: toRefs(people.casting.items, "P", WRITER_FACES),
     music: brief.format === "short_film" ? toRefs(people.music.items, "M", 8) : [],
     brands: toRefs(execution.brands.items, "B", 6),
     places: toRefs(execution.places.items, "L", 6),
@@ -325,15 +290,6 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
     base: execution.base?.held ? execution.base.area : undefined,
     names: cast.entityNames,
   };
-  // The references' stills (films and series) come from TMDB while the writer works, so they cost no time.
-  const pendingStills =
-    deps.qloo.mode === "mock"
-      ? Promise.resolve(new Map<string, string>())
-      : filmStills(
-          [...writeContext.references, ...writeContext.series].map((r) => r.item),
-          deps.tmdb,
-          signal,
-        );
   const draft = await modelStep(
     run,
     "write",
@@ -372,8 +328,13 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
       ].map((r) => [r.ref, r.item.name] as const),
     ]),
   );
-  // After a fast write the stills may still be out: wait a moment at most, then go without.
-  const none = () => new Map<string, string>();
-  const stills = await Promise.race([pendingStills, defaultSleep(1_500, signal).then(none, none)]);
+  // The references' stills (films and series) came from TMDB with their characters, while the run went on; after a fast
+  // write any still out gets a moment more, then the board goes without it.
+  const looked = await run.tmdb.settled(
+    [...writeContext.references, ...writeContext.series].map((r) => r.item),
+    1_500,
+  );
+  run.tmdb.logTitles();
+  const stills = new Map([...looked].flatMap(([id, found]) => (found.still ? [[id, found.still] as const] : [])));
   return { draft, writeContext, scrub, stills };
 }

@@ -63,6 +63,9 @@ async function findTags(run: Run, words: string[], filter: object): Promise<{ ta
   return { tags: uniqueBy(picked.flat(), (t) => t.id).slice(0, 4), missed, errored: results.some((r) => r.status === "error") };
 }
 
+/** How many films and series the writer sees (as R and S refs), so how many TMDB is asked about. */
+export const WRITER_REFS = { films: 8, series: 4 } as const;
+
 export async function executePlan(run: Run, plan: Plan, cast: Cast, areas: BaseArea[]): Promise<Execution> {
   const { brief, emit, begin } = run;
   const { subjectIds, directorIds, cityId } = cast;
@@ -103,6 +106,15 @@ export async function executePlan(run: Run, plan: Plan, cast: Cast, areas: BaseA
   // Awaited below; this only keeps a failure while the tags are pending from going unhandled.
   pendingReferences.catch(() => {});
   pendingSeries.catch(() => {});
+  // TMDB's stills and characters for the titles the writer will see, asked for as each list lands.
+  pendingReferences.then(
+    (found) => run.tmdb.start(found.items.slice(0, WRITER_REFS.films)),
+    () => {},
+  );
+  pendingSeries.then(
+    (found) => run.tmdb.start(found.items.slice(0, WRITER_REFS.series)),
+    () => {},
+  );
   const [wardrobe, ambience] = await Promise.all([
     // Brand genre tags are hierarchical (urn:tag:genre:brand:fashion:...), so filter by what they apply to, not by type.
     findTags(run, plan.wardrobe_words, { applies_to: "brand" }),

@@ -6,6 +6,7 @@ import { normalizeName } from "../tools/shared";
 import type { ToolResult } from "../tools/types";
 import type { Brief } from "./brief";
 import { withYear } from "./options";
+import { TmdbLookups } from "./pipeline-tmdb";
 import type { AgentEvent, Ambiguity, BriefField, Credit, CreditKind, LlmTrace, StepId, StepStatus, Treatment } from "./types";
 
 // What the pipeline's stages share: the run's inputs and outcomes, the state every stage adds to (Qloo's requests,
@@ -55,6 +56,8 @@ export interface Run {
   tool: <T>(step: StepId, name: string, input: unknown) => Promise<ToolResult<T>>;
   /** Shows a step as running; the function it returns ends the step, timed from now. */
   begin: (id: StepId, label: string) => EndStep;
+  /** What TMDB adds: the references' stills and characters, and the parts actors are known for. */
+  tmdb: TmdbLookups;
 }
 
 export function startRun(
@@ -101,6 +104,8 @@ export function startRun(
     llmCalls: 0,
     tool,
     begin,
+    // Mock films and actors aren't TMDB's.
+    tmdb: new TmdbLookups(deps.qloo.mode === "mock" ? undefined : deps.tmdb, signal),
   };
 }
 
