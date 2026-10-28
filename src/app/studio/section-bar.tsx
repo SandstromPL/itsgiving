@@ -9,15 +9,16 @@ import { titleFont, titleStyle } from "./title-fonts";
 // The sticky bar under a treatment's cover: the title, the way back, and a tab per section that lights the one in view.
 
 /**
- * A treatment's sections, in reading order, for the section bar under the cover. Casting and a short film's music are
- * only on boards built since they were added (2026-10-28); a board without them has no tab for them.
+ * A treatment's sections, in reading order, for the section bar under the cover. A short film's music is only on boards
+ * built since it was added (2026-10-28), and the story's people only since 2026-10-29: boards from 2026-10-28 have their
+ * casting instead. A board without one has no tab for it.
  */
-export function boardSections(t: Pick<Treatment, "casting" | "music">): (readonly [string, string])[] {
+export function boardSections(t: Pick<Treatment, "characters" | "casting" | "music">): (readonly [string, string])[] {
   return [
     ["concept", "Concept"],
     ["references", "References"],
     ["beats", "Beats"],
-    ...(t.casting ? [["casting", "Casting"] as const] : []),
+    ...(t.characters ? [["characters", "Characters"] as const] : t.casting ? [["casting", "Casting"] as const] : []),
     ["wardrobe", "Wardrobe"],
     ["locations", "Locations"],
     // Short on the tab, whole as the section's heading: eleven tabs then fit from about 1280 px.

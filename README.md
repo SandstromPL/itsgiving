@@ -50,8 +50,9 @@ fast and cheap, and within the free fallback models' limits.
    (`score_for_audience`, which asks Qloo to rank exactly that list). The calls run at once. Beside them, from the
    moment the names are resolved, run two searches that need nothing else: the **actors** this audience knows
    (`casting_references`: actors only, leaving out people Qloo also tags as influencers, YouTubers, reality-TV names,
-   athletes or musicians, within the budget's reach) and the **artists** it plays (`music_references`, each with a few
-   of its notable songs). The writer is the first to wait for them, and a re-plan doesn't ask again. The heatmap scores
+   athletes or musicians, within the budget's reach), each with the two parts TMDB says they're best known for, and
+   the **artists** it plays (`music_references`, each with a few of its notable songs). The writer is the first to wait
+   for them, and a re-plan doesn't ask again. The heatmap scores
    every tile of the city for the audience; itsgiving groups the hottest tenth into the three strongest areas, 2 km in
    radius, and names each after the neighbourhoods Qloo lists around its centre. Tags that name who people are
    (sexual orientation, gender identity, religion, ethnicity, health, party politics) are dropped here: Qloo has some
@@ -78,15 +79,19 @@ fast and cheap, and within the free fallback models' limits.
 6. **Re-plan (optional LLM call 2)** only when a whole set of style words matched no Qloo tag.
 7. **Write (last LLM call).** The model writes the treatment as JSON, citing films, series, actors, brands and
    places only by ref (`R1`, `S1`, `P1`, `B1`, `L1`), and for a short film its music (`M1`); refs not returned by a
-   tool fail validation. Actors get a role in the story, written about the role, never the person. A song may be named
+   tool fail validation. It sketches 2-4 **characters** (who they are, what they want and hide, how they move and
+   speak, their look, where we meet and leave them, the beats they're in), each drawn from a character TMDB credits in
+   one of the first films or series (`C1`, listed under each title with Qloo's archetypes and traits for it), and each
+   given a different actor as a reference for the part, written about the part, never the person. A song may be named
    only from Qloo's list of that artist's notable songs, and code drops any other. A brand whose pieces start above
    what the budget buys is written as a reference to rent or match, and a place's opening hours can set when a scene
    is shot. Code maps refs back to Qloo items and attaches each
    item's evidence (rank within its call, affinity, popularity, the input entities that drove it) and the model that
    wrote it. A ref that slips into the prose is swapped for its name, and lighting or shot notes sent as objects are
-   flattened, so neither costs a repair call. While the model writes, TMDB gives each reference film's still (its
-   backdrop, by IMDb ID): the cover and the reference cards show film frames, not posters, whose own lettering would
-   fight the treatment's title.
+   flattened, so neither costs a repair call. TMDB gives each reference its still (its backdrop, by IMDb ID) and its
+   top-billed characters, looked up as soon as Qloo's films land: the cover and the reference cards show film frames,
+   not posters, whose own lettering would fight the treatment's title. A TMDB failure costs a still, a character or a
+   role, never the treatment.
 
 Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
 
@@ -236,7 +241,7 @@ status, a one-line summary, compact data, warnings and the provenance of every Q
 | `audience_heatmap` | Where in a city an audience over-indexes, as named areas to base a shoot in | `GET /v2/insights` (`urn:heatmap`), `GET /search` (localities near a point) |
 | `score_for_audience` | Ranks a given list (the director's own films) for an audience | `GET /v2/insights` (`filter.results.entities`) |
 | `reference_films` | Films/shows the audience loves, with era and deep-cut controls and explanations | `GET /v2/insights` (movie, tv_show) |
-| `casting_references` | Actors the audience knows, as casting references, within a popularity ceiling | `GET /v2/insights` (person, `urn:tag:genre:person:actor`) |
+| `casting_references` | Actors the audience knows, as faces for the story's characters, within a popularity ceiling | `GET /v2/insights` (person, `urn:tag:genre:person:actor`) |
 | `music_references` | Artists the audience plays, with their genres and notable songs | `GET /v2/insights` (artist) |
 | `styling_brands` | Fashion and lifestyle brands for wardrobe, with each brand's style and price range | `GET /v2/insights` (brand) |
 | `scout_locations` | Real places in the shoot city, or near a point, by ambience, budget and photo, with hours and contact | `GET /v2/insights` (place) |
@@ -300,7 +305,7 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `TMDB_BASE_URL` | Optional: another address for TMDB's API; defaults to `https://api.themoviedb.org` |
 | `ITSGIVING_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
-| `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list and for the reference films' stills. IMDb links work without it; without stills, covers show the palette alone |
+| `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list, the reference films' stills and characters, and actors' roles. IMDb links work without it; without stills, covers show the palette alone, and characters aren't drawn from any |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional: the Supabase project's URL and publishable key, which turn accounts on (read at build time) |
 | `SUPABASE_SECRET_KEY` | With the two above: the project's secret key, used only on the server, to read and write saved treatments and to seal each treatment it builds so only those can be saved |
 
@@ -383,8 +388,8 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
 ## Credits
 
 - Taste data: [Qloo](https://www.qloo.com/)'s Insights API.
-- Imported film lists and film stills: [TMDB](https://www.themoviedb.org/). This product uses the TMDB API but is not
-  endorsed or certified by TMDB.
+- Imported film lists, film stills, characters and actors' roles: [TMDB](https://www.themoviedb.org/). This product
+  uses the TMDB API but is not endorsed or certified by TMDB.
 - Street maps under the heatmap: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, from
   OpenStreetMap's standard tiles under its [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 

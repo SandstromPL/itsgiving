@@ -8,6 +8,7 @@ import {
   audiencePhrase,
   budgetPhrase,
   coverReference,
+  joinNames,
   openingLine,
   priceLine,
   siteName,
@@ -17,7 +18,8 @@ import {
   withoutIdentity,
   type Nudge,
 } from "@/lib/agent/options";
-import type { LlmStep, Treatment } from "@/lib/agent/types";
+import type { Character, LlmStep, Treatment } from "@/lib/agent/types";
+import type { KnownRole } from "@/lib/tmdb";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { PINNED, ShootBaseBlock, locationPins } from "./base-map";
 import { useEra } from "./era-layer";
@@ -40,6 +42,32 @@ const prose = "font-serif text-[1.25rem] leading-[1.38]";
 const card = "rounded-[26px] border border-line bg-card print:break-inside-avoid";
 /** A place's map, phone and website, at the foot of its card. */
 const placeLink = "py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground";
+
+/** A character's sketch, after who they are, in reading order. */
+const SKETCH: [string, "wants" | "hides" | "presence" | "look" | "arc"][] = [
+  ["Wants", "wants"],
+  ["Hides", "hides"],
+  ["Presence", "presence"],
+  ["Look", "look"],
+  ["Arc", "arc"],
+];
+
+/** "Calum in Aftersun (2022) and Lucius in Gladiator II (2024)". */
+const knownAs = (roles: KnownRole[]) => joinNames(roles.map((role) => `${role.character} in ${withYear(role.title, role.year)}`));
+
+/** What TMDB gave this board, for its credits: stills, the characters its people draw on, and actors' roles. */
+const tmdbGave = (t: Treatment) =>
+  [
+    t.references.some((r) => r.still) && "film stills",
+    t.characters?.some((c) => c.from) && "characters",
+    t.characters?.some((c) => c.face?.known.length) && "actors' roles",
+  ].filter((part): part is string => Boolean(part));
+
+const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** The names of the people in a beat (1-based), as the writer placed them. */
+const peopleIn = (characters: Character[] | undefined, beat: number) =>
+  (characters ?? []).filter((c) => c.beats.includes(beat)).map((c) => c.name);
 
 /**
  * A grid of n cards with no hole in its last row: two columns, three from xl when the count allows, and one card (the
@@ -112,6 +140,106 @@ function Also({ label, items, mock }: { label: string; items: CompactEntity[]; m
     <p className="text-[15px] leading-6 text-dim">
       {label} <span className={`font-mono text-[13px] ${evidenceTone(mock)}`}>{listWithYears(items)}</span>
     </p>
+  );
+}
+
+/**
+ * The story's people, one to a row: who they are and their sketch in the serif (itsgiving's writing), the character in a
+ * title this audience loves that they're drawn from (TMDB's credits, with Qloo's archetypes for the title), and the actor
+ * whose presence fits the part, with Qloo's receipt for them and the parts TMDB says they're known for.
+ */
+function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: string }) {
+  const characters = t.characters ?? [];
+  const drawn = characters.some((c) => c.from);
+  const faced = characters.some((c) => c.face);
+  const note = [
+    "itsgiving wrote these characters.",
+    drawn && "Each draws on a character in a title this audience loves, as TMDB credits it.",
+    faced && `The actors are ones this audience over-indexes on, each with its rank from ${source}: references for the part, not offers.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <Section id="characters" title="Characters" note={note}>
+      {characters.length > 0 ? (
+        <ul className="flex flex-col gap-5 print:gap-4">
+          {characters.map((c) => (
+            <li key={c.name} className={`${card} flex flex-col overflow-hidden sm:flex-row`}>
+              {c.face && (
+                <div className="flex shrink-0 flex-col border-line sm:w-48 sm:border-r">
+                  <Still
+                    src={c.face.entity.image}
+                    alt={`Photo of ${c.face.entity.name}`}
+                    className="aspect-[3/2] w-full object-[50%_22%] sm:aspect-[4/5] sm:object-center"
+                  />
+                  <div className="flex flex-1 flex-col gap-3 p-4">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[15px] leading-5 font-semibold">{c.face.entity.name}</p>
+                      {c.face.known.length > 0 && (
+                        <p className="text-[13px] leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
+                      )}
+                    </div>
+                    <Why
+                      label="why this face"
+                      name={c.face.entity.name}
+                      qloo={c.face.qloo}
+                      of="actors"
+                      read={[{ term: "The part", text: c.presence }]}
+                      writtenBy={t.writtenBy}
+                      mock={mock}
+                      className="mt-auto"
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="flex flex-1 flex-col gap-4 p-5">
+                <div className="flex flex-col gap-1.5">
+                  <h3 className="type-head text-[1.7rem] leading-tight">{c.name}</h3>
+                  <p className={`${prose} max-w-[64ch]`}>{c.who}</p>
+                </div>
+                <dl className="grid gap-x-8 gap-y-3 xl:grid-cols-2 print:grid-cols-2">
+                  {SKETCH.map(([term, key]) => (
+                    <div key={key} className={`flex flex-col gap-0.5 ${key === "arc" ? "xl:col-span-2 print:col-span-2" : ""}`}>
+                      <dt className="text-[13px] font-semibold text-faint">{term}</dt>
+                      <dd className="max-w-[64ch] font-serif text-[1.15rem] leading-snug">
+                        {c[key]}
+                        {key === "arc" && c.beats.length > 0 && (
+                          <span className="ml-2 font-sans text-[13px] text-faint">
+                            {c.beats.length > 1 ? "Beats" : "Beat"} {joinNames(c.beats.map(String))}
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {c.from && (
+                  <div className="flex flex-col gap-1 border-t border-line pt-3">
+                    <p className="max-w-[64ch] text-[15px] leading-6">
+                      <span className="font-semibold">Drawn from {c.from.character}</span> ({c.from.actor}) in{" "}
+                      {withYear(c.from.title.name, c.from.title.year)}
+                      {c.from.take && <span className="font-serif text-[1.15rem] leading-snug">: {c.from.take}</span>}
+                    </p>
+                    {c.from.archetypes.length > 0 && (
+                      <p className="text-[13px] leading-5 text-faint">
+                        Qloo&apos;s archetypes for the {c.from.title.kind === "tv_show" ? "series" : "film"}:{" "}
+                        <span className={`font-mono text-[12px] ${evidenceTone(mock)}`}>{c.from.archetypes.join(" / ")}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[15px] text-dim">The writer sketched no characters for this treatment.</p>
+      )}
+      <Also
+        label={faced ? "Also high for this audience:" : "Actors this audience over-indexes on:"}
+        items={t.extras.people ?? []}
+        mock={mock}
+      />
+    </Section>
   );
 }
 
@@ -422,7 +550,12 @@ export function Board({
               </span>
               <h3 className="type-head text-[1.45rem] leading-tight">{beat.title}</h3>
               <p className={prose}>{beat.description}</p>
-              {beat.reference && <p className="mt-auto pt-1 text-[13px] text-faint">After {beat.reference.name}</p>}
+              {(beat.reference || peopleIn(t.characters, i + 1).length > 0) && (
+                <div className="mt-auto flex flex-col pt-1 text-[13px] text-faint">
+                  {peopleIn(t.characters, i + 1).length > 0 && <p>With {joinNames(peopleIn(t.characters, i + 1))}</p>}
+                  {beat.reference && <p>After {beat.reference.name}</p>}
+                </div>
+              )}
             </li>
           ))}
         </ol>
@@ -431,61 +564,65 @@ export function Board({
         </div>
       </Section>
 
-      {/* Boards built before casting references (2026-10-28) have none, and no section for them. */}
-      {t.casting && (
-        <Section
-          id="casting"
-          title="Casting"
-          note={`Actors this audience over-indexes on, each with its rank from ${source}: references for the presence a role needs, not offers. itsgiving wrote the roles.`}
-        >
-          {t.casting.length > 0 ? (
-            // On paper too, each face is a small portrait beside its role, one under another: a page holds three of them
-            // and the line of other actors after them.
-            <ul className="grid gap-5 lg:grid-cols-2 print:flex print:flex-col print:gap-4">
-              {t.casting.map((c, i, all) => (
-                <li
-                  key={c.entity.id}
-                  className={`${card} flex flex-col overflow-hidden sm:flex-row ${i === all.length - 1 && i % 2 === 0 ? "lg:col-span-2" : ""}`}
-                >
-                  <Still
-                    src={c.entity.image}
-                    alt={`Photo of ${c.entity.name}`}
-                    className="aspect-[3/2] w-full shrink-0 object-[50%_22%] sm:aspect-[4/5] sm:w-40 sm:object-center"
-                  />
-                  <div className="flex flex-1 flex-col gap-3 p-5">
-                    <div className="flex flex-col gap-3">
-                      <div className="flex flex-col gap-1">
-                        <h3 className="type-head text-[1.6rem] leading-tight">{c.entity.name}</h3>
-                        <QlooTags tags={c.qloo.tags} />
-                      </div>
-                      <p className={`${prose} max-w-[64ch]`}>{c.notes.role}</p>
-                    </div>
-                    <Why
-                      label="why this face"
-                      name={c.entity.name}
-                      qloo={c.qloo}
-                      of="actors"
-                      read={[{ term: "The role", text: c.notes.role }]}
-                      writtenBy={t.writtenBy}
-                      mock={mock}
-                      className="mt-auto"
+      {/* Boards built from 2026-10-29 sketch the story's people; those from 2026-10-28 have casting; older ones neither. */}
+      {t.characters ? (
+        <Characters t={t} mock={mock} source={source} />
+      ) : (
+        t.casting && (
+          <Section
+            id="casting"
+            title="Casting"
+            note={`Actors this audience over-indexes on, each with its rank from ${source}: references for the presence a role needs, not offers. itsgiving wrote the roles.`}
+          >
+            {t.casting.length > 0 ? (
+              // On paper too, each face is a small portrait beside its role, one under another: a page holds three of them
+              // and the line of other actors after them.
+              <ul className="grid gap-5 lg:grid-cols-2 print:flex print:flex-col print:gap-4">
+                {t.casting.map((c, i, all) => (
+                  <li
+                    key={c.entity.id}
+                    className={`${card} flex flex-col overflow-hidden sm:flex-row ${i === all.length - 1 && i % 2 === 0 ? "lg:col-span-2" : ""}`}
+                  >
+                    <Still
+                      src={c.entity.image}
+                      alt={`Photo of ${c.entity.name}`}
+                      className="aspect-[3/2] w-full shrink-0 object-[50%_22%] sm:aspect-[4/5] sm:w-40 sm:object-center"
                     />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            (t.extras.people?.length ?? 0) === 0 && (
-              <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no actors for this audience.</p>
-            )
-          )}
-          {/* With no roles written, Qloo's actors are still evidence of the faces this audience knows. */}
-          <Also
-            label={t.casting.length > 0 ? "Also high for this audience:" : "Actors this audience over-indexes on:"}
-            items={t.extras.people ?? []}
-            mock={mock}
-          />
-        </Section>
+                    <div className="flex flex-1 flex-col gap-3 p-5">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1">
+                          <h3 className="type-head text-[1.6rem] leading-tight">{c.entity.name}</h3>
+                          <QlooTags tags={c.qloo.tags} />
+                        </div>
+                        <p className={`${prose} max-w-[64ch]`}>{c.notes.role}</p>
+                      </div>
+                      <Why
+                        label="why this face"
+                        name={c.entity.name}
+                        qloo={c.qloo}
+                        of="actors"
+                        read={[{ term: "The role", text: c.notes.role }]}
+                        writtenBy={t.writtenBy}
+                        mock={mock}
+                        className="mt-auto"
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              (t.extras.people?.length ?? 0) === 0 && (
+                <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no actors for this audience.</p>
+              )
+            )}
+            {/* With no roles written, Qloo's actors are still evidence of the faces this audience knows. */}
+            <Also
+              label={t.casting.length > 0 ? "Also high for this audience:" : "Actors this audience over-indexes on:"}
+              items={t.extras.people ?? []}
+              mock={mock}
+            />
+          </Section>
+        )
       )}
 
       <div className="cut-only">
@@ -851,9 +988,9 @@ export function Board({
                   </dd>
                 </>
               )}
-              {t.references.some((r) => r.still) && (
+              {tmdbGave(t).length > 0 && (
                 <>
-                  <dt className="text-faint">Film stills</dt>
+                  <dt className="text-faint">{capitalized(joinNames(tmdbGave(t)))}</dt>
                   <dd>TMDB</dd>
                 </>
               )}

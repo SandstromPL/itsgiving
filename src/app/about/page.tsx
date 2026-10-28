@@ -71,7 +71,7 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
   },
   {
     title: STEP_LABELS.audience,
-    text: "What the fans over-index on, in Qloo's own words (moods, genres, styles), the age and gender they lean to, and the film subgenres they love, which suggest an era look for the cover. Beside it, the actors they know, as casting references, and the artists they play, as a short film's music.",
+    text: "What the fans over-index on, in Qloo's own words (moods, genres, styles), the age and gender they lean to, and the film subgenres they love, which suggest an era look for the cover. Beside it, the actors they know, as faces for the story's characters, and the artists they play, as a short film's music.",
     qloo: [
       "/v2/insights, taste tags",
       "/v2/insights, demographics",
@@ -102,7 +102,7 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
   },
   {
     title: STEP_LABELS.write,
-    text: "The model writes the treatment and may cite only what Qloo returned. Every film, face, brand and place keeps its receipt: its rank for this audience, and its affinity.",
+    text: "The model writes the treatment and may cite only what Qloo returned. It sketches the story's characters, each drawn from a character in one of the films or series, as TMDB credits it. Every film, face, brand and place keeps its receipt: its rank for this audience, and its affinity.",
     model: "The model writes, citing only Qloo's picks.",
   },
 ];
@@ -110,7 +110,7 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
 const LIMITS = [
   "Qloo describes groups. A treatment says what an audience tends to love, never what one person will do.",
   "Qloo scores feature films, series and artists, not short films or songs. A short's audience comes from the feature films it's after, and a video's from the artist, not the track. A song named in a treatment comes from Qloo's list of the artist's notable songs: clear it before you use it.",
-  "Casting references are faces this audience knows, for the presence a role needs. Whether anyone is free or interested is for you to ask.",
+  "Characters are invented for the story. The characters they're drawn from and the parts an actor is known for come from TMDB, and the actors are faces this audience knows, for the presence a part needs: whether anyone is free or interested is for you to ask.",
   "Not every artist is in Qloo. When one is missing, stand-in artists carry the audience, and the treatment says so.",
   "Locations are a scout list. Availability and filming permission are yours to confirm with each venue.",
 ] as const;
