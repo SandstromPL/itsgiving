@@ -23,6 +23,8 @@ export interface WriteContext extends Who {
   series: Ref<CompactEntity>[];
   /** Actors the audience over-indexes on (P refs), for casting references. */
   casting: Ref<CompactEntity>[];
+  /** A short film's music: artists the audience over-indexes on (M refs). Empty for a music video, whose song is given. */
+  music: Ref<CompactEntity>[];
   brands: Ref<CompactEntity>[];
   places: Ref<CompactEntity>[];
   leans: string[];
@@ -42,6 +44,7 @@ export interface Draft {
   /** The cited film whose still becomes the cover. */
   cover?: string | null;
   casting?: { ref: string; role: string }[];
+  music?: { ref: string; song: string | null; use: string }[];
   wardrobe?: { ref: string; look: string }[];
   locations?: { ref: string; scene: string }[];
   palette: { name: string; hex: string }[];
@@ -56,7 +59,7 @@ const refEnum = (refs: Ref<unknown>[] | ToneCandidate[]) => z.enum(refs.map((r) 
 // maximums are stated in the descriptions and applied in code, so a model that
 // writes one shot too many isn't sent back for a repair.
 export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
-  const { tone, references, series, casting, brands, places } = ctx;
+  const { tone, references, series, casting, music, brands, places } = ctx;
   // A beat or a reference may point at a film or a series; the cover is always a film's still.
   const titles = [...references, ...series];
   return z.strictObject({
@@ -116,6 +119,20 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
               }),
             )
             .describe("2-4 casting references."),
+        }
+      : {}),
+    ...(music.length > 0
+      ? {
+          // No minimum, like casting: a draft without music keeps the rest rather than costing a repair.
+          music: z
+            .array(
+              z.strictObject({
+                ref: refEnum(music),
+                song: z.string().nullable().describe("One of that artist's songs exactly as listed, or null."),
+                use: text.describe("Where and how it's used: a needle drop at a beat, or the score's direction."),
+              }),
+            )
+            .describe("2-4 music references."),
         }
       : {}),
     ...(brands.length > 0
@@ -182,6 +199,13 @@ export function refScrubber(names: Map<string, string>): (text: string) => strin
   return (text) => text.replace(pattern, (ref) => names.get(ref) ?? ref);
 }
 
+/** "M1 Phoebe Bridgers · Indie Rock, Indie Folk · songs: Motion Sickness, Kyoto, Garden Song". */
+function artistLine({ ref, item }: Ref<CompactEntity>): string {
+  const genres = item.artist?.genres ?? item.tags.slice(0, 3);
+  const songs = item.artist?.songs?.slice(0, 3) ?? [];
+  return [`${ref} ${item.name}`, genres.join(", "), songs.length > 0 ? `songs: ${songs.join(", ")}` : ""].filter(Boolean).join(" · ");
+}
+
 function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): string {
   const bits = [`${ref} ${withYear(item.name, item.year)}`];
   if (item.place) {
@@ -212,6 +236,7 @@ export function writePrompt(ctx: WriteContext): string {
   if (ctx.series.length > 0) parts.push("Series:", ...ctx.series.map((r) => entityLine(r, ctx)));
   // Names only: an actor's Qloo tags say little a casting note needs, and keep the prompt small.
   if (ctx.casting.length > 0) parts.push("Actors (casting references):", ...ctx.casting.map((r) => `${r.ref} ${r.item.name}`));
+  if (ctx.music.length > 0) parts.push("Music (artists this audience plays):", ...ctx.music.map(artistLine));
   if (ctx.brands.length > 0) parts.push("Wardrobe brands:", ...ctx.brands.map((r) => entityLine(r, ctx)));
   if (ctx.base) {
     parts.push(
@@ -239,6 +264,12 @@ export function writePrompt(ctx: WriteContext): string {
     parts.push(
       "Casting: give 2-4 of the actors (P refs) a role in this story each, as a reference for the presence that role needs,",
       "not an offer. Write about the role and what it asks of an actor, never about the person's looks, life or past work.",
+    );
+  }
+  if (ctx.music.length > 0) {
+    parts.push(
+      "Music: pick 2-4 of the artists (M refs) for needle drops or the score's direction, and say where each is used. Name a",
+      "song only from that artist's listed songs, exactly as written; otherwise leave song null.",
     );
   }
   if (ctx.places.some(({ item }) => item.place?.hours)) {
@@ -323,6 +354,12 @@ function hashOf(textValue: string): number {
 /** The template writer's roles for its casting references, by format. */
 const VIDEO_ROLES = ["The one the artist keeps almost meeting", "A friend at the edge of the frame", "A stranger in the last shot"];
 const FILM_ROLES = ["The lead", "The one the lead keeps almost meeting", "A friend who sees it first"];
+/** The template writer's notes on where its music goes. */
+const MUSIC_USES = [
+  "Under the opening, low enough to hear the street through it.",
+  "A needle drop at the turn, cut hard on the downbeat.",
+  "Over the last shot and into the credits.",
+];
 
 export function mockDraft(ctx: WriteContext): Draft {
   const vibe = vibeOf(
@@ -394,6 +431,15 @@ export function mockDraft(ctx: WriteContext): Draft {
           casting: ctx.casting.slice(0, 3).map((p, i) => ({
             ref: p.ref,
             role: `${(isVideo ? VIDEO_ROLES : FILM_ROLES)[i]}: someone who can hold a long, quiet close-up.`,
+          })),
+        }
+      : {}),
+    ...(ctx.music.length > 0
+      ? {
+          music: ctx.music.slice(0, 3).map((m, i) => ({
+            ref: m.ref,
+            song: m.item.artist?.songs?.[0] ?? null,
+            use: MUSIC_USES[i],
           })),
         }
       : {}),

@@ -692,6 +692,56 @@ export function Board({
         <PaletteSwatches palette={t.palette} />
       </Section>
 
+      {/* A short film's music; a music video's song is given, and boards built before 2026-10-28 have none. */}
+      {t.music && (
+        <Section
+          id="music"
+          title="Music"
+          note={`Artists this audience over-indexes on, each with its rank from ${source}, for needle drops and the score's direction. A song named here is from ${mock ? "the mock's" : "Qloo's"} list of the artist's notable songs: clear any track before you use it. itsgiving wrote the notes.`}
+        >
+          {t.music.length > 0 ? (
+            <ul className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
+              {t.music.map((m, i, all) => (
+                <li
+                  key={m.entity.id}
+                  className={`${card} flex flex-col gap-3.5 p-5 ${i === all.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
+                >
+                  <div className="flex flex-col gap-1">
+                    <h3 className="type-head text-[1.7rem] leading-tight">{m.entity.name}</h3>
+                    <QlooTags tags={m.entity.artist?.genres ?? m.qloo.tags} />
+                    {m.notes.song && <p className="text-[14px] text-faint">Song: {m.notes.song}</p>}
+                  </div>
+                  <p className={prose}>{m.notes.use}</p>
+                  <Why
+                    label="why this artist"
+                    name={m.entity.name}
+                    qloo={m.qloo}
+                    of="artists"
+                    facts={[
+                      { term: "Songs", text: m.entity.artist?.songs?.join(", ") },
+                      { term: "Lyrics about", text: m.entity.artist?.themes?.join(", ") },
+                    ]}
+                    read={[{ term: "How it's used", text: m.notes.use }]}
+                    writtenBy={t.writtenBy}
+                    mock={mock}
+                    className="mt-auto"
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            (t.extras.artists?.length ?? 0) === 0 && (
+              <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no artists for this audience.</p>
+            )
+          )}
+          <Also
+            label={t.music.length > 0 ? "Also high for this audience:" : "Artists this audience over-indexes on:"}
+            items={t.extras.artists ?? []}
+            mock={mock}
+          />
+        </Section>
+      )}
+
       <Section
         id="audience"
         title="Audience"
@@ -749,6 +799,17 @@ export function Board({
                 <p className="text-[15px] text-dim">No taste tags came back.</p>
               )}
             </dd>
+            {!t.music && (t.extras.artists?.length ?? 0) > 0 && (
+              <>
+                <dt className="text-[15px] font-semibold">Music they play</dt>
+                <dd className={`font-mono text-[13px] leading-6 ${evidenceTone(mock)}`}>
+                  {t.extras
+                    .artists!.slice(0, 6)
+                    .map((a) => a.name)
+                    .join(", ")}
+                </dd>
+              </>
+            )}
             {t.audience.leans.length > 0 && (
               <>
                 <dt className="text-[15px] font-semibold">Age and gender</dt>

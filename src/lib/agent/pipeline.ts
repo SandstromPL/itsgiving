@@ -318,6 +318,7 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
     references: toRefs(execution.references.items, "R", 8),
     series: toRefs(execution.series.items, "S", 4),
     casting: toRefs(people.casting.items, "P", 8),
+    music: brief.format === "short_film" ? toRefs(people.music.items, "M", 8) : [],
     brands: toRefs(execution.brands.items, "B", 6),
     places: toRefs(execution.places.items, "L", 6),
     leans: audience.leans,
@@ -361,9 +362,14 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
   const scrub = refScrubber(
     new Map([
       ...candidates.map((c) => [c.ref, c.tag.name] as const),
-      ...[...writeContext.references, ...writeContext.series, ...writeContext.casting, ...writeContext.brands, ...writeContext.places].map(
-        (r) => [r.ref, r.item.name] as const,
-      ),
+      ...[
+        ...writeContext.references,
+        ...writeContext.series,
+        ...writeContext.casting,
+        ...writeContext.music,
+        ...writeContext.brands,
+        ...writeContext.places,
+      ].map((r) => [r.ref, r.item.name] as const),
     ]),
   );
   // After a fast write the stills may still be out: wait a moment at most, then go without.

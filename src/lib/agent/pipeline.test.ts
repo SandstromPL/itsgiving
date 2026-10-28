@@ -172,6 +172,43 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     expect(t.notes.join(" ")).toMatch(/Casting references: only \d matched at first, so itsgiving lifted the popularity ceiling/);
   });
 
+  it("gives a short film music from what its audience plays, naming only songs Qloo lists for the artist", async () => {
+    const { outcome, steps } = await run({ touchstones: ["Past Lives", "Aftersun"], city: "Mumbai", format: "short_film" });
+    const t = treatmentOf(outcome);
+    expect(t.music?.length).toBeGreaterThan(0);
+    for (const m of t.music ?? []) {
+      expect(m.entity.kind).toBe("artist");
+      expect(m.notes.use).toBeTruthy();
+      expect(m.qloo.tool).toBe("music_references");
+      if (m.notes.song) expect(m.entity.artist?.songs).toContain(m.notes.song);
+    }
+    expect((t.music ?? []).some((m) => m.notes.song)).toBe(true);
+    expect(steps.find((s) => s.id === "music" && s.status !== "running")?.credit?.kind).toBe("music");
+  });
+
+  it("drops a song the writer names that isn't on Qloo's list for that artist", async () => {
+    const invented = (mock: Record<string, unknown>) => ({
+      ...mock,
+      music: (mock.music as { ref: string; use: string }[]).map((m) => ({ ...m, song: "A Song Nobody Wrote" })),
+    });
+    const { provider } = scriptedProvider({ treatment: invented });
+    const { outcome } = await run({ touchstones: ["Past Lives", "Aftersun"], city: "Mumbai", format: "short_film" }, liveWith(provider));
+    const t = treatmentOf(outcome);
+    expect(t.music?.length).toBeGreaterThan(0);
+    expect(t.music?.every((m) => m.notes.song === "")).toBe(true);
+  });
+
+  it("keeps a music video's music as evidence of what its audience plays, without writing it or billing it", async () => {
+    const { outcome, steps } = await run({ artist: "Prateek Kuhad", city: "Mumbai" });
+    const t = treatmentOf(outcome);
+    expect(t.music).toBeUndefined();
+    expect(t.extras.artists?.length).toBeGreaterThan(0);
+    expect(t.extras.artists?.map((a) => a.name)).not.toContain("Prateek Kuhad");
+    const music = steps.find((s) => s.id === "music" && s.status !== "running");
+    expect(music?.status).toBe("done");
+    expect(music?.credit).toBeUndefined();
+  });
+
   it("leaves the scores out when there are no director films", async () => {
     const t = treatmentOf((await run({ artist: "Prateek Kuhad", city: "Mumbai" })).outcome);
     expect(t.directorFit).toBeUndefined();
@@ -706,6 +743,7 @@ describe("LLM schemas", () => {
       references: [{ ref: "R1", item: entity }],
       series: [{ ref: "S1", item: entity }],
       casting: [{ ref: "P1", item: entity }],
+      music: [{ ref: "M1", item: entity }],
       brands: [{ ref: "B1", item: entity }],
       places: [{ ref: "L1", item: entity }],
     } as unknown as WriteContext;

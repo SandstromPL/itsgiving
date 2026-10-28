@@ -95,7 +95,20 @@ export function assemble(input: AssembleInput): Treatment {
   const wardrobe = cite(ctx.brands, execution.brands.items, "styling_brands", draft.wardrobe, ["look"], 4);
   const locations = cite(ctx.places, execution.places.items, "scout_locations", draft.locations, ["scene"], 4);
   const casting = cite(ctx.casting, people.casting.items, "casting_references", draft.casting, ["role"], 4);
-  const cited = new Set([...references, ...wardrobe, ...locations, ...casting].map((p) => p.entity.id));
+  // A song is kept only as Qloo lists it among the artist's notable songs: a title the model remembers isn't evidence.
+  const songOf = (ref: string, song: string | null) => {
+    const wanted = (song ?? "").trim().toLowerCase();
+    return ctx.music.find((r) => r.ref === ref)?.item.artist?.songs?.find((s) => s.toLowerCase() === wanted) ?? "";
+  };
+  const music = cite(
+    ctx.music,
+    people.music.items,
+    "music_references",
+    draft.music?.map((m) => ({ ref: m.ref, use: m.use, song: songOf(m.ref, m.song) })),
+    ["use", "song"],
+    4,
+  );
+  const cited = new Set([...references, ...wardrobe, ...locations, ...casting, ...music].map((p) => p.entity.id));
   const uncited = (items: CompactEntity[]) => items.filter((e) => !cited.has(e.id));
 
   const directorFit = audience.directorFit.flatMap((list) =>
@@ -134,6 +147,7 @@ export function assemble(input: AssembleInput): Treatment {
     references,
     cover,
     casting,
+    ...(run.brief.format === "short_film" ? { music } : {}),
     wardrobe,
     locations,
     base: execution.base
@@ -150,6 +164,7 @@ export function assemble(input: AssembleInput): Treatment {
       brands: uncited(execution.brands.items),
       locations: uncited(execution.places.items),
       people: uncited(people.casting.items),
+      artists: uncited(people.music.items),
     },
     audience: {
       taste_tags: audience.tasteTags,

@@ -62,6 +62,7 @@ export function report(
   what: string,
   relaxed: Relaxed,
   describe: (items: CompactEntity[]) => string,
+  billed = true,
 ) {
   const { notes, emit, trail } = run;
   if (relaxed.error) {
@@ -79,5 +80,5 @@ export function report(
       ? `No ${what.toLowerCase()} matched, even after relaxing.`
       : `${describe(relaxed.items)}${relaxed.relaxations.length > 0 ? ` (relaxed: ${relaxed.relaxations.join(", ")})` : ""}`;
   // Relaxed finds are credited too: they are what the treatment uses.
-  emit({ type: "step", id: step, status, label, summary, qloo: trail[step], credit: toCredit(kind, relaxed.items) });
+  emit({ type: "step", id: step, status, label, summary, qloo: trail[step], ...(billed ? { credit: toCredit(kind, relaxed.items) } : {}) });
 }

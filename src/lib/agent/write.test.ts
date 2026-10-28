@@ -16,6 +16,7 @@ function context(overrides: Partial<WriteContext> = {}): WriteContext {
     references: [],
     series: [],
     casting: [],
+    music: [],
     brands: [],
     places: [],
     leans: [],
@@ -90,6 +91,19 @@ describe("writeSchema", () => {
     expect(writeSchema(withCast).safeParse({ ...rest, casting: [{ ref: "P1", role: "The lead." }] }).success).toBe(true);
     expect(writeSchema(withCast).safeParse({ ...rest, casting: [] }).success).toBe(true);
     expect(writeSchema(withCast).safeParse({ ...rest, casting: [{ ref: "P2", role: "The lead." }] }).success).toBe(false);
+  });
+
+  it("lists a short film's artists with their genres and songs, and lets a song be left out", () => {
+    const phoebe = entity("a1", "Phoebe Bridgers", {
+      kind: "artist",
+      artist: { genres: ["Indie Rock", "Indie Folk"], songs: ["Motion Sickness", "Kyoto", "Garden Song", "Punisher"] },
+    });
+    const withMusic = { ...ctx, music: [{ ref: "M1", item: phoebe }] };
+    expect(writePrompt(withMusic)).toContain("M1 Phoebe Bridgers · Indie Rock, Indie Folk · songs: Motion Sickness, Kyoto, Garden Song\n");
+    expect(writePrompt(withMusic)).toContain("Name a\nsong only from that artist's listed songs");
+    const rest = draft([{ ref: "R1" }, { ref: "R2" }], "R1");
+    expect(writeSchema(withMusic).safeParse({ ...rest, music: [{ ref: "M1", song: null, use: "Under the opening." }] }).success).toBe(true);
+    expect(writeSchema(withMusic).safeParse({ ...rest, music: [{ ref: "M1", song: "Kyoto", use: "At the turn." }] }).success).toBe(true);
   });
 
   it("lists the series apart from the films in the prompt", () => {

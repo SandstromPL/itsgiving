@@ -260,6 +260,17 @@ function film(
   };
 }
 
+/** A few artists' notable songs, as live Qloo lists them on the artist (2026-10-28). */
+const SONGS: Record<string, string[]> = {
+  "Prateek Kuhad": ["cold/mess", "Kasoor", "Tum Jab Paas"],
+  "When Chai Met Toast": ["Firefly", "Khoj", "When We Feel Young"],
+  "Phoebe Bridgers": ["Motion Sickness", "Kyoto", "Garden Song"],
+  "Bon Iver": ["Holocene", "Skinny Love", "Re: Stacks"],
+  "Lana Del Rey": ["Video Games", "Summertime Sadness", "Mariners Apartment Complex"],
+  "Frank Ocean": ["Nights", "Pink + White", "Thinkin Bout You"],
+  "Arijit Singh": ["Channa Mereya", "Tum Hi Ho", "Agar Tum Saath Ho"],
+};
+
 function artist(name: string, popularity: number, vibes: string[], tags: string[], spotify?: string): MockEntity {
   return {
     id: mockId(`${ARTIST}:${name}`),
@@ -268,7 +279,11 @@ function artist(name: string, popularity: number, vibes: string[], tags: string[
     popularity,
     vibes,
     tags,
-    properties: { image: { url: STILL } },
+    properties: {
+      image: { url: STILL },
+      primary_genres: tags.map((id) => TAGS.find((t) => t.id === id)?.name).filter(Boolean),
+      ...(SONGS[name] ? { notable_songs: SONGS[name] } : {}),
+    },
     external: spotify ? { spotify } : undefined,
   };
 }

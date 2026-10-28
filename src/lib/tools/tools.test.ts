@@ -261,6 +261,19 @@ describe("casting_references", () => {
   });
 });
 
+describe("music_references", () => {
+  it("finds the artists an audience plays, with their genres and notable songs, leaving out the subject", async () => {
+    const prateek = mockEntityId("Prateek Kuhad");
+    const result = await runTool("music_references", { signal_entity_ids: [prateek], exclude_ids: [prateek] }, ctx);
+    expect(result.status).toBe("ok");
+    const { artists } = result.data as { artists: { id: string; artist?: { genres?: string[]; songs?: string[] } }[] };
+    expect(artists.map((a) => a.id)).not.toContain(prateek);
+    expect(artists.every((a) => (a.artist?.genres?.length ?? 0) > 0)).toBe(true);
+    expect(artists.some((a) => (a.artist?.songs?.length ?? 0) > 0)).toBe(true);
+    expect(result.provenance[0].query).toMatchObject({ "filter.type": "urn:entity:artist", "filter.exclude.entities": prateek });
+  });
+});
+
 describe("score_for_audience", () => {
   it("ranks only the titles it is given, for the signal's audience", async () => {
     const films = ["In the Mood for Love", "Donnie Darko", "Rockstar"].map((name) => mockEntityId(name));

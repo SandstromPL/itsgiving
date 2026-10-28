@@ -10,6 +10,7 @@ export type StepId =
   | "overlap"
   | "heatmap"
   | "casting"
+  | "music"
   | "plan"
   | "tags"
   | "references"
@@ -32,7 +33,7 @@ export interface LlmTrace {
 }
 
 /** What a credit names: who the run reads, what Qloo found for them, and where the shoot is based. */
-export type CreditKind = "subject" | "audience" | "base" | "cast" | "style" | "films" | "brands" | "places";
+export type CreditKind = "subject" | "audience" | "base" | "cast" | "music" | "style" | "films" | "brands" | "places";
 
 /** A step's find, billed like a film's opening credit while the run builds (timeline.tsx): Qloo's names only. */
 export interface Credit {
@@ -172,8 +173,23 @@ export interface Treatment {
    * role needs, never offers. Missing on treatments built before 2026-10-28.
    */
   casting?: Pick<"role">[];
-  /** Qloo results the writer did not cite, still shown as evidence. `people`: missing before 2026-10-28. */
-  extras: { references: CompactEntity[]; brands: CompactEntity[]; locations: CompactEntity[]; people?: CompactEntity[] };
+  /**
+   * A short film's music: artists the audience over-indexes on, each with where it's used and, at most, one of its
+   * notable songs as Qloo lists them ("" when none). Music videos have none: their song is given. Missing before
+   * 2026-10-28.
+   */
+  music?: Pick<"use" | "song">[];
+  /**
+   * Qloo results the writer did not cite, still shown as evidence. `people` and `artists` are missing before
+   * 2026-10-28; a music video's `artists` are what its audience also plays.
+   */
+  extras: {
+    references: CompactEntity[];
+    brands: CompactEntity[];
+    locations: CompactEntity[];
+    people?: CompactEntity[];
+    artists?: CompactEntity[];
+  };
   audience: {
     taste_tags: CompactTag[];
     overlap: CompactTag[];

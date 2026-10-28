@@ -127,6 +127,42 @@ export const castingReferences = defineTool({
   },
 });
 
+export const musicReferences = defineTool({
+  name: "music_references",
+  description:
+    "Find music artists the audience of the given entities over-indexes on: needle drops and the score's direction for a " +
+    "short film, or what a music video's audience also plays. Each comes with a few of its notable songs as Qloo lists " +
+    "them, the only songs a treatment may name.",
+  inputSchema: z.strictObject({
+    signal_entity_ids: entityIds(10).describe("The artist and/or touchstones whose audience the music should fit."),
+    exclude_ids: z.array(z.string().min(1)).max(50).optional().describe("Entity IDs to leave out, such as the subject itself."),
+    take: take(10, 20),
+  }),
+  example: { signal_entity_ids: [mockEntityId("Past Lives")] },
+  async run(input, { qloo }) {
+    const response = await qloo.insights({
+      "filter.type": entityUrn("artist"),
+      "signal.interests.entities": input.signal_entity_ids,
+      "filter.exclude.entities": input.exclude_ids,
+      "feature.explainability": true,
+      take: input.take,
+    });
+    const artists = entityList(response.data).map((e) => compactEntity(e, { maxTags: 4 }));
+    return {
+      status: artists.length > 0 ? "ok" : "empty",
+      summary:
+        artists.length > 0
+          ? `${plural(artists.length, "artist")}: ${artists
+              .slice(0, 5)
+              .map((a) => a.name)
+              .join(", ")}.`
+          : "No artists matched for this audience.",
+      data: { artists },
+      warnings: response.warnings,
+    };
+  },
+});
+
 export const stylingBrands = defineTool({
   name: "styling_brands",
   description:
