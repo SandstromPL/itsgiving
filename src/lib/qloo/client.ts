@@ -4,7 +4,6 @@ import type { Pacer } from "./pacer";
 import { cacheKey, serializeParams, validateInsightsParams } from "./params";
 import type {
   ApiInfoResponse,
-  AudiencesResponse,
   CompareResponse,
   EntityListResponse,
   InsightsResponse,
@@ -197,18 +196,6 @@ export class QlooClient {
 
   tags(params: QlooParams) {
     return this.get<TagsResponse>("/v2/tags", params);
-  }
-
-  tagTypes(params: QlooParams = {}) {
-    return this.get<unknown>("/v2/tags/types", params);
-  }
-
-  audiences(params: QlooParams) {
-    return this.get<AudiencesResponse>("/v2/audiences", params);
-  }
-
-  audienceTypes(params: QlooParams = {}) {
-    return this.get<unknown>("/v2/audiences/types", params);
   }
 
   compare(params: QlooParams) {

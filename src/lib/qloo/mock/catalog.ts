@@ -25,13 +25,6 @@ export interface MockEntity {
   external?: { imdb?: string; spotify?: string };
 }
 
-export interface MockAudience {
-  id: string;
-  name: string;
-  type: string;
-  vibes: string[];
-}
-
 export interface MockCity {
   name: string;
   countryCode: string;
@@ -403,12 +396,3 @@ export function mockEntityId(name: string, subtype?: string): string {
   if (!entity) throw new Error(`No mock entity named ${name}`);
   return entity.id;
 }
-
-export const AUDIENCES: MockAudience[] = [
-  { id: "urn:audience:hobbies_and_interests:film_buffs", name: "Film Buffs", type: "urn:audience:hobbies_and_interests", vibes: ["surreal", "melancholic", "retro"] },
-  { id: "urn:audience:hobbies_and_interests:live_music", name: "Live Music", type: "urn:audience:hobbies_and_interests", vibes: ["rebellious", "urban", "playful"] },
-  { id: "urn:audience:hobbies_and_interests:fashion", name: "Fashion", type: "urn:audience:hobbies_and_interests", vibes: ["maximalist", "minimalist", "urban"] },
-  { id: "urn:audience:life_stage:college_students", name: "College Students", type: "urn:audience:life_stage", vibes: ["playful", "rebellious", "neon"] },
-  { id: "urn:audience:leisure:nightlife", name: "Nightlife", type: "urn:audience:leisure", vibes: ["nocturnal", "neon", "urban"] },
-  { id: "urn:audience:global_issues:sustainability", name: "Sustainability", type: "urn:audience:global_issues", vibes: ["folk", "minimalist", "warm"] },
-];

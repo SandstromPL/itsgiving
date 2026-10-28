@@ -48,38 +48,8 @@ export class RateLimiter {
   }
 }
 
-/** Small LRU with a TTL; Map iteration order doubles as recency order. */
-export class TtlCache<V> {
-  private readonly entries = new Map<string, { value: V; expires: number }>();
-
-  constructor(
-    private readonly max: number,
-    private readonly ttlMs: number,
-    private readonly now: () => number = Date.now,
-  ) {}
-
-  get(key: string): V | undefined {
-    const entry = this.entries.get(key);
-    if (!entry) return undefined;
-    if (entry.expires <= this.now()) {
-      this.entries.delete(key);
-      return undefined;
-    }
-    this.entries.delete(key);
-    this.entries.set(key, entry);
-    return entry.value;
-  }
-
-  set(key: string, value: V): void {
-    this.entries.delete(key);
-    this.entries.set(key, { value, expires: this.now() + this.ttlMs });
-    while (this.entries.size > this.max) {
-      const oldest = this.entries.keys().next().value;
-      if (oldest === undefined) break;
-      this.entries.delete(oldest);
-    }
-  }
-}
+/** The treatment cache is the server's one LRU with a TTL (lib/lru.ts); the service and its tests take it from here. */
+export { TtlCache } from "../lru";
 
 /**
  * The client's address as the rate limits count it, from proxy headers (Vercel sets x-forwarded-for itself): an IPv4

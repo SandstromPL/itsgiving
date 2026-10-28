@@ -43,14 +43,6 @@ export interface QlooEntity {
   location?: { lat?: number; lon?: number; geohash?: string };
 }
 
-export interface QlooAudience {
-  id: string;
-  entity_id?: string;
-  name: string;
-  type?: string;
-  parents?: { type: string }[];
-}
-
 export interface DemographicsBlock {
   entity_id: string;
   query: {
@@ -96,11 +88,6 @@ export interface EntityListResponse {
 export interface TagsResponse {
   success?: boolean;
   results?: { tags?: QlooTag[] } | QlooTag[];
-}
-
-export interface AudiencesResponse {
-  success?: boolean;
-  results?: { audiences?: QlooAudience[]; entities?: QlooAudience[] } | QlooAudience[];
 }
 
 /** /v2/analysis/compare: the recipe shows tags only and no `success` field. */

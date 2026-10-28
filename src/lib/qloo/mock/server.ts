@@ -1,17 +1,6 @@
 import type { FetchLike } from "../client";
 import { TAG_TYPES } from "../urns";
-import {
-  AUDIENCES,
-  CITIES,
-  ENTITIES,
-  LOCALITIES,
-  SUBGENRES,
-  TAGS,
-  type MockCity,
-  type MockEntity,
-  type MockLocality,
-  type MockTag,
-} from "./catalog";
+import { CITIES, ENTITIES, LOCALITIES, SUBGENRES, TAGS, type MockCity, type MockEntity, type MockLocality, type MockTag } from "./catalog";
 
 // A small fake of the Qloo API for building without a key. It mirrors the
 // documented request/response shapes and the known gotchas (403 for
@@ -40,7 +29,6 @@ type Vector = Map<string, number>;
 
 const entityById = new Map(ENTITIES.map((e) => [e.id, e]));
 const tagById = new Map(TAGS.map((t) => [t.id, t]));
-const audienceById = new Map(AUDIENCES.map((au) => [au.id, au]));
 const localityById = new Map(LOCALITIES.map((l) => [l.id, l]));
 
 function hash(text: string): number {
@@ -311,8 +299,6 @@ function buildProfile(params: URLSearchParams, prefix = ""): Profile {
   for (const id of entityIds) toVector(entityById.get(id)!.vibes, 1, vector);
   const tagIds = list(params, `${prefix}signal.interests.tags`).filter((id) => tagById.has(id));
   for (const id of tagIds) toVector(tagById.get(id)!.vibes, 0.8, vector);
-  const audienceIds = list(params, `${prefix}signal.demographics.audiences`).filter((id) => audienceById.has(id));
-  for (const id of audienceIds) toVector(audienceById.get(id)!.vibes, 0.6, vector);
   const age = list(params, `${prefix}signal.demographics.age`);
   if (age.some((bucket) => bucket === "24_and_younger" || bucket === "25_to_29")) {
     toVector(["playful", "neon", "rebellious"], 0.3, vector);
@@ -321,7 +307,7 @@ function buildProfile(params: URLSearchParams, prefix = ""): Profile {
     toVector(["nostalgic", "warm", "retro"], 0.3, vector);
   }
   const hasSignal =
-    entityIds.length + tagIds.length + audienceIds.length + age.length > 0 ||
+    entityIds.length + tagIds.length + age.length > 0 ||
     params.has(`${prefix}signal.demographics.gender`) ||
     params.has(`${prefix}signal.location.query`) ||
     params.has(`${prefix}signal.location`);
@@ -539,18 +525,6 @@ function tags(params: URLSearchParams): Response {
   return respond({ success: true, results: { tags: page(matches, params, 20, 50) }, _mock: true });
 }
 
-function audiences(params: URLSearchParams): Response {
-  const query = normalize(params.get("filter.query") ?? "");
-  const matches = AUDIENCES.filter((au) => !query || normalize(au.name).includes(query) || au.vibes.includes(query)).map((au) => ({
-    id: au.id,
-    entity_id: au.id,
-    name: au.name,
-    type: au.type,
-    parents: [],
-  }));
-  return respond({ success: true, results: { audiences: page(matches, params, 20, 50) }, _mock: true });
-}
-
 function compare(params: URLSearchParams): Response {
   const a = buildProfile(params, "a.");
   const b = buildProfile(params, "b.");
@@ -607,8 +581,6 @@ export function createMockFetch(): FetchLike {
         return insights(params);
       case "/v2/tags":
         return tags(params);
-      case "/v2/audiences":
-        return audiences(params);
       case "/v2/analysis/compare":
         return compare(params);
       case "/v2/trending":

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { audienceList, compactEntity, entityList, extractContributions, pickTags, tagList } from "./normalize";
+import { compactEntity, entityList, extractContributions, pickTags, tagList } from "./normalize";
 
 describe("result readers", () => {
   it("read entities from both the flat and the wrapped shapes", () => {
@@ -9,10 +9,8 @@ describe("result readers", () => {
     expect(entityList(undefined)).toEqual([]);
   });
 
-  it("read tags and audiences from the documented variants", () => {
+  it("read tags from the documented variants", () => {
     expect(tagList({ results: { tags: [{ name: "Neon" }] } })).toHaveLength(1);
-    expect(audienceList({ results: { audiences: [{ id: "a", name: "A" }] } })).toHaveLength(1);
-    expect(audienceList({ results: { entities: [{ id: "b", name: "B" }] } })).toHaveLength(1);
   });
 });
 

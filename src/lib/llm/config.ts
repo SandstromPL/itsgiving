@@ -34,8 +34,16 @@ export interface LlmConfig {
   geminiFallbackModel?: string;
   /** Real LLM calls allowed per UTC day across the process; the mock never counts. */
   dailyCap: number;
+  /** Longest a call may take when it sets no limit of its own (CALL_TIMEOUT_MS). */
   timeoutMs: number;
 }
+
+/**
+ * The limit for a model call that sets none of its own. Every call the app makes sets one (the treatment's plan and
+ * write steps take theirs from TIMING in agent/pipeline.ts), so this is a backstop, not a setting: the LLM_TIMEOUT_MS
+ * variable that once set it never reached a call.
+ */
+const CALL_TIMEOUT_MS = 20_000;
 
 function positiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
@@ -69,8 +77,7 @@ export function llmConfigFromEnv(env: Record<string, string | undefined> = proce
     deepseekModel: env.DEEPSEEK_MODEL?.trim() || DEFAULT_MODELS.deepseek,
     geminiFallbackModel: geminiFallbackModel === geminiModel ? undefined : geminiFallbackModel,
     dailyCap: positiveInt(env.LLM_DAILY_CAP, 300),
-    // Only for calls that set no limit of their own: the treatment's plan and write steps do (TIMING in agent/pipeline.ts).
-    timeoutMs: positiveInt(env.LLM_TIMEOUT_MS, 20_000),
+    timeoutMs: CALL_TIMEOUT_MS,
   };
 }
 

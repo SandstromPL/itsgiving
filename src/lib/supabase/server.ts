@@ -56,6 +56,19 @@ export async function confirmedViewerId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+/**
+ * The project's secret key, or null when saving isn't set up. Only the server holds it: its own client below, and the
+ * save route's seal check (seal.ts draws the seal's key from it).
+ */
+export function savingSecret(): string | null {
+  return process.env.SUPABASE_SECRET_KEY?.trim() || null;
+}
+
+/** Whether saving, sharing and deleting accounts are set up on this server: until they are, those routes answer 404. */
+export function savingConfigured(): boolean {
+  return savingSecret() !== null;
+}
+
 /** How long the server waits for the database: a slow or paused project then reads as unavailable, not a hung page. */
 const DATABASE_TIMEOUT_MS = 8_000;
 
@@ -67,7 +80,7 @@ let admin: SupabaseClient | null = null;
  */
 export function adminSupabase(): SupabaseClient | null {
   const config = supabasePublic();
-  const secret = process.env.SUPABASE_SECRET_KEY?.trim();
+  const secret = savingSecret();
   if (!config || !secret) return null;
   admin ??= createClient(config.url, secret, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
