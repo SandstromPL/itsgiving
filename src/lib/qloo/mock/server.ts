@@ -1,6 +1,17 @@
 import type { FetchLike } from "../client";
 import { TAG_TYPES } from "../urns";
-import { CITIES, ENTITIES, LOCALITIES, SUBGENRES, TAGS, type MockCity, type MockEntity, type MockLocality, type MockTag } from "./catalog";
+import {
+  CITIES,
+  ENTITIES,
+  ENTITY_TAGS,
+  LOCALITIES,
+  SUBGENRES,
+  TAGS,
+  type MockCity,
+  type MockEntity,
+  type MockLocality,
+  type MockTag,
+} from "./catalog";
 
 // A small fake of the Qloo API for building without a key. It mirrors the
 // documented request/response shapes and the known gotchas (403 for
@@ -28,7 +39,8 @@ const SUPPORTED_TYPES = new Set([
 type Vector = Map<string, number>;
 
 const entityById = new Map(ENTITIES.map((e) => [e.id, e]));
-const tagById = new Map(TAGS.map((t) => [t.id, t]));
+// Tags only entities carry (ENTITY_TAGS) are served on entities and honoured as filters, never offered by the tag search.
+const tagById = new Map([...TAGS, ...ENTITY_TAGS].map((t) => [t.id, t]));
 const localityById = new Map(LOCALITIES.map((l) => [l.id, l]));
 
 function hash(text: string): number {

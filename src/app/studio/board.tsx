@@ -4,9 +4,13 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   NUDGES,
   NUDGE_LABELS,
+  aboveBudget,
   audiencePhrase,
+  budgetPhrase,
   coverReference,
-  excerpt,
+  openingLine,
+  priceLine,
+  siteName,
   tagLabel,
   tmdbSize,
   withoutIdentity,
@@ -17,7 +21,7 @@ import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
 import { PINNED, ShootBaseBlock, locationPins } from "./base-map";
 import { useEra } from "./era-layer";
 import { useLingo } from "./lingo";
-import { QlooTags, Still, Tape, Why, modelName } from "./parts";
+import { QlooNote, QlooTags, Still, Tape, Why, modelName } from "./parts";
 import { type CoverStill } from "./title-card";
 import { suggestTitleFont } from "./title-fonts";
 import { evidenceTone, outlineButton, paperEvidence } from "./ui";
@@ -33,6 +37,8 @@ const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", wr
 const prose = "font-serif text-[1.25rem] leading-[1.38]";
 /** A card is never cut across two printed pages. */
 const card = "rounded-[26px] border border-line bg-card print:break-inside-avoid";
+/** A place's map, phone and website, at the foot of its card. */
+const placeLink = "py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground";
 
 /**
  * A grid of n cards with no hole in its last row: two columns, three from xl when the count allows, and one card (the
@@ -434,27 +440,42 @@ export function Board({
           <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
           <ul className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
-            {t.wardrobe.map((w, i) => (
-              <li
-                key={w.entity.id}
-                className={`${card} flex flex-col gap-3.5 p-5 ${i === t.wardrobe.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
-              >
-                <div className="flex flex-col gap-1">
-                  <h3 className="type-head text-[1.7rem] leading-tight">{w.entity.name}</h3>
-                  <QlooTags tags={w.qloo.tags} />
-                </div>
-                <p className={prose}>{w.notes.look}</p>
-                <Why
-                  label="why this brand"
-                  name={w.entity.name}
-                  qloo={w.qloo}
-                  read={[{ term: "The look", text: w.notes.look }]}
-                  writtenBy={t.writtenBy}
-                  mock={mock}
-                  className="mt-auto"
-                />
-              </li>
-            ))}
+            {t.wardrobe.map((w, i) => {
+              const price = priceLine(w.entity.brand?.price);
+              const reference = aboveBudget(w.entity, t.brief.budget);
+              return (
+                <li
+                  key={w.entity.id}
+                  className={`${card} flex flex-col gap-3.5 p-5 ${i === t.wardrobe.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
+                >
+                  <div className="flex flex-col gap-1">
+                    <h3 className="type-head text-[1.7rem] leading-tight">{w.entity.name}</h3>
+                    <QlooTags tags={w.qloo.tags} />
+                    {price && (
+                      <p className="text-[14px] text-faint">
+                        {price}
+                        {reference && `, above ${budgetPhrase(t.brief.budget)}: rent it or match it`}
+                      </p>
+                    )}
+                  </div>
+                  <QlooNote text={w.entity.brand?.style} mock={mock} />
+                  <p className={prose}>{w.notes.look}</p>
+                  <Why
+                    label="why this brand"
+                    name={w.entity.name}
+                    qloo={w.qloo}
+                    facts={[
+                      { term: "Style", text: w.entity.brand?.style },
+                      { term: "Prices", text: price },
+                    ]}
+                    read={[{ term: "The look", text: w.notes.look }]}
+                    writtenBy={t.writtenBy}
+                    mock={mock}
+                    className="mt-auto"
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
         <Also label="Also high for this audience:" items={t.extras.brands} mock={mock} />
@@ -488,6 +509,10 @@ export function Board({
                 const where = [place?.kind, hood, place?.price_level ? `price level ${place.price_level}\u00a0of\u00a04` : undefined]
                   .filter(Boolean)
                   .join(", ");
+                const hours = openingLine(place?.hours);
+                const suits = [place?.fits?.length ? `Suits ${place.fits.join(", ").toLowerCase()}` : undefined, ...(place?.views ?? [])]
+                  .filter(Boolean)
+                  .join("; ");
                 const map =
                   place?.lat !== undefined && place?.lon !== undefined
                     ? `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=17/${place.lat}/${place.lon}`
@@ -532,39 +557,47 @@ export function Board({
                         <div>
                           <h3 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h3>
                           {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
+                          {hours && <p className="text-[14px] text-faint">Open {hours}</p>}
+                          {suits && <p className="text-[14px] text-faint">{suits}</p>}
                         </div>
-                        {place?.ambience && (
-                          <p className="text-[14px] leading-5 text-dim">
-                            <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>
-                              {mock ? "Mock note" : "Qloo"}{" "}
-                            </span>
-                            {/* The whole note is in "Why this place". */}
-                            {excerpt(place.ambience, 180)}
-                          </p>
-                        )}
+                        <QlooNote text={place?.ambience} mock={mock} />
                         <p className={prose}>{l.notes.scene}</p>
                       </div>
                       <Why
                         label="why this place"
                         name={l.entity.name}
                         qloo={l.qloo}
-                        note={place?.ambience}
+                        facts={[
+                          { term: "Atmosphere", text: place?.ambience },
+                          { term: "The space", text: place?.setting },
+                          { term: "Hours", text: hours },
+                        ]}
                         read={[{ term: "The scene", text: l.notes.scene }]}
                         writtenBy={t.writtenBy}
                         mock={mock}
                         className={`mt-auto ${printReceipt}`}
                       />
-                      {/* On paper the map link (a live one in a PDF) closes the writing's column. */}
-                      {map && (
-                        <div className="flex flex-wrap items-center gap-2 print:col-start-2 print:row-start-4 print:px-5 print:pb-4">
-                          <a
-                            href={map}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-full py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
-                          >
-                            Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
-                          </a>
+                      {/* The map and the venue's own number and site, to ask about filming there. On paper they close the
+                          writing's column (live links in a PDF). */}
+                      {(map || place?.phone || place?.website) && (
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 print:col-start-2 print:row-start-4 print:px-5 print:pb-4">
+                          {map && (
+                            <a href={map} target="_blank" rel="noreferrer" className={placeLink}>
+                              Map<span className="sr-only"> of {l.entity.name} (opens in a new tab)</span>
+                            </a>
+                          )}
+                          {place?.phone && (
+                            <a href={`tel:${place.phone.replace(/[^\d+]/g, "")}`} className={placeLink}>
+                              <span className="sr-only">Call {l.entity.name}: </span>
+                              {place.phone}
+                            </a>
+                          )}
+                          {place?.website && (
+                            <a href={place.website} target="_blank" rel="noreferrer" className={placeLink}>
+                              {siteName(place.website)}
+                              <span className="sr-only">, {l.entity.name}&apos;s website (opens in a new tab)</span>
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>

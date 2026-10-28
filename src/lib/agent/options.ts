@@ -1,5 +1,6 @@
 // Brief options shared by the server and the browser (no Node imports here).
 
+import type { CompactEntity, CompactPlace, Weekday } from "../qloo";
 import { withYear } from "../text";
 import type { StepId, TreatmentWho } from "./types";
 
@@ -16,12 +17,83 @@ export const NUDGE_LABELS: Record<Nudge, string> = {
   cheaper_locations: "Cheaper locations",
 };
 
+/**
+ * What a budget reaches. `brandReferenceFrom`: the US-dollar price a brand's pieces start at from which, on this
+ * budget, its look is a reference to rent or match rather than buy.
+ */
 export const BUDGETS = {
-  shoestring: { label: "Shoestring", priceLevelMax: 2 },
-  indie: { label: "Indie", priceLevelMax: 3 },
-  premium: { label: "Premium", priceLevelMax: undefined },
+  shoestring: { label: "Shoestring", priceLevelMax: 2, brandReferenceFrom: 75 },
+  indie: { label: "Indie", priceLevelMax: 3, brandReferenceFrom: 150 },
+  premium: { label: "Premium", priceLevelMax: undefined, brandReferenceFrom: undefined },
 } as const;
 export type Budget = keyof typeof BUDGETS;
+
+const dollars = (value: number) => `$${value.toLocaleString("en-US")}`;
+
+/** A brand's price range from Qloo: "$20–150", "from $300" or "up to $90". */
+export function priceLine(price?: { min?: number; max?: number }): string | undefined {
+  const { min, max } = price ?? {};
+  if (min !== undefined && max !== undefined) return min === max ? dollars(min) : `${dollars(min)}–${max.toLocaleString("en-US")}`;
+  if (min !== undefined) return `from ${dollars(min)}`;
+  return max !== undefined ? `up to ${dollars(max)}` : undefined;
+}
+
+/** "an indie budget", "a shoestring budget". */
+export function budgetPhrase(budget: Budget): string {
+  const label = BUDGETS[budget].label.toLowerCase();
+  return `${/^[aeiou]/.test(label) ? "an" : "a"} ${label} budget`;
+}
+
+/** True when a brand's pieces start above what the budget buys (BUDGETS.brandReferenceFrom). */
+export function aboveBudget(brand: Pick<CompactEntity, "brand">, budget: Budget): boolean {
+  const from = BUDGETS[budget].brandReferenceFrom;
+  const min = brand.brand?.price?.min;
+  return from !== undefined && min !== undefined && min >= from;
+}
+
+const DAY_NAMES: Record<Weekday, string> = {
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+  sunday: "Sun",
+};
+const WEEK = Object.keys(DAY_NAMES) as Weekday[];
+
+/**
+ * A place's week in one line, days with the same hours run together: "Tue–Sun 12:00–15:30; closed Mon", or "Daily
+ * 09:00–23:00". Days Qloo doesn't list are left out.
+ */
+export function openingLine(hours?: CompactPlace["hours"]): string | undefined {
+  if (!hours) return undefined;
+  const runs: { from: Weekday; to: Weekday; value: string }[] = [];
+  for (const day of WEEK) {
+    const value = hours[day];
+    const last = runs.at(-1);
+    if (value === undefined) continue;
+    if (last && last.value === value && WEEK.indexOf(day) === WEEK.indexOf(last.to) + 1) last.to = day;
+    else runs.push({ from: day, to: day, value });
+  }
+  if (runs.length === 0) return undefined;
+  if (runs.length === 1 && runs[0].from === "monday" && runs[0].to === "sunday") {
+    return runs[0].value === "closed" ? "Closed all week" : `Daily ${runs[0].value}`;
+  }
+  const days = ({ from, to }: { from: Weekday; to: Weekday }) => (from === to ? DAY_NAMES[from] : `${DAY_NAMES[from]}–${DAY_NAMES[to]}`);
+  const open = runs.filter((r) => r.value !== "closed").map((r) => `${days(r)} ${r.value}`);
+  const closed = runs.filter((r) => r.value === "closed").map(days);
+  return [...open, ...(closed.length > 0 ? [`closed ${closed.join(", ")}`] : [])].join("; ");
+}
+
+/** A website as its readable name: "https://www.thalassa.in/menu" -> "thalassa.in". */
+export function siteName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
 
 export const FORMATS = { music_video: "Music video", short_film: "Short film" } as const;
 export type Format = keyof typeof FORMATS;

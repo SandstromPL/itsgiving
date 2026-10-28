@@ -1,13 +1,13 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
-import { tagLabel } from "@/lib/agent/options";
+import { Fragment, useId, useState, type ReactNode } from "react";
+import { excerpt, tagLabel } from "@/lib/agent/options";
 import type { QlooEvidence, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { ProducedBy } from "@/lib/llm/generate";
 import type { Reasoning } from "@/lib/llm/types";
 import type { QlooMode } from "@/lib/qloo/client";
-import { paperEvidence, rankMark, slip } from "./ui";
+import { evidenceTone, paperEvidence, rankMark, slip } from "./ui";
 
 /** Pink "camera tape" label for anything mocked. */
 export function Tape({ children, title }: { children: ReactNode; title?: string }) {
@@ -161,6 +161,18 @@ export function Receipt({
   );
 }
 
+/** Qloo's own words about an item on its card (a place's atmosphere, a brand's style), marked as Qloo's, shortened. */
+export function QlooNote({ text, mock, max = 180 }: { text?: string; mock: boolean; max?: number }) {
+  if (!text) return null;
+  return (
+    <p className="text-[14px] leading-5 text-dim">
+      <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>{mock ? "Mock note" : "Qloo"} </span>
+      {/* The whole note is in the item's Why window. */}
+      {excerpt(text, max)}
+    </p>
+  );
+}
+
 /** A few of the item's Qloo tags (style notes for films, aesthetics for brands, kind and mood for places). */
 export function QlooTags({ tags, max = 3 }: { tags: string[]; max?: number }) {
   if (tags.length === 0) return null;
@@ -182,7 +194,7 @@ export function Why({
   read,
   writtenBy,
   mock,
-  note,
+  facts = [],
   className = "",
 }: {
   label: string;
@@ -192,8 +204,8 @@ export function Why({
   writtenBy: ProducedBy;
   /** True when the evidence came from the synthetic mock, not Qloo. */
   mock: boolean;
-  /** Qloo's own description of the item, e.g. a place's atmosphere. */
-  note?: string;
+  /** What Qloo itself says about the item (a place's atmosphere, a brand's style), listed with its evidence. */
+  facts?: { term: string; text?: string }[];
   /** Placement of the receipt in its card. */
   className?: string;
 }) {
@@ -252,11 +264,14 @@ export function Why({
                   <dd>{qloo.tags.slice(0, 6).map(tagLabel).join(", ")}</dd>
                 </>
               )}
-              {note && (
-                <>
-                  <dt className="text-faint">Atmosphere</dt>
-                  <dd>{note}</dd>
-                </>
+              {facts.map(
+                ({ term, text }) =>
+                  text && (
+                    <Fragment key={term}>
+                      <dt className="text-faint">{term}</dt>
+                      <dd>{text}</dd>
+                    </Fragment>
+                  ),
               )}
             </dl>
             <p className="mt-2 text-xs leading-5 text-faint">

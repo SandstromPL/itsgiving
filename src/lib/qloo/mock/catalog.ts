@@ -155,6 +155,23 @@ export const TAGS: MockTag[] = [
   tag(G_PLACE, "park", "Park", [PLACE], ["warm", "dreamy", "tender"], 0.7),
 ];
 
+const TIME_OF_DAY = "urn:tag:time_of_day_fit:qloo";
+const VIEW = "urn:tag:view:qloo";
+
+/**
+ * Tags live entities carry that the tag search never needs to offer: the times of day and views a place suits. The
+ * server knows them, so it serves them on entities and honours them as filters, but the tag search, the taste reads and
+ * the comparisons above never see them.
+ */
+export const ENTITY_TAGS: MockTag[] = [
+  tag(TIME_OF_DAY, "morning", "Morning", [PLACE], [], 0.5),
+  tag(TIME_OF_DAY, "afternoon", "Afternoon", [PLACE], [], 0.5),
+  tag(TIME_OF_DAY, "evening", "Evening", [PLACE], [], 0.5),
+  tag(TIME_OF_DAY, "late_night", "Late night", [PLACE], [], 0.5),
+  tag(VIEW, "street_view", "Street view", [PLACE], [], 0.5),
+  tag(VIEW, "city_view", "City view", [PLACE], [], 0.5),
+];
+
 const SUBGENRE = "urn:tag:subgenre:qloo";
 
 /**
@@ -256,9 +273,66 @@ function person(name: string, popularity: number, vibes: string[]): MockEntity {
   return { id: mockId(`${PERSON}:${name}`), name, subtype: PERSON, popularity, vibes, tags: [], properties: { image: { url: STILL } } };
 }
 
+const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).replace(/_/g, " ");
+
+/** What a mock brand's pieces sell for, by its fashion genre, in US dollars. */
+const BRAND_PRICES: Record<string, [number, number]> = {
+  luxury: [400, 5000],
+  contemporary: [60, 450],
+  streetwear: [40, 250],
+  denim: [40, 180],
+  basics: [10, 80],
+  ethnic_wear: [20, 200],
+  footwear: [90, 260],
+};
+
 function brand(name: string, popularity: number, vibes: string[], tags: string[]): MockEntity {
-  // Live clothing brands carry the parent genre (urn:tag:genre:brand:fashion) as well as the specific ones.
-  return { id: mockId(`${BRAND}:${name}`), name, subtype: BRAND, popularity, vibes, tags: [G_FASHION, ...tags], properties: {} };
+  const genre = tags.find((t) => t.startsWith(`${G_FASHION}:`))?.slice(G_FASHION.length + 1) ?? "contemporary";
+  const [min, max] = BRAND_PRICES[genre] ?? BRAND_PRICES.contemporary;
+  // Live clothing brands carry the parent genre (urn:tag:genre:brand:fashion) as well as the specific ones, and a style
+  // sentence, aesthetic traits and a price range (live, 2026-10-28); these are made up from the brand's vibes.
+  return {
+    id: mockId(`${BRAND}:${name}`),
+    name,
+    subtype: BRAND,
+    popularity,
+    vibes,
+    tags: [G_FASHION, ...tags],
+    properties: {
+      style_description: `A ${vibes[0]}, ${vibes[1] ?? vibes[0]} label: ${title(genre).toLowerCase()} pieces cut for everyday wear.`,
+      aesthetic_properties: vibes.slice(0, 3).map(title),
+      price_range_usd_min: min,
+      price_range_usd_max: max,
+    },
+  };
+}
+
+/** Live Qloo's hours shape: {monday: [{opens: "T18:00:00", closes: "T01:30:00", closed: false}], ...}. */
+function weekHours(open: string[], times: [string, string][]) {
+  const days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+  return Object.fromEntries(
+    days.map((day) => [
+      day,
+      open.includes(day)
+        ? times.map(([opens, closes]) => ({ opens: `T${opens}:00`, closes: `T${closes}:00`, closed: false }))
+        : [{ opens: null, closes: null, closed: true }],
+    ]),
+  );
+}
+
+const EVERY_DAY = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+/** A mock place's hours, by what kind of place it is. */
+function placeHours(tags: string[]) {
+  const is = (kind: string) => tags.includes(`${G_PLACE}:${kind}`);
+  if (is("restaurant:bar") || is("live_music_venue")) return weekHours(EVERY_DAY.slice(1), [["18:00", "01:30"]]);
+  if (is("restaurant:cafe")) return weekHours(EVERY_DAY, [["08:00", "22:00"]]);
+  if (is("park")) return weekHours(EVERY_DAY, [["06:00", "21:00"]]);
+  if (is("book_store")) return weekHours(EVERY_DAY.slice(0, 6), [["10:00", "20:00"]]);
+  return weekHours(EVERY_DAY, [
+    ["12:00", "15:30"],
+    ["19:00", "23:30"],
+  ]);
 }
 
 function place(
@@ -273,13 +347,18 @@ function place(
   hasPhoto = true,
 ): MockEntity {
   const cityInfo = CITIES.find((c) => c.name === city);
+  // Live places also carry hours, what the space is like, and the times of day and views they suit (2026-10-28). The
+  // mock makes them up from the place's kind and vibes. It has no phone or website: a made-up one could reach someone.
+  const outdoors = tags.includes(`${G_PLACE}:park`);
+  const fits = vibes.includes("nocturnal") ? ["evening", "late_night"] : outdoors || tags.includes(`${G_PLACE}:restaurant:cafe`) ? ["morning", "afternoon"] : ["afternoon", "evening"];
+  const view = tags.includes(`${SETTING}:rooftop`) ? "city_view" : outdoors ? undefined : "street_view";
   return {
     id: mockId(`${PLACE}:${name}:${city}`),
     name,
     subtype: PLACE,
     popularity,
     vibes,
-    tags,
+    tags: [...tags, ...fits.map((fit) => `${TIME_OF_DAY}:${fit}`), ...(view ? [`${VIEW}:${view}`] : [])],
     disambiguation: `${neighborhood}, ${city}`,
     properties: {
       address: `${neighborhood}, ${city}`,
@@ -288,6 +367,8 @@ function place(
       price_level: priceLevel,
       lat: coords[0],
       lon: coords[1],
+      hours: placeHours(tags),
+      physical_setting_description: `A ${vibes[0]}, ${vibes[1] ?? vibes[0]} room in ${neighborhood}, ${outdoors ? "open to the sky" : "with its own light from the street"}.`,
       ...(hasPhoto ? { image: { url: PLACE_PHOTO } } : {}),
     },
   };

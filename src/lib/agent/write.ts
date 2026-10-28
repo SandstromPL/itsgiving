@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { CompactEntity } from "../qloo";
 import type { Brief } from "./brief";
-import { subjectPhrase, withYear } from "./options";
+import { aboveBudget, budgetPhrase, joinNames, openingLine, priceLine, subjectPhrase, withYear } from "./options";
 import { areaLabel, describeBrief, vibeOf, type ToneCandidate, type Vibe, type Who } from "./plan";
 import type { BaseArea } from "./types";
 
@@ -163,8 +163,13 @@ function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): strin
     if (item.place.price_level) bits.push(`price ${item.place.price_level}/4`);
   }
   if (item.tags.length > 0) bits.push(item.tags.slice(0, 4).join(", "));
+  const price = priceLine(item.brand?.price);
+  if (price) bits.push(price);
   // Qloo's own read of the room, clipped so six places stay within Groq's tokens-per-minute budget.
   if (item.place?.ambience) bits.push(`"${item.place.ambience.slice(0, 140)}"`);
+  const hours = openingLine(item.place?.hours);
+  if (hours) bits.push(`open ${hours}`);
+  if (item.place?.fits?.length) bits.push(`suits ${item.place.fits.join(", ").toLowerCase()}`);
   // With one subject every pick is "via" it; only spend tokens on this when it discriminates. An artist Qloo lacks
   // drove nothing: their stand-ins did.
   const signals = (ctx.artistMissing ? 0 : ctx.artistNames.length) + ctx.touchstoneNames.length + (ctx.standInNames?.length ?? 0);
@@ -195,6 +200,15 @@ export function writePrompt(ctx: WriteContext): string {
     "scenes say what happens there and stay true to the place's Qloo description. Palette: 4-6 named colours. Lighting",
     "and shot notes are plain sentences, concrete and doable on this budget.",
   );
+  const pricey = ctx.brands.filter(({ item }) => aboveBudget(item, ctx.brief.budget)).map(({ item }) => item.name);
+  if (pricey.length > 0) {
+    parts.push(
+      `On ${budgetPhrase(ctx.brief.budget)}, ${joinNames(pricey)} ${pricey.length > 1 ? "are" : "is"} a reference to rent or match, not to buy: say so in that look.`,
+    );
+  }
+  if (ctx.places.some(({ item }) => item.place?.hours)) {
+    parts.push("Where a place lists its hours, a scene can use them: shoot before it opens or on the day it's closed.");
+  }
   return parts.join("\n");
 }
 
