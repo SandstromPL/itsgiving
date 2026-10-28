@@ -87,7 +87,7 @@ describe("TmdbClient", () => {
     expect(token.requests[0].auth).toBe("Bearer eyJhbGciOi.fake.token");
   });
 
-  it("tries once more after a dropped connection or a busy TMDB, but not after a refusal", async () => {
+  it("tries again after a dropped connection or a busy TMDB, but not after a refusal", async () => {
     let calls = 0;
     const flaky = new TmdbClient({
       apiKey: "key",
@@ -102,6 +102,20 @@ describe("TmdbClient", () => {
     await expect(flaky.imdbId({ tmdbId: 843, kind: "movie", title: "In the Mood for Love" })).rejects.toThrow(/TMDB returned 503/);
     expect(calls).toBe(2);
     expect(await flaky.imdbId({ tmdbId: 843, kind: "movie", title: "In the Mood for Love" })).toBe("tt0118694");
+
+    // Dropped connections come in bursts: a third try, a second later, gets through.
+    let drops = 0;
+    const dropping = new TmdbClient({
+      apiKey: "key",
+      baseUrl: "https://tmdb.test",
+      fetch: async () => {
+        drops += 1;
+        if (drops <= 2) throw new TypeError("read ECONNRESET");
+        return Response.json({ imdb_id: "tt0118694" });
+      },
+    });
+    expect(await dropping.imdbId({ tmdbId: 843, kind: "movie", title: "In the Mood for Love" })).toBe("tt0118694");
+    expect(drops).toBe(3);
 
     const refused = fakeTmdb({ "/3/list/9": 401 });
     await expect(refused.client.list("9", 25)).rejects.toThrow(/rejected/);

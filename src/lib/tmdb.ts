@@ -213,7 +213,9 @@ export class TmdbClient {
     const bearer = key.startsWith("eyJ");
     const query = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]));
     if (!bearer) query.set("api_key", key);
-    // Two attempts: a fresh connection to TMDB sometimes drops (seen live, 2026-10-25), and a busy TMDB recovers fast.
+    // A busy TMDB gets two attempts and recovers fast. A dropped connection gets three, the last after a full second:
+    // from this side resets come in bursts (seen live, 2026-10-25, and on 4 of 8 actors in one run on 2026-10-29,
+    // while the run was also pulling Qloo's data), and a second try 300 ms later can land in the same burst.
     for (let attempt = 1; ; attempt++) {
       const timeout = AbortSignal.timeout(this.options.timeoutMs ?? 8_000);
       let response: Response;
@@ -226,8 +228,8 @@ export class TmdbClient {
         );
       } catch (err) {
         signal?.throwIfAborted();
-        if (attempt < 2 && !timeout.aborted) {
-          await defaultSleep(300, signal);
+        if (attempt < 3 && !timeout.aborted) {
+          await defaultSleep(attempt === 1 ? 300 : 1_000, signal);
           continue;
         }
         throw new TmdbError(
