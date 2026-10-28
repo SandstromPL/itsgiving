@@ -1,7 +1,8 @@
 import { RateLimiter } from "@/lib/agent/guards";
+import { problem, tooMany } from "@/lib/http";
 import { fromElsewhere } from "@/lib/saved/shape";
 import { SavedStoreError, deleteAccount } from "@/lib/saved/store";
-import { confirmedViewerId, sessionSupabase } from "@/lib/supabase/server";
+import { confirmedViewerId, savingConfigured, sessionSupabase } from "@/lib/supabase/server";
 
 // Deletes the signed-in person's itsgiving account and everything they saved, so their share links stop working. Only
 // ever their own (the id comes from their session, confirmed with Supabase: a copied token from a session that has
@@ -11,20 +12,13 @@ import { confirmedViewerId, sessionSupabase } from "@/lib/supabase/server";
 /** Per person: deleting is one confirmed click, so only a stuck button comes near this. */
 const limiter = new RateLimiter(5, 60_000);
 
-function problem(status: number, error: string, headers?: Record<string, string>) {
-  return Response.json({ error }, { status, headers });
-}
-
 export async function DELETE(request: Request) {
   if (fromElsewhere(request.headers)) return problem(403, "Your account can be deleted only from itsgiving's own pages.");
-  if (!process.env.SUPABASE_SECRET_KEY?.trim()) return problem(404, "Accounts aren't set up on this server.");
+  if (!savingConfigured()) return problem(404, "Accounts aren't set up on this server.");
   const id = await confirmedViewerId();
   if (!id) return problem(401, "Sign in first.");
   const limit = limiter.check(id);
-  if (!limit.ok) {
-    const seconds = Math.ceil(limit.retryAfterMs / 1000);
-    return problem(429, `Too many tries at once. Try again in ${seconds} s.`, { "retry-after": String(seconds) });
-  }
+  if (!limit.ok) return tooMany("tries", limit.retryAfterMs);
 
   const started = Date.now();
   try {
