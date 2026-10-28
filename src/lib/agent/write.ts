@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { CompactEntity } from "../qloo";
+import type { KnownRole } from "../tmdb";
 import type { Brief } from "./brief";
 import { aboveBudget, budgetPhrase, joinNames, openingLine, priceLine, subjectPhrase, withYear } from "./options";
 import { areaLabel, describeBrief, vibeOf, type ToneCandidate, type Vibe, type Who } from "./plan";
@@ -7,11 +8,19 @@ import type { BaseArea } from "./types";
 
 // The writing LLM call. Every Qloo item is listed under a short ref (R1, B1,
 // L1, T1) and the schema's enums accept only those refs, so a citation can
-// only point at something a tool actually returned.
+// only point at something a tool actually returned. TMDB's characters get refs
+// too (C1), so a character can only be drawn from one TMDB credits.
 
 export interface Ref<T> {
   ref: string;
   item: T;
+}
+
+/** A character in one of the references, as TMDB credits it: what the story's people may be drawn from. */
+export interface TitleCharacter {
+  title: CompactEntity;
+  name: string;
+  actor: string;
 }
 
 export interface WriteContext extends Who {
@@ -21,8 +30,12 @@ export interface WriteContext extends Who {
   references: Ref<CompactEntity>[];
   /** Series the audience over-indexes on (S refs): references too, but never the cover. */
   series: Ref<CompactEntity>[];
-  /** Actors the audience over-indexes on (P refs), for casting references. */
+  /** Characters in the first films and series (C refs), from TMDB: empty without it, and in mock mode. */
+  characters: Ref<TitleCharacter>[];
+  /** Actors the audience over-indexes on (P refs), as faces for the story's people. */
   casting: Ref<CompactEntity>[];
+  /** The parts each actor is best known for, by entity ID (TMDB). */
+  roles: Map<string, KnownRole[]>;
   /** A short film's music: artists the audience over-indexes on (M refs). Empty for a music video, whose song is given. */
   music: Ref<CompactEntity>[];
   brands: Ref<CompactEntity>[];
@@ -43,7 +56,20 @@ export interface Draft {
   references?: { ref: string; why: string; borrow: string }[];
   /** The cited film whose still becomes the cover. */
   cover?: string | null;
-  casting?: { ref: string; role: string }[];
+  /** The story's people. `from` (a C ref), `take` and `face` (a P ref) are null or "" when there's nothing to cite. */
+  characters: {
+    name: string;
+    who: string;
+    wants: string;
+    hides: string;
+    presence: string;
+    look: string;
+    arc: string;
+    beats: number[];
+    from: string | null;
+    take: string;
+    face: string | null;
+  }[];
   music?: { ref: string; song: string | null; use: string }[];
   wardrobe?: { ref: string; look: string }[];
   locations?: { ref: string; scene: string }[];
@@ -59,7 +85,7 @@ const refEnum = (refs: Ref<unknown>[] | ToneCandidate[]) => z.enum(refs.map((r) 
 // maximums are stated in the descriptions and applied in code, so a model that
 // writes one shot too many isn't sent back for a repair.
 export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
-  const { tone, references, series, casting, music, brands, places } = ctx;
+  const { tone, references, series, characters, casting, music, brands, places } = ctx;
   // A beat or a reference may point at a film or a series; the cover is always a film's still.
   const titles = [...references, ...series];
   return z.strictObject({
@@ -106,21 +132,31 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
             : {}),
         }
       : {}),
-    ...(casting.length > 0
-      ? {
-          // No minimum: a draft without casting keeps the rest, rather than costing a repair call.
-          casting: z
-            .array(
-              z.strictObject({
-                ref: refEnum(casting),
-                role: text.describe(
-                  "The role in this story the actor is a reference for, and what it needs. About the role, never the person.",
-                ),
-              }),
-            )
-            .describe("2-4 casting references."),
-        }
-      : {}),
+    // No minimum, and filled in when it's missing (normalizeDraft): a draft without its people keeps the rest, rather
+    // than costing a repair call. Every field is always there, so the shape never depends on what was found.
+    characters: z
+      .array(
+        z.strictObject({
+          name: text.describe("Invented, fitting the city and the story."),
+          who: text.describe("One sentence: their age range, what they do, where they stand in the story."),
+          wants: text.describe("One sentence."),
+          hides: text.describe("One sentence: what they keep back, which an actor can play."),
+          presence: text.describe("How they move and speak: what the part asks of an actor."),
+          look: text.describe("Garments, fabrics, colours."),
+          arc: text.describe("Where we meet them and where we leave them."),
+          beats: z.array(z.number()).describe("The beats they're in, by number."),
+          from:
+            characters.length > 0
+              ? refEnum(characters).nullable().describe("The listed character (C ref) they're drawn from, or null.")
+              : z.null().describe("Null: no characters are listed."),
+          take: z.string().describe("One sentence: what to take from that character, not a copy. Empty when from is null."),
+          face:
+            casting.length > 0
+              ? refEnum(casting).nullable().describe("An actor (P ref) as a reference for the part, a different one each, or null.")
+              : z.null().describe("Null: no actors are listed."),
+        }),
+      )
+      .describe("2-4 characters."),
     ...(music.length > 0
       ? {
           // No minimum, like casting: a draft without music keeps the rest rather than costing a repair.
@@ -175,11 +211,27 @@ function flattenNote(note: unknown): unknown {
   return parts.length > 0 ? parts.join(" — ") : note;
 }
 
+/** A beat number as models send them: 2, "2" or "Beat 2". Anything else is left for the schema to refuse. */
+function beatNumber(beat: unknown): unknown {
+  if (typeof beat !== "string") return beat;
+  const digits = /\d+/.exec(beat);
+  return digits ? Number(digits[0]) : beat;
+}
+
+/** A character with the fields that may be empty filled in as empty, and its beats as numbers. */
+function fillCharacter(person: unknown): unknown {
+  if (!person || typeof person !== "object" || Array.isArray(person)) return person;
+  const filled: Record<string, unknown> = { from: null, take: "", face: null, beats: [], ...person };
+  if (Array.isArray(filled.beats)) filled.beats = filled.beats.map(beatNumber);
+  return filled;
+}
+
 /**
  * DeepSeek's JSON mode sometimes sends lighting or shot notes as objects. Flattening them before
  * validation keeps what it wrote and saves a whole repair call (15-35 s with thinking on). A draft
  * with references but no cover pick gets "none", which the board reads as its first film's still,
- * rather than a repair for the one field that may be empty.
+ * rather than a repair for the one field that may be empty. The same goes for a draft without its
+ * characters, or a character without a source, a face or its beats.
  */
 export function normalizeDraft(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
@@ -188,6 +240,7 @@ export function normalizeDraft(value: unknown): unknown {
     if (Array.isArray(draft[key])) draft[key] = draft[key].map(flattenNote);
   }
   if (Array.isArray(draft.references) && draft.cover === undefined) draft.cover = null;
+  draft.characters = Array.isArray(draft.characters) ? draft.characters.map(fillCharacter) : (draft.characters ?? []);
   return draft;
 }
 
@@ -206,6 +259,12 @@ function artistLine({ ref, item }: Ref<CompactEntity>): string {
   return [`${ref} ${item.name}`, genres.join(", "), songs.length > 0 ? `songs: ${songs.join(", ")}` : ""].filter(Boolean).join(" · ");
 }
 
+/** "P1 Paul Mescal · known as Lucius in Gladiator II (2024); Calum in Aftersun (2022)". */
+function actorLine({ ref, item }: Ref<CompactEntity>, roles: Map<string, KnownRole[]>): string {
+  const known = (roles.get(item.id) ?? []).map((role) => `${role.character} in ${withYear(role.title, role.year)}`);
+  return known.length > 0 ? `${ref} ${item.name} · known as ${known.join("; ")}` : `${ref} ${item.name}`;
+}
+
 function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): string {
   const bits = [`${ref} ${withYear(item.name, item.year)}`];
   if (item.place) {
@@ -220,6 +279,11 @@ function entityLine({ ref, item }: Ref<CompactEntity>, ctx: WriteContext): strin
   const hours = openingLine(item.place?.hours);
   if (hours) bits.push(`open ${hours}`);
   if (item.place?.fits?.length) bits.push(`suits ${item.place.fits.join(", ").toLowerCase()}`);
+  // A title's archetypes and traits are Qloo's for the whole film; its characters are TMDB's, each with its own ref.
+  if (item.film?.archetypes?.length) bits.push(`archetypes: ${item.film.archetypes.join(", ")}`);
+  if (item.film?.traits?.length) bits.push(`traits: ${item.film.traits.join(", ")}`);
+  const people = ctx.characters.filter((c) => c.item.title.id === item.id);
+  if (people.length > 0) bits.push(`characters: ${people.map((c) => `${c.ref} ${c.item.name} (${c.item.actor})`).join(", ")}`);
   // With one subject every pick is "via" it; only spend tokens on this when it discriminates. An artist Qloo lacks
   // drove nothing: their stand-ins did.
   const signals = (ctx.artistMissing ? 0 : ctx.artistNames.length) + ctx.touchstoneNames.length + (ctx.standInNames?.length ?? 0);
@@ -234,8 +298,8 @@ export function writePrompt(ctx: WriteContext): string {
   if (ctx.leans.length > 0) parts.push(`Audience skew: ${ctx.leans.join("; ")}`);
   if (ctx.references.length > 0) parts.push("Film references:", ...ctx.references.map((r) => entityLine(r, ctx)));
   if (ctx.series.length > 0) parts.push("Series:", ...ctx.series.map((r) => entityLine(r, ctx)));
-  // Names only: an actor's Qloo tags say little a casting note needs, and keep the prompt small.
-  if (ctx.casting.length > 0) parts.push("Actors (casting references):", ...ctx.casting.map((r) => `${r.ref} ${r.item.name}`));
+  // An actor's Qloo tags say little a part needs: their name, and the parts TMDB says they're known for.
+  if (ctx.casting.length > 0) parts.push("Actors (faces this audience knows):", ...ctx.casting.map((r) => actorLine(r, ctx.roles)));
   if (ctx.music.length > 0) parts.push("Music (artists this audience plays):", ...ctx.music.map(artistLine));
   if (ctx.brands.length > 0) parts.push("Wardrobe brands:", ...ctx.brands.map((r) => entityLine(r, ctx)));
   if (ctx.base) {
@@ -247,8 +311,8 @@ export function writePrompt(ctx: WriteContext): string {
   parts.push(
     "",
     "TASK",
-    "Write the treatment. Cite films, series, brands and places by ref only in the ref fields; in the text, call them by",
-    "name and never write refs (T1, R2, S1, B1, L3) or price levels. For each reference say why it fits this audience and,",
+    "Write the treatment. Cite films, series, characters, actors, brands and places by ref only in the ref fields; in the",
+    "text, call them by name and never write refs (T1, R2, S1, C1, P1, B1, L3) or price levels. For each reference say why it fits this audience and,",
     "in one sentence, the specific look or technique to borrow; a series may be one or two of them. For the cover, name the",
     "cited film whose look best fits the title and logline: a frame from it is the cover. Wardrobe looks name garments, fabrics and colours. Location",
     "scenes say what happens there and stay true to the place's Qloo description. Palette: 4-6 named colours. Lighting",
@@ -260,12 +324,25 @@ export function writePrompt(ctx: WriteContext): string {
       `On ${budgetPhrase(ctx.brief.budget)}, ${joinNames(pricey)} ${pricey.length > 1 ? "are" : "is"} a reference to rent or match, not to buy: say so in that look.`,
     );
   }
-  if (ctx.casting.length > 0) {
+  parts.push(
+    `Characters: 2-4 people for this story${ctx.brief.format === "music_video" ? "; the artist plays themselves and isn't one of them, so sketch the people around them" : ""}.`,
+    `Give each an invented name that fits ${ctx.brief.city} and the story, who they are (age range, what they do, where they stand in the story),`,
+    "what they want, what they hide, how they move and speak, their look, where we meet and leave them, and the beats they're in by number.",
+  );
+  if (ctx.characters.length > 0) {
     parts.push(
-      "Casting: give 2-4 of the actors (P refs) a role in this story each, as a reference for the presence that role needs,",
-      "not an offer. Write about the role and what it asks of an actor, never about the person's looks, life or past work.",
+      "Draw each from one of the characters listed under the titles (C refs), and say in one sentence what to take, not a copy; or set from to null.",
     );
   }
+  if (ctx.casting.length > 0) {
+    parts.push(
+      "Where an actor (P refs) fits a part, give that character a different actor from the others, as a reference for the presence it needs, not an offer.",
+    );
+  }
+  parts.push(
+    "Write about the characters and their parts, never an actor's looks or life, and don't describe an actor's other roles.",
+    "A character's traits come from the story and the titles, never from who the audience is.",
+  );
   if (ctx.music.length > 0) {
     parts.push(
       "Music: pick 2-4 of the artists (M refs) for needle drops or the score's direction, and say where each is used. Name a",
@@ -350,10 +427,22 @@ function hashOf(textValue: string): number {
   return h;
 }
 
-/** Deterministic writer for mock mode and for when every LLM fails; output is labelled "Mock LLM". */
-/** The template writer's roles for its casting references, by format. */
-const VIDEO_ROLES = ["The one the artist keeps almost meeting", "A friend at the edge of the frame", "A stranger in the last shot"];
-const FILM_ROLES = ["The lead", "The one the lead keeps almost meeting", "A friend who sees it first"];
+/**
+ * The template writer's people, by format: parts more than people, since it knows no story. Each is [name, who], and
+ * the beats it's in (of the template's four).
+ */
+const TEMPLATE_PEOPLE: Record<Brief["format"], [string, string, number[]][]> = {
+  music_video: [
+    ["The one the artist keeps almost meeting", "Never quite in the same shot as the artist until the last beat.", [2, 4]],
+    ["A friend at the edge of the frame", "Sees what the artist won't say.", [1, 3]],
+    ["A stranger in the last shot", "Arrives once, and changes how the ending reads.", [4]],
+  ],
+  short_film: [
+    ["The lead", "Carries the film: we see the city through them.", [1, 2, 3, 4]],
+    ["The one the lead keeps almost meeting", "Always a step out of time with the lead.", [2, 4]],
+    ["A friend who sees it first", "Says the thing the lead can't.", [3]],
+  ],
+};
 /** The template writer's notes on where its music goes. */
 const MUSIC_USES = [
   "Under the opening, low enough to hear the street through it.",
@@ -361,6 +450,7 @@ const MUSIC_USES = [
   "Over the last shot and into the credits.",
 ];
 
+/** Deterministic writer for mock mode and for when every LLM fails; output is labelled "Mock LLM". */
 export function mockDraft(ctx: WriteContext): Draft {
   const vibe = vibeOf(
     ctx.tone.map((t) => t.tag.name),
@@ -426,14 +516,22 @@ export function mockDraft(ctx: WriteContext): Draft {
           cover: refs[0].ref,
         }
       : {}),
-    ...(ctx.casting.length > 0
-      ? {
-          casting: ctx.casting.slice(0, 3).map((p, i) => ({
-            ref: p.ref,
-            role: `${(isVideo ? VIDEO_ROLES : FILM_ROLES)[i]}: someone who can hold a long, quiet close-up.`,
-          })),
-        }
-      : {}),
+    characters: TEMPLATE_PEOPLE[ctx.brief.format].map(([name, who, beats], i) => ({
+      name,
+      who,
+      wants: "To be seen without having to ask for it.",
+      hides: "How much the last time cost them.",
+      presence: "Someone who can hold a long, quiet close-up.",
+      look: `Worn-in pieces in ${palette[i % palette.length].name.toLowerCase()}.`,
+      arc:
+        i === 0
+          ? "Alone at the start; not alone at the end."
+          : `In for the ${beats.map((b) => beatNames[b - 1].toLowerCase()).join(" and ")}.`,
+      beats,
+      from: ctx.characters[i]?.ref ?? null,
+      take: ctx.characters[i] ? "How much they leave unsaid." : "",
+      face: ctx.casting[i]?.ref ?? null,
+    })),
     ...(ctx.music.length > 0
       ? {
           music: ctx.music.slice(0, 3).map((m, i) => ({

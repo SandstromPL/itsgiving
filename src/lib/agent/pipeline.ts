@@ -1,5 +1,4 @@
 import { describeKind, generateJson, type LlmResult, type Reasoning } from "../llm";
-import type { CompactEntity } from "../qloo";
 import type { Brief } from "./brief";
 import { STEP_LABELS, withYear, type Thinking } from "./options";
 import { assemble, type Written } from "./pipeline-assemble";
@@ -20,7 +19,16 @@ import {
   type ToneCandidate,
 } from "./plan";
 import type { AgentEvent, Credit, LlmStep, LlmTrace } from "./types";
-import { mockDraft, normalizeDraft, refScrubber, writePrompt, writeSchema, type Ref, type WriteContext } from "./write";
+import {
+  mockDraft,
+  normalizeDraft,
+  refScrubber,
+  writePrompt,
+  writeSchema,
+  type Ref,
+  type TitleCharacter,
+  type WriteContext,
+} from "./write";
 
 export { closestTags } from "./pipeline-execute";
 export { parseTitle } from "./pipeline-resolve";
@@ -267,14 +275,27 @@ async function replan(run: Run, planContext: PlanContext, plan: Plan, execution:
   return replanned;
 }
 
+/** The titles whose characters (TMDB's) the writer sees: the first films and series, so the prompt stays small. */
+const CHARACTER_TITLES = { films: 6, series: 2 };
+
 /** The writer's draft of the treatment, from the final plan and what it found. */
 async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, execution: Execution, people: People): Promise<Written> {
   const { brief, deps, signal } = run;
   const { candidates } = audience;
   const chosenTone = (plan.tone ?? []).map((ref) => candidates.find((c) => c.ref === ref)).filter((c): c is ToneCandidate => Boolean(c));
   const tone = chosenTone.length > 0 ? chosenTone : candidates.slice(0, 3);
-  const toRefs = (items: CompactEntity[], prefix: string, max: number): Ref<CompactEntity>[] =>
+  const toRefs = <T>(items: T[], prefix: string, max: number): Ref<T>[] =>
     items.slice(0, max).map((item, i) => ({ ref: `${prefix}${i + 1}`, item }));
+  // The characters the story's people may be drawn from: TMDB's, for what has come back of the first titles' lookups. It
+  // gets a moment more at most, since the lookups began as the titles landed.
+  const titles = [
+    ...execution.references.items.slice(0, CHARACTER_TITLES.films),
+    ...execution.series.items.slice(0, CHARACTER_TITLES.series),
+  ];
+  const looked = await run.tmdb.settled(titles, 1_500);
+  const characters = titles.flatMap((title) =>
+    (looked.get(title.id)?.characters ?? []).map((c): TitleCharacter => ({ title, name: c.name, actor: c.actor })),
+  );
   const writeContext: WriteContext = {
     brief,
     ...cast.who,
@@ -282,7 +303,9 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
     tone,
     references: toRefs(execution.references.items, "R", WRITER_REFS.films),
     series: toRefs(execution.series.items, "S", WRITER_REFS.series),
+    characters: toRefs(characters, "C", characters.length),
     casting: toRefs(people.casting.items, "P", WRITER_FACES),
+    roles: people.roles,
     music: brief.format === "short_film" ? toRefs(people.music.items, "M", 8) : [],
     brands: toRefs(execution.brands.items, "B", 6),
     places: toRefs(execution.places.items, "L", 6),
@@ -318,6 +341,7 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
   const scrub = refScrubber(
     new Map([
       ...candidates.map((c) => [c.ref, c.tag.name] as const),
+      ...writeContext.characters.map((c) => [c.ref, c.item.name] as const),
       ...[
         ...writeContext.references,
         ...writeContext.series,
@@ -330,11 +354,11 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
   );
   // The references' stills (films and series) came from TMDB with their characters, while the run went on; after a fast
   // write any still out gets a moment more, then the board goes without it.
-  const looked = await run.tmdb.settled(
+  const back = await run.tmdb.settled(
     [...writeContext.references, ...writeContext.series].map((r) => r.item),
     1_500,
   );
   run.tmdb.logTitles();
-  const stills = new Map([...looked].flatMap(([id, found]) => (found.still ? [[id, found.still] as const] : [])));
+  const stills = new Map([...back].flatMap(([id, found]) => (found.still ? [[id, found.still] as const] : [])));
   return { draft, writeContext, scrub, stills };
 }

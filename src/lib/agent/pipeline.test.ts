@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Cooldowns, DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
-import { QlooClient, createQlooClient, type CompactEntity, type FetchLike } from "../qloo";
+import { QlooClient, createQlooClient, type FetchLike } from "../qloo";
 import { MemoryCache } from "../qloo/cache";
 import { mockEntityId } from "../qloo/mock/catalog";
 import { createMockFetch } from "../qloo/mock/server";
@@ -8,6 +8,7 @@ import { briefKey, briefSchema, normalizeBrief, pickKey, priceLevelMax, type Bri
 import { RateLimiter, TtlCache, clientIp } from "./guards";
 import { distanceM } from "../tools/heatmap";
 import { cssString } from "../text";
+import type { TmdbClient } from "../tmdb";
 import { NONE_PICK, coverStill, excerpt, isIdentityTag, subjectPhrase, tagLabel, tmdbSize } from "./options";
 import { clipSentences, closestTags, parseTitle, runPipeline, type PipelineOutcome } from "./pipeline";
 import { describeBrief, planSchema } from "./plan";
@@ -144,14 +145,24 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     expect(t.references.find((r) => r.entity.id === t.cover)?.entity.kind).toBe("movie");
   });
 
-  it("finds actors this audience knows, and gives a few of them roles as casting references", async () => {
+  it("sketches the story's people, each with a different actor this audience knows as a reference", async () => {
     const { outcome, steps } = await run({ artist: "Prateek Kuhad", city: "Mumbai" });
     const t = treatmentOf(outcome);
-    expect(t.casting?.length).toBeGreaterThan(0);
-    for (const c of t.casting ?? []) {
-      expect(c.entity.kind).toBe("person");
-      expect(c.notes.role).toBeTruthy();
-      expect(c.qloo).toMatchObject({ tool: "casting_references", rank: expect.any(Number), because: [{ name: "Prateek Kuhad" }] });
+    expect(t.casting).toBeUndefined();
+    expect(t.characters).toHaveLength(3);
+    for (const c of t.characters ?? []) {
+      for (const line of [c.name, c.who, c.wants, c.hides, c.presence, c.look, c.arc]) expect(line).toBeTruthy();
+      expect(c.beats.length).toBeGreaterThan(0);
+      expect(c.beats.every((b) => b >= 1 && b <= t.beats.length)).toBe(true);
+      // Mock films and actors aren't TMDB's: no character to draw from, no parts known.
+      expect(c.from).toBeUndefined();
+      expect(c.face?.known).toEqual([]);
+    }
+    const faces = (t.characters ?? []).flatMap((c) => (c.face ? [c.face] : []));
+    expect(new Set(faces.map((f) => f.entity.id)).size).toBe(faces.length);
+    for (const face of faces) {
+      expect(face.entity.kind).toBe("person");
+      expect(face.qloo).toMatchObject({ tool: "casting_references", rank: expect.any(Number), because: [{ name: "Prateek Kuhad" }] });
     }
     // Actors only, within an indie budget's reach, and never the YouTuber Qloo also tags as an actor.
     expect(t.qloo.steps.casting?.[0].query).toMatchObject({
@@ -159,10 +170,70 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
       "filter.tags": "urn:tag:genre:person:actor",
       "filter.popularity.max": "0.9",
     });
-    const everyone = [...(t.casting ?? []).map((c) => c.entity), ...(t.extras.people ?? [])];
+    const everyone = [...faces.map((f) => f.entity), ...(t.extras.people ?? [])];
     expect(everyone.every((e) => (e.popularity ?? 0) <= 0.9)).toBe(true);
     expect(everyone.map((e) => e.name)).not.toContain("Prajakta Koli");
+    // An actor given a part isn't listed again among the others.
+    expect((t.extras.people ?? []).filter((e) => faces.some((f) => f.entity.id === e.id))).toEqual([]);
     expect(steps.find((s) => s.id === "casting" && s.status !== "running")?.status).toBe("done");
+  });
+
+  it("draws the story's people from TMDB's characters, and names the parts their actors are known for", async () => {
+    const mock = createMockFetch();
+    // The mock's actors have no IMDb IDs: give each one, under imdb_id as live Qloo does.
+    const fetchImpl: FetchLike = async (url, init) => {
+      const response = await mock(url, init);
+      if (!decodeURIComponent(url).includes("filter.type=urn:entity:person")) return response;
+      const body = await response.json();
+      (body.results?.entities ?? []).forEach(
+        (e: { external?: unknown }, i: number) => (e.external = { imdb_id: [{ id: `nm${1_000_000 + i}` }] }),
+      );
+      return Response.json(body, { status: response.status });
+    };
+    const live = new QlooClient({
+      mode: "live",
+      apiKey: "test",
+      baseUrl: "https://mock.qloo.invalid",
+      fetch: fetchImpl,
+      cache: new MemoryCache(),
+    });
+    const asked: string[] = [];
+    const tmdb = {
+      configured: true,
+      async find(imdb: string) {
+        asked.push(imdb);
+        return { kind: "movie", tmdbId: 1, still: `https://image.tmdb.org/t/p/w1280/${imdb}.jpg` };
+      },
+      async characters() {
+        return [
+          { name: "Shoko", actor: "Saori Hayami" },
+          { name: "Shoya", actor: "Miyu Irino" },
+        ];
+      },
+      async roles(imdb: string) {
+        return imdb === "nm1000000" ? [{ character: "Calum", title: "Aftersun", year: 2022 }] : [];
+      },
+    } as unknown as TmdbClient;
+    const short = brief({ touchstones: ["Past Lives", "Aftersun"], city: "Mumbai", format: "short_film" });
+    const outcome = await runPipeline(short, { qloo: live, llm: mockLlm(), tmdb }, () => {}, {
+      id: "test",
+      signal: new AbortController().signal,
+    });
+    const t = treatmentOf(outcome);
+    // A Silent Voice and Donnie Darko are the mock's films with IMDb IDs: each was asked about once.
+    expect(asked).toContain("tt5323662");
+    expect(new Set(asked).size).toBe(asked.length);
+    const [lead] = t.characters ?? [];
+    expect(lead.from).toMatchObject({ character: "Shoko", actor: "Saori Hayami", take: expect.any(String) });
+    expect(["A Silent Voice", "Donnie Darko"]).toContain(lead.from?.title.name);
+    expect((t.characters ?? []).flatMap((c) => c.face?.known ?? [])).toContainEqual({ character: "Calum", title: "Aftersun", year: 2022 });
+    // The stills come from the same lookups, and TMDB never makes a treatment partial.
+    expect(
+      t.references
+        .filter((r) => r.entity.external?.imdb)
+        .every((r) => r.still === `https://image.tmdb.org/t/p/w1280/${r.entity.external?.imdb}.jpg`),
+    ).toBe(true);
+    expect(t.complete).toBe(true);
   });
 
   it("lifts the popularity ceiling when too few actors are within a shoestring budget's reach", async () => {
@@ -741,6 +812,7 @@ describe("LLM schemas", () => {
       tone: [{ ref: "T1", tag: { id: "urn:tag:x", name: "x" }, source: "audience" }],
       references: [{ ref: "R1", item: entity }],
       series: [{ ref: "S1", item: entity }],
+      characters: [{ ref: "C1", item: { title: entity, name: "Anna", actor: "Jessie Buckley" } }],
       casting: [{ ref: "P1", item: entity }],
       music: [{ ref: "M1", item: entity }],
       brands: [{ ref: "B1", item: entity }],
@@ -750,13 +822,22 @@ describe("LLM schemas", () => {
     expect(strictModeViolations(toJsonSchema(planSchema([])))).toEqual([]);
     expect(strictModeViolations(toJsonSchema(planSchema(["T1"], ["A1", "A2"])))).toEqual([]);
     expect(strictModeViolations(toJsonSchema(writeSchema(ctx)))).toEqual([]);
+    // Nothing to cite: the people's sources and faces can only be null.
+    expect(strictModeViolations(toJsonSchema(writeSchema({ ...ctx, characters: [], casting: [] })))).toEqual([]);
   });
 
   it("give a draft with films but no cover pick an empty one, rather than spend a repair call on it", () => {
-    expect(normalizeDraft({ title: "T", references: [] })).toEqual({ title: "T", references: [], cover: null });
-    expect(normalizeDraft({ references: [], cover: "R2" })).toEqual({ references: [], cover: "R2" });
+    expect(normalizeDraft({ title: "T", references: [] })).toEqual({ title: "T", references: [], cover: null, characters: [] });
+    expect(normalizeDraft({ references: [], cover: "R2" })).toEqual({ references: [], cover: "R2", characters: [] });
     // No films, no cover field: the schema has none to accept.
-    expect(normalizeDraft({ title: "T" })).toEqual({ title: "T" });
+    expect(normalizeDraft({ title: "T" })).toEqual({ title: "T", characters: [] });
+  });
+
+  it("give a character left without a source, a face or its beats empty ones, and read beats sent as words", () => {
+    const person = { name: "Ira", who: "w", wants: "w", hides: "h", presence: "p", look: "l", arc: "a" };
+    expect(normalizeDraft({ characters: [person] })).toEqual({ characters: [{ ...person, from: null, take: "", face: null, beats: [] }] });
+    const sent = { ...person, from: "C2", take: "Her stillness.", face: "P1", beats: [1, "3", "Beat 4", "the end"] };
+    expect(normalizeDraft({ characters: [sent] })).toEqual({ characters: [{ ...sent, beats: [1, 3, 4, "the end"] }] });
   });
 
   it("only let the planner base the shoot in an area the heatmap returned", () => {

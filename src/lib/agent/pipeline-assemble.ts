@@ -6,7 +6,7 @@ import type { People } from "./pipeline-people";
 import type { Cast } from "./pipeline-resolve";
 import { clip, uniqueBy, type Run } from "./pipeline-run";
 import type { Plan } from "./plan";
-import type { Pick, QlooEvidence, Treatment } from "./types";
+import type { Character, Pick, QlooEvidence, Treatment } from "./types";
 import type { Draft, Ref, WriteContext } from "./write";
 
 // The run's end: the writer's draft becomes the treatment, each cited item with Qloo's evidence for it.
@@ -94,7 +94,48 @@ export function assemble(input: AssembleInput): Treatment {
   const cover = references.some((r) => r.entity.id === coverPick) ? coverPick : undefined;
   const wardrobe = cite(ctx.brands, execution.brands.items, "styling_brands", draft.wardrobe, ["look"], 4);
   const locations = cite(ctx.places, execution.places.items, "scout_locations", draft.locations, ["scene"], 4);
-  const casting = cite(ctx.casting, people.casting.items, "casting_references", draft.casting, ["role"], 4);
+  // The story's people: four at most, each name once. An actor plays one part (the first character to name them keeps
+  // them), and a character is only in beats the treatment has.
+  const beatCount = Math.min(draft.beats.length, 6);
+  const faces = new Set<string>();
+  const characters = uniqueBy(draft.characters, (c) => c.name.trim().toLowerCase())
+    .slice(0, 4)
+    .map((c): Character => {
+      const from = ctx.characters.find((r) => r.ref === c.from)?.item;
+      const actor = ctx.casting.find((r) => r.ref === c.face)?.item;
+      const face = actor && !faces.has(actor.id) ? actor : undefined;
+      if (face) faces.add(face.id);
+      return {
+        name: prose(c.name, 60),
+        who: prose(c.who, 300),
+        wants: prose(c.wants, 300),
+        hides: prose(c.hides, 300),
+        presence: prose(c.presence, 400),
+        look: prose(c.look, 300),
+        arc: prose(c.arc, 400),
+        beats: [...new Set(c.beats.filter((b) => Number.isInteger(b) && b >= 1 && b <= beatCount))].sort((a, b) => a - b),
+        ...(from
+          ? {
+              from: {
+                title: { id: from.title.id, name: from.title.name, year: from.title.year, kind: from.title.kind },
+                character: from.name,
+                actor: from.actor,
+                take: prose(c.take, 400),
+                archetypes: from.title.film?.archetypes ?? [],
+              },
+            }
+          : {}),
+        ...(face
+          ? {
+              face: {
+                entity: face,
+                qloo: evidence(people.casting.items, "casting_references", face),
+                known: people.roles.get(face.id) ?? [],
+              },
+            }
+          : {}),
+      };
+    });
   // A song is kept only as Qloo lists it among the artist's notable songs: a title the model remembers isn't evidence.
   const songOf = (ref: string, song: string | null) => {
     const wanted = (song ?? "").trim().toLowerCase();
@@ -108,7 +149,7 @@ export function assemble(input: AssembleInput): Treatment {
     ["use", "song"],
     4,
   );
-  const cited = new Set([...references, ...wardrobe, ...locations, ...casting, ...music].map((p) => p.entity.id));
+  const cited = new Set([...[...references, ...wardrobe, ...locations, ...music].map((p) => p.entity.id), ...faces]);
   const uncited = (items: CompactEntity[]) => items.filter((e) => !cited.has(e.id));
 
   const directorFit = audience.directorFit.flatMap((list) =>
@@ -146,7 +187,7 @@ export function assemble(input: AssembleInput): Treatment {
     }),
     references,
     cover,
-    casting,
+    characters,
     ...(run.brief.format === "short_film" ? { music } : {}),
     wardrobe,
     locations,

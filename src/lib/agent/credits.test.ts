@@ -84,7 +84,8 @@ describe("the run's opening credits", () => {
     expect(onBoard(t.references, t.extras.references)).toEqual(expect.arrayContaining(names("films")));
     expect(onBoard(t.wardrobe, t.extras.brands)).toEqual(expect.arrayContaining(names("brands")));
     expect(onBoard(t.locations, t.extras.locations)).toEqual(expect.arrayContaining(names("places")));
-    expect(onBoard(t.casting ?? [], t.extras.people ?? [])).toEqual(expect.arrayContaining(names("cast")));
+    const faces = (t.characters ?? []).flatMap((c) => (c.face ? [c.face] : []));
+    expect(onBoard(faces, t.extras.people ?? [])).toEqual(expect.arrayContaining(names("cast")));
     // Each comes on the step that found it; the base comes with the plan that chose it.
     expect(Object.fromEntries(credited.map((s) => [s.credit?.kind, s.id]))).toEqual({
       subject: "resolve",

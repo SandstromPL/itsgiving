@@ -1,5 +1,6 @@
 import type { LlmAttempt, LlmMode, ProducedBy } from "../llm";
-import type { CompactEntity, CompactTag, Provenance, QlooMode } from "../qloo";
+import type { CompactEntity, CompactTag, EntityKind, Provenance, QlooMode } from "../qloo";
+import type { KnownRole } from "../tmdb";
 import type { HeatArea, HeatGrid } from "../tools/heatmap";
 import type { RankedTag } from "../tools/taste";
 import type { Brief } from "./brief";
@@ -128,6 +129,38 @@ export interface Beat {
   reference: { id: string; name: string } | null;
 }
 
+/** One of the story's people, as the writer sketched them. Each line is one sentence. */
+export interface Character {
+  name: string;
+  /** Their age range, what they do, where they stand in the story. */
+  who: string;
+  wants: string;
+  hides: string;
+  /** How they move and speak: what the part asks of an actor. */
+  presence: string;
+  look: string;
+  /** Where we meet them and where we leave them. */
+  arc: string;
+  /** The beats they're in, 1-based and in order: only beats the treatment has. */
+  beats: number[];
+  /**
+   * The character in a title this audience loves that they're drawn from, as TMDB credits it, with what to take and the
+   * title's archetypes as Qloo files them: the film's, never the character's.
+   */
+  from?: {
+    title: { id: string; name: string; year?: number; kind?: EntityKind };
+    character: string;
+    actor: string;
+    take: string;
+    archetypes: string[];
+  };
+  /**
+   * An actor this audience over-indexes on (casting_references), as a reference for the presence the part needs, never
+   * an offer; `known` is the parts TMDB says they're best known for.
+   */
+  face?: { entity: CompactEntity; qloo: QlooEvidence; known: KnownRole[] };
+}
+
 /** An area from Qloo's heatmap, with the ref (A1, A2...) the planner chose it by. */
 export interface BaseArea extends HeatArea {
   ref: string;
@@ -169,8 +202,13 @@ export interface Treatment {
   lighting: string[];
   shots: string[];
   /**
+   * The story's people, each drawn from a character in a title this audience loves and given an actor it knows as a
+   * reference. Missing on treatments built before 2026-10-29, which have `casting` instead.
+   */
+  characters?: Character[];
+  /**
    * Actors the audience over-indexes on, each given a role in the story by the writer: references for the presence a
-   * role needs, never offers. Missing on treatments built before 2026-10-28.
+   * role needs, never offers. Only on treatments built on 2026-10-28; later ones have `characters`.
    */
   casting?: Pick<"role">[];
   /**

@@ -15,7 +15,9 @@ function context(overrides: Partial<WriteContext> = {}): WriteContext {
     tone: [],
     references: [],
     series: [],
+    characters: [],
     casting: [],
+    roles: new Map(),
     music: [],
     brands: [],
     places: [],
@@ -68,6 +70,7 @@ describe("writeSchema", () => {
     palette: ["#111111", "#222222", "#333333"].map((hex) => ({ name: hex, hex })),
     lighting: ["Soft.", "Low."],
     shots: ["Wide.", "Close.", "Held."],
+    characters: [],
   });
   const ctx = context({
     references: [
@@ -83,14 +86,53 @@ describe("writeSchema", () => {
     expect(writeSchema(ctx).safeParse(draft([{ ref: "R1" }, { ref: "S9" }], "R1")).success).toBe(false);
   });
 
-  it("lists the actors by name, asks for roles, and doesn't need a repair when the casting is left out", () => {
-    const withCast = { ...ctx, casting: [{ ref: "P1", item: entity("h1", "Tripti Dimri", { kind: "person", tags: ["Actor"] }) }] };
-    expect(writePrompt(withCast)).toContain("Actors (casting references):\nP1 Tripti Dimri\n");
-    expect(writePrompt(withCast)).toContain("never about the person's looks, life or past work");
+  it("lists each title's archetypes, traits and characters, and the parts each actor is known for", () => {
+    const fingernails = entity("f3", "Fingernails", {
+      year: 2023,
+      film: { archetypes: ["The triangle", "The lover"], traits: ["Conflicted"] },
+    });
+    const mescal = entity("h1", "Paul Mescal", { kind: "person" });
+    const prompt = writePrompt({
+      ...ctx,
+      references: [...ctx.references, { ref: "R3", item: fingernails }],
+      characters: [
+        { ref: "C1", item: { title: fingernails, name: "Anna", actor: "Jessie Buckley" } },
+        { ref: "C2", item: { title: fingernails, name: "Amir", actor: "Riz Ahmed" } },
+      ],
+      casting: [
+        { ref: "P1", item: mescal },
+        { ref: "P2", item: entity("h2", "Tripti Dimri", { kind: "person" }) },
+      ],
+      roles: new Map([["h1", [{ character: "Calum", title: "Aftersun", year: 2022 }]]]),
+    });
+    expect(prompt).toContain(
+      "R3 Fingernails (2023) · archetypes: The triangle, The lover · traits: Conflicted · characters: C1 Anna (Jessie Buckley), C2 Amir (Riz Ahmed)\n",
+    );
+    expect(prompt).toContain("Actors (faces this audience knows):\nP1 Paul Mescal · known as Calum in Aftersun (2022)\nP2 Tripti Dimri\n");
+    expect(prompt).toContain("never an actor's looks or life");
+    expect(prompt).toContain("never from who the audience is");
+    // In a music video the artist is themselves, not one of the story's people.
+    expect(prompt).toContain("the artist plays themselves");
+    expect(writePrompt({ ...ctx, brief: { ...ctx.brief, format: "short_film" } })).not.toContain("the artist plays themselves");
+  });
+
+  it("cites a character's source and face only by the refs listed, and needs no repair without them", () => {
+    const withPeople = {
+      ...ctx,
+      characters: [{ ref: "C1", item: { title: ctx.references[0].item, name: "Nora", actor: "Greta Lee" } }],
+      casting: [{ ref: "P1", item: entity("h1", "Tripti Dimri", { kind: "person" }) }],
+    };
     const rest = draft([{ ref: "R1" }, { ref: "R2" }], "R1");
-    expect(writeSchema(withCast).safeParse({ ...rest, casting: [{ ref: "P1", role: "The lead." }] }).success).toBe(true);
-    expect(writeSchema(withCast).safeParse({ ...rest, casting: [] }).success).toBe(true);
-    expect(writeSchema(withCast).safeParse({ ...rest, casting: [{ ref: "P2", role: "The lead." }] }).success).toBe(false);
+    const person = { name: "Ira", who: "w", wants: "w", hides: "h", presence: "p", look: "l", arc: "a", beats: [1, 3] };
+    const parse = (c: WriteContext, extra: object) => writeSchema(c).safeParse({ ...rest, characters: [{ ...person, ...extra }] }).success;
+    expect(parse(withPeople, { from: "C1", take: "Her stillness.", face: "P1" })).toBe(true);
+    expect(parse(withPeople, { from: null, take: "", face: null })).toBe(true);
+    expect(parse(withPeople, { from: "C2", take: "", face: null })).toBe(false);
+    expect(parse(withPeople, { from: null, take: "", face: "P2" })).toBe(false);
+    // With nothing listed, a source or a face can only be null.
+    expect(parse(ctx, { from: null, take: "", face: null })).toBe(true);
+    expect(parse(ctx, { from: "C1", take: "", face: null })).toBe(false);
+    expect(writeSchema(withPeople).safeParse({ ...rest, characters: [] }).success).toBe(true);
   });
 
   it("lists a short film's artists with their genres and songs, and lets a song be left out", () => {
