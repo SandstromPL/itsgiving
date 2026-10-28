@@ -6,9 +6,10 @@ reference films, wardrobe brands and real shoot locations, each with the evidenc
 
 The name is Gen Z slang: "it's giving…" means "this has the vibe of…", which is what a treatment tells a client.
 
-> **Status:** work in progress for the [Qloo Agentic Hackathon](https://qloo.devpost.com/). The treatment builder
-> runs end to end on live Qloo: the Qloo tools, a lean LLM agent (DeepSeek first, free models as fallbacks), the board
-> UI, four pre-built featured treatments, and a director's taste imported from a TMDB list or IMDb links.
+> **Status:** built for the [Qloo Agentic Hackathon](https://qloo.devpost.com/) and live at
+> https://itsgiving-two.vercel.app. The treatment builder runs end to end on live Qloo: the Qloo tools, a lean LLM agent
+> (DeepSeek first, free models as fallbacks), the board UI, four pre-built featured treatments, a director's taste
+> imported from a TMDB list or IMDb links, and accounts for saving and sharing.
 
 ## Why Qloo
 
@@ -49,7 +50,9 @@ fast and cheap, and within the free fallback models' limits.
    every tile of the city for the audience; itsgiving groups the hottest tenth into the three strongest areas, 2 km in
    radius, and names each after the neighbourhoods Qloo lists around its centre. Tags that name who people are
    (sexual orientation, gender identity, religion, ethnicity, health, party politics) are dropped here: Qloo has some
-   as film themes, but a treatment never describes its audience by who they are.
+   as film themes, but a treatment never describes its audience by who they are. The audience read also asks Qloo
+   which film subgenres this audience loves; when one of them is a film tradition an era look borrows from (Bollywood
+   for Bombay '75, say), the title card suggests that era, with the rank Qloo gave it.
 4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, how deep the cuts go, a few plain
    style words for wardrobe and ambience, and which of the strongest areas to base the shoot in. Tags and areas are
    shown to it as short refs (`T1`, `A1`, ...) and the output schema only accepts those refs, so it cannot invent a
@@ -82,7 +85,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - **Two voices, never mixed.** Qloo's evidence is printed on receipt slips (rank within its call, affinity, the input
   that drove it). The treatment's own writing is set in a serif.
 - **"it's giving".** The tone tags Qloo found, with the ones shared with the director's taste highlighted.
-- **Title card.** A window of nine cinematic faces for the cover title, all free Google fonts standing in for a film
+- **Title card.** A window that dresses the cover: an era look (one of four film traditions, Bombay '75, Paris '60,
+  Hong Kong '94 and Hollywood '54, suggested from the audience's film subgenres on Qloo), the still behind the title,
+  and ten cinematic faces for the cover title, all free Google fonts standing in for a film
   look: a Futura-like face for Wes Anderson, Roman capitals for the Trajan poster meme, Courier Prime for a script page,
   and lettering from the Mumbai local's hand-painted signs. The starting face comes from the treatment's own evidence:
   the Qloo heatmap's shoot base in Mumbai, or a tone tag elsewhere.
@@ -91,9 +96,11 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - **Section bar and pinned map.** Under the cover, one bar lists the sections, lights up the one being read and fills
   a thin line as you go; once the cover scrolls away, the title and the way back join it. In Locations, the
   shoot-base map stays put beside the places and lights up the pin of the one in view.
-- **A map you can read.** The heatmap sits on the city's streets (OpenStreetMap, darkened), so the bright squares show
-  where in the city the audience is strongest, around the three strongest areas and the numbered locations. The
-  homepage draws a featured run's map with the same component.
+- **A map you can read.** The heatmap is drawn as contour lines on the city's streets (OpenStreetMap, darkened): the
+  bolder the line, the stronger the audience inside it, around the three strongest areas and the numbered locations.
+  The homepage draws a featured run's map with the same component, and the PDF prints it light.
+- **Palette and sharing.** A palette swatch copies its hex code. Share opens a window with the link, the phone's own
+  share menu, WhatsApp, email and a QR code drawn in the browser.
 - **Director's cut.** The Konami code letterboxes the page and brings out the board's extras: an INTERVAL card and a
   film edge under the beats. Escape puts them away.
 
@@ -107,8 +114,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 - **The studio** (`/studio`) is the tool. A music video starts from its artist and a city; a short film from the films
   it's after and a city. The rest waits under "Make it yours": a video's reference films and stand-in artists, a
   short's "music its audience loves" (an artist whose fans it's for, which shapes the audience, not the story), your
-  own films, the budget and the thinking depth. "Your poster" fills in beside it. While a treatment builds, the brief folds into one line and the run takes the page: a countdown, the
-  step it's on, every Qloo call, and the tab's title counting the seconds. Back from a board returns to the brief, and
+  own films, the budget and the thinking depth. "Your poster" fills in beside it. While a treatment builds, the brief
+  folds into one line and the run takes the page: a countdown, the step it's on, every Qloo call, what Qloo found
+  rolling in as opening credits, and the tab's title counting the seconds. Back from a board returns to the brief, and
   "Back to" the treatment's title opens it again, even after a visit to the homepage.
 - **Featured treatments** (`/t/<slug>`) are pages of their own, built with the site, so Back, reload and links work as
   anywhere. A rework chip there hands the treatment to the studio, which opens it at once and re-runs it with the
@@ -199,8 +207,9 @@ finished treatments and each one's page shows it at once, whatever the live rate
 - With no keys, `LLM_MODE=mock`, a spent daily cap, or every provider down, a deterministic template plans and writes.
   Its output is always labelled **Mock LLM**, and the result records which model produced each step.
 
-Both providers are called over REST (`generateContent` with `responseJsonSchema`; OpenAI-compatible chat completions
-with `response_format: json_schema`), so there are no SDK dependencies.
+All three providers are called over REST: DeepSeek's chat completions in JSON mode (the schema rides in the prompt),
+Gemini's `generateContent` with `responseJsonSchema`, and Groq's OpenAI-compatible chat completions with
+`response_format: json_schema`. There are no SDK dependencies.
 
 ## Agent tools
 
@@ -212,7 +221,7 @@ status, a one-line summary, compact data, warnings and the provenance of every Q
 | `resolve_entities` | Names and cities to Qloo IDs; asks the user about ambiguous names | `GET /search` |
 | `import_external_ids` | IMDb / Spotify IDs to Qloo entities (e.g. a director's watch history) | `GET /entities` |
 | `find_tags` | Mood or style words to tag IDs | `GET /v2/tags` (semantic search) |
-| `read_audience` | Taste vocabulary plus age/gender skew of an audience | `GET /v2/insights` (`urn:tag`, `urn:demographics`) |
+| `read_audience` | Taste vocabulary, age/gender skew and the film subgenres an audience loves | `GET /v2/insights` (`urn:tag` twice, `urn:demographics`) |
 | `taste_overlap` | Shared traits between the director's taste and the artist | `GET /v2/analysis/compare` |
 | `audience_heatmap` | Where in a city an audience over-indexes, as named areas to base a shoot in | `GET /v2/insights` (`urn:heatmap`), `GET /search` (localities near a point) |
 | `reference_films` | Films/shows the audience loves, with era and deep-cut controls and explanations | `GET /v2/insights` (movie, tv_show) |
@@ -226,7 +235,7 @@ Requires Node 22.12 or newer (`.nvmrc` pins 24).
 ```bash
 nvm use
 npm install
-cp .env.example .env.local   # optional: add QLOO_API_KEY, GEMINI_API_KEY, GROQ_API_KEY
+cp .env.example .env.local   # optional: add QLOO_API_KEY, DEEPSEEK_API_KEY, GEMINI_API_KEY, GROQ_API_KEY, TMDB_API_KEY
 npm run dev                  # http://localhost:3000
 ```
 
@@ -253,7 +262,7 @@ authenticated;` in the SQL editor clears that, and new tables still get RLS.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Dev server: the treatment builder at `/`, the tool playground at `/playground` |
+| `npm run dev` | Dev server: the homepage at `/`, the treatment builder at `/studio`, the tool playground at `/playground` |
 | `npm test` | Unit tests (always against the mocks and fake LLM providers, never live APIs) |
 | `npm run typecheck` / `npm run lint` | Static checks |
 | `npm run smoke` | Day-1 checks of the live Qloo data itsgiving depends on (about 30 requests) |
@@ -276,7 +285,7 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
 | `DEEPSEEK_API_KEY` | Optional, paid: when set, DeepSeek plans and writes first (under a cent a treatment) and the free tiers become fallbacks |
 | `DEEPSEEK_MODEL` / `GEMINI_MODEL` / `GROQ_MODEL` / `GEMINI_FALLBACK_MODEL` | Models in chain order (defaults `deepseek-flash`, `gemini-3.5-flash-lite`, `openai/gpt-oss-120b`, `gemini-3.8-flash`); `none` drops a Gemini one |
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
-| `LLM_TIMEOUT_MS` | Per-call timeout for calls that don't set their own (default 20000); treatment steps use `TIMING` |
+| `TMDB_BASE_URL` | Optional: another address for TMDB's API; defaults to `https://api.themoviedb.org` |
 | `ITSGIVING_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
 | `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list and for the reference films' stills. IMDb links work without it; without stills, covers show the palette alone |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional: the Supabase project's URL and publishable key, which turn accounts on (read at build time) |
@@ -288,7 +297,8 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
   `treatment`, `error`, `done`). Guarded by a per-IP rate limit (6 fresh treatments a minute), a daily LLM-call cap, a
   run budget (120 s deep, 90 s quick, under a 150 s `maxDuration`) and a 24-hour cache keyed by the normalized brief.
 - `POST /api/taste`: takes `{ "source": "<TMDB list link or IMDb links>" }` and returns the films Qloo knows, by IMDb
-  ID, plus the ones it left out. At most 26 TMDB calls and one Qloo call; 8 imports a minute per IP.
+  ID, plus the ones it left out. At most 30 TMDB calls (5 list pages, then 25 lookups) and one Qloo call; 8 imports a
+  minute per IP.
 - `POST /api/saved`: saves `{ treatment, seal }` to the signed-in person's account. The seal must be the server's
   own (an HMAC it attached when it built the treatment), at most 100 per person; saving the same take again returns
   the same id.

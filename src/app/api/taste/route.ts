@@ -5,12 +5,12 @@ import { problem, readJson, tooMany } from "@/lib/http";
 import { TmdbError } from "@/lib/tmdb";
 
 // Imports a director's taste: a public TMDB list or pasted IMDb links, as films Qloo knows by IMDb ID.
-// At most 26 TMDB calls (8 s each at worst, six at a time) and one Qloo call.
+// At most 30 TMDB calls (5 list pages, then 25 lookups; 8 s each at worst, six at a time) and one Qloo call.
 export const maxDuration = 30;
 
 const MAX_BODY_BYTES = 4 * 1024;
 const bodySchema = z.strictObject({ source: z.string().trim().min(1).max(2000) });
-/** Per IP. An import can cost 26 TMDB calls, so bursts stay small. */
+/** Per IP. An import can cost 30 TMDB calls, so bursts stay small. */
 const limiter = new RateLimiter(8, 60_000);
 
 export async function POST(request: Request) {
