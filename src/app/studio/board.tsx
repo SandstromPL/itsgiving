@@ -431,6 +431,58 @@ export function Board({
         </div>
       </Section>
 
+      {/* Boards built before casting references (2026-10-28) have none, and no section for them. */}
+      {t.casting && (
+        <Section
+          id="casting"
+          title="Casting"
+          note={`Actors this audience over-indexes on, each with its rank from ${source}: references for the presence a role needs, not offers. itsgiving wrote the roles.`}
+        >
+          {t.casting.length > 0 ? (
+            <ul className="grid gap-5 lg:grid-cols-2 print:flex print:flex-col print:gap-4">
+              {t.casting.map((c) => (
+                <li key={c.entity.id} className={`${card} flex flex-col overflow-hidden sm:flex-row ${printRow}`}>
+                  <Still
+                    src={c.entity.image}
+                    alt={`Photo of ${c.entity.name}`}
+                    className={`aspect-[4/5] w-full shrink-0 sm:w-40 print:aspect-[4/5] ${printPicture}`}
+                  />
+                  <div className="flex flex-1 flex-col gap-3 p-5 print:contents">
+                    <div className={printRead}>
+                      <div className="flex flex-col gap-1">
+                        <h3 className="type-head text-[1.6rem] leading-tight">{c.entity.name}</h3>
+                        <QlooTags tags={c.qloo.tags} />
+                      </div>
+                      <p className={prose}>{c.notes.role}</p>
+                    </div>
+                    <Why
+                      label="why this face"
+                      name={c.entity.name}
+                      qloo={c.qloo}
+                      of="actors"
+                      read={[{ term: "The role", text: c.notes.role }]}
+                      writtenBy={t.writtenBy}
+                      mock={mock}
+                      className={`mt-auto ${printReceipt}`}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            (t.extras.people?.length ?? 0) === 0 && (
+              <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no actors for this audience.</p>
+            )
+          )}
+          {/* With no roles written, Qloo's actors are still evidence of the faces this audience knows. */}
+          <Also
+            label={t.casting.length > 0 ? "Also high for this audience:" : "Actors this audience over-indexes on:"}
+            items={t.extras.people ?? []}
+            mock={mock}
+          />
+        </Section>
+      )}
+
       <div className="cut-only">
         <Interval />
       </div>

@@ -157,6 +157,9 @@ export const TAGS: MockTag[] = [
 
 const TIME_OF_DAY = "urn:tag:time_of_day_fit:qloo";
 const VIEW = "urn:tag:view:qloo";
+const G_PERSON = "urn:tag:genre:person";
+const ACTOR = `${G_PERSON}:actor`;
+const YOUTUBER = `${G_PERSON}:youtuber`;
 
 /**
  * Tags live entities carry that the tag search never needs to offer: the times of day and views a place suits. The
@@ -170,6 +173,8 @@ export const ENTITY_TAGS: MockTag[] = [
   tag(TIME_OF_DAY, "late_night", "Late night", [PLACE], [], 0.5),
   tag(VIEW, "street_view", "Street view", [PLACE], [], 0.5),
   tag(VIEW, "city_view", "City view", [PLACE], [], 0.5),
+  tag(G_PERSON, "actor", "Actor", [PERSON], [], 0.5),
+  tag(G_PERSON, "youtuber", "Youtuber", [PERSON], [], 0.5),
 ];
 
 const SUBGENRE = "urn:tag:subgenre:qloo";
@@ -268,9 +273,9 @@ function artist(name: string, popularity: number, vibes: string[], tags: string[
   };
 }
 
-/** Live Qloo files some musicians only as people (Raftaar, 2026-10-26). */
-function person(name: string, popularity: number, vibes: string[]): MockEntity {
-  return { id: mockId(`${PERSON}:${name}`), name, subtype: PERSON, popularity, vibes, tags: [], properties: { image: { url: STILL } } };
+/** Live Qloo files some musicians only as people (Raftaar, 2026-10-26), and its actors are people too. */
+function person(name: string, popularity: number, vibes: string[], tags: string[] = []): MockEntity {
+  return { id: mockId(`${PERSON}:${name}`), name, subtype: PERSON, popularity, vibes, tags, properties: { image: { url: STILL } } };
 }
 
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).replace(/_/g, " ");
@@ -439,6 +444,16 @@ export const ENTITIES: MockEntity[] = [
   artist("Sabrina Carpenter", 0.9, ["playful", "romantic", "retro", "maximalist"], [m("pop")], "74KM79TiuVKeVCqs8QtB0B"),
   artist("Divine", 0.7, ["urban", "gritty", "rebellious"], [m("hip_hop")]),
   person("Raftaar", 0.9, ["urban", "rebellious", "epic", "playful"]),
+  // Actors, for casting references (real names, made-up affinities). One is also a YouTuber, whom casting leaves out.
+  person("Tripti Dimri", 0.79, ["romantic", "tender", "dreamy", "warm"], [ACTOR]),
+  person("Sayani Gupta", 0.87, ["rebellious", "intimate", "urban", "tender"], [ACTOR]),
+  person("Avinash Tiwary", 0.61, ["melancholic", "tender", "intimate", "folk"], [ACTOR]),
+  person("Shweta Tripathi", 0.92, ["warm", "playful", "tender", "nostalgic"], [ACTOR]),
+  person("Paul Mescal", 0.9, ["melancholic", "intimate", "tender", "nostalgic"], [ACTOR]),
+  person("Rachel Sennott", 0.82, ["playful", "urban", "rebellious", "neon"], [ACTOR]),
+  person("Hunter Schafer", 0.97, ["neon", "surreal", "rebellious", "dreamy"], [ACTOR]),
+  person("Jodie Comer", 0.95, ["dark", "playful", "maximalist", "urban"], [ACTOR]),
+  person("Prajakta Koli", 0.99, ["playful", "warm", "tender"], [ACTOR, YOUTUBER]),
 
   brand("Nicobar", 0.45, ["warm", "minimalist", "folk", "tender"], [f("contemporary"), s("bohemian")]),
   brand("Fabindia", 0.7, ["warm", "folk", "nostalgic"], [f("ethnic_wear"), s("bohemian")]),

@@ -8,18 +8,24 @@ import { titleFont, titleStyle } from "./title-fonts";
 
 // The sticky bar under a treatment's cover: the title, the way back, and a tab per section that lights the one in view.
 
-/** The treatment's sections, in reading order, for the section bar under the cover. */
-export const SECTIONS = [
-  ["concept", "Concept"],
-  ["references", "References"],
-  ["beats", "Beats"],
-  ["wardrobe", "Wardrobe"],
-  ["locations", "Locations"],
-  ["camera", "Camera and light"],
-  ["palette", "Palette"],
-  ["audience", "Audience"],
-  ["credits", "Credits"],
-] as const;
+/**
+ * A treatment's sections, in reading order, for the section bar under the cover. Casting is only on boards built since
+ * it was added (2026-10-28); a board without it has no tab for it.
+ */
+export function boardSections(t: Pick<Treatment, "casting">): (readonly [string, string])[] {
+  return [
+    ["concept", "Concept"],
+    ["references", "References"],
+    ["beats", "Beats"],
+    ...(t.casting ? [["casting", "Casting"] as const] : []),
+    ["wardrobe", "Wardrobe"],
+    ["locations", "Locations"],
+    ["camera", "Camera and light"],
+    ["palette", "Palette"],
+    ["audience", "Audience"],
+    ["credits", "Credits"],
+  ];
+}
 
 /**
  * One sticky bar under the cover: the sections to jump to, the one being read lit, and a thin line that fills as the
@@ -44,6 +50,9 @@ export function SectionBar({
   back: ReactNode;
 }) {
   const lingo = useLingo().t;
+  const sections = boardSections(t);
+  // The scrollspy reads the sections by id; it starts over only when the board's set of sections changes.
+  const ids = sections.map(([id]) => id).join(" ");
   const [stuck, setStuck] = useState(false);
   const [current, setCurrent] = useState<string | null>(null);
   const line = useRef<HTMLSpanElement>(null);
@@ -126,7 +135,7 @@ export function SectionBar({
       frame = 0;
       setStuck((cover.current?.getBoundingClientRect().bottom ?? 1) < 0);
       let reading: string | null = null;
-      for (const [id] of SECTIONS) {
+      for (const id of ids.split(" ")) {
         const heading = article.current?.querySelector(`#${id}`);
         if (heading && heading.getBoundingClientRect().top <= 120) reading = id;
       }
@@ -151,7 +160,7 @@ export function SectionBar({
       window.removeEventListener("resize", schedule);
       window.removeEventListener("resize", measure);
     };
-  }, [cover, article]);
+  }, [cover, article, ids]);
   const edge = (fade: boolean) => (fade ? "transparent" : "#000");
   const mask =
     more.before || more.after
@@ -195,7 +204,7 @@ export function SectionBar({
             aria-hidden
             className="pointer-events-none absolute top-0 left-0 -z-10 origin-left rounded-full bg-foreground opacity-0"
           />
-          {SECTIONS.map(([id, label]) => (
+          {sections.map(([id, label]) => (
             <a
               key={id}
               href={`#${id}`}

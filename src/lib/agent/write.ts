@@ -21,6 +21,8 @@ export interface WriteContext extends Who {
   references: Ref<CompactEntity>[];
   /** Series the audience over-indexes on (S refs): references too, but never the cover. */
   series: Ref<CompactEntity>[];
+  /** Actors the audience over-indexes on (P refs), for casting references. */
+  casting: Ref<CompactEntity>[];
   brands: Ref<CompactEntity>[];
   places: Ref<CompactEntity>[];
   leans: string[];
@@ -39,6 +41,7 @@ export interface Draft {
   references?: { ref: string; why: string; borrow: string }[];
   /** The cited film whose still becomes the cover. */
   cover?: string | null;
+  casting?: { ref: string; role: string }[];
   wardrobe?: { ref: string; look: string }[];
   locations?: { ref: string; scene: string }[];
   palette: { name: string; hex: string }[];
@@ -53,7 +56,7 @@ const refEnum = (refs: Ref<unknown>[] | ToneCandidate[]) => z.enum(refs.map((r) 
 // maximums are stated in the descriptions and applied in code, so a model that
 // writes one shot too many isn't sent back for a repair.
 export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
-  const { tone, references, series, brands, places } = ctx;
+  const { tone, references, series, casting, brands, places } = ctx;
   // A beat or a reference may point at a film or a series; the cover is always a film's still.
   const titles = [...references, ...series];
   return z.strictObject({
@@ -98,6 +101,21 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
                   .describe("The cited film whose look best fits the title and logline: a frame from it is the cover."),
               }
             : {}),
+        }
+      : {}),
+    ...(casting.length > 0
+      ? {
+          // No minimum: a draft without casting keeps the rest, rather than costing a repair call.
+          casting: z
+            .array(
+              z.strictObject({
+                ref: refEnum(casting),
+                role: text.describe(
+                  "The role in this story the actor is a reference for, and what it needs. About the role, never the person.",
+                ),
+              }),
+            )
+            .describe("2-4 casting references."),
         }
       : {}),
     ...(brands.length > 0
@@ -192,6 +210,8 @@ export function writePrompt(ctx: WriteContext): string {
   if (ctx.leans.length > 0) parts.push(`Audience skew: ${ctx.leans.join("; ")}`);
   if (ctx.references.length > 0) parts.push("Film references:", ...ctx.references.map((r) => entityLine(r, ctx)));
   if (ctx.series.length > 0) parts.push("Series:", ...ctx.series.map((r) => entityLine(r, ctx)));
+  // Names only: an actor's Qloo tags say little a casting note needs, and keep the prompt small.
+  if (ctx.casting.length > 0) parts.push("Actors (casting references):", ...ctx.casting.map((r) => `${r.ref} ${r.item.name}`));
   if (ctx.brands.length > 0) parts.push("Wardrobe brands:", ...ctx.brands.map((r) => entityLine(r, ctx)));
   if (ctx.base) {
     parts.push(
@@ -213,6 +233,12 @@ export function writePrompt(ctx: WriteContext): string {
   if (pricey.length > 0) {
     parts.push(
       `On ${budgetPhrase(ctx.brief.budget)}, ${joinNames(pricey)} ${pricey.length > 1 ? "are" : "is"} a reference to rent or match, not to buy: say so in that look.`,
+    );
+  }
+  if (ctx.casting.length > 0) {
+    parts.push(
+      "Casting: give 2-4 of the actors (P refs) a role in this story each, as a reference for the presence that role needs,",
+      "not an offer. Write about the role and what it asks of an actor, never about the person's looks, life or past work.",
     );
   }
   if (ctx.places.some(({ item }) => item.place?.hours)) {
@@ -294,6 +320,10 @@ function hashOf(textValue: string): number {
 }
 
 /** Deterministic writer for mock mode and for when every LLM fails; output is labelled "Mock LLM". */
+/** The template writer's roles for its casting references, by format. */
+const VIDEO_ROLES = ["The one the artist keeps almost meeting", "A friend at the edge of the frame", "A stranger in the last shot"];
+const FILM_ROLES = ["The lead", "The one the lead keeps almost meeting", "A friend who sees it first"];
+
 export function mockDraft(ctx: WriteContext): Draft {
   const vibe = vibeOf(
     ctx.tone.map((t) => t.tag.name),
@@ -357,6 +387,14 @@ export function mockDraft(ctx: WriteContext): Draft {
             borrow: BORROW[i % BORROW.length],
           })),
           cover: refs[0].ref,
+        }
+      : {}),
+    ...(ctx.casting.length > 0
+      ? {
+          casting: ctx.casting.slice(0, 3).map((p, i) => ({
+            ref: p.ref,
+            role: `${(isVideo ? VIDEO_ROLES : FILM_ROLES)[i]}: someone who can hold a long, quiet close-up.`,
+          })),
         }
       : {}),
     ...(brands.length > 0

@@ -5,7 +5,18 @@ import type { RankedTag } from "../tools/taste";
 import type { Brief } from "./brief";
 
 export type StepId =
-  "resolve" | "audience" | "overlap" | "heatmap" | "plan" | "tags" | "references" | "wardrobe" | "locations" | "replan" | "write";
+  | "resolve"
+  | "audience"
+  | "overlap"
+  | "heatmap"
+  | "casting"
+  | "plan"
+  | "tags"
+  | "references"
+  | "wardrobe"
+  | "locations"
+  | "replan"
+  | "write";
 
 export type StepStatus = "running" | "done" | "warning" | "skipped" | "error";
 
@@ -21,7 +32,7 @@ export interface LlmTrace {
 }
 
 /** What a credit names: who the run reads, what Qloo found for them, and where the shoot is based. */
-export type CreditKind = "subject" | "audience" | "base" | "style" | "films" | "brands" | "places";
+export type CreditKind = "subject" | "audience" | "base" | "cast" | "style" | "films" | "brands" | "places";
 
 /** A step's find, billed like a film's opening credit while the run builds (timeline.tsx): Qloo's names only. */
 export interface Credit {
@@ -156,8 +167,13 @@ export interface Treatment {
   palette: { name: string; hex: string }[];
   lighting: string[];
   shots: string[];
-  /** Qloo results the writer did not cite, still shown as evidence. */
-  extras: { references: CompactEntity[]; brands: CompactEntity[]; locations: CompactEntity[] };
+  /**
+   * Actors the audience over-indexes on, each given a role in the story by the writer: references for the presence a
+   * role needs, never offers. Missing on treatments built before 2026-10-28.
+   */
+  casting?: Pick<"role">[];
+  /** Qloo results the writer did not cite, still shown as evidence. `people`: missing before 2026-10-28. */
+  extras: { references: CompactEntity[]; brands: CompactEntity[]; locations: CompactEntity[]; people?: CompactEntity[] };
   audience: {
     taste_tags: CompactTag[];
     overlap: CompactTag[];

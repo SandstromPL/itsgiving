@@ -15,6 +15,7 @@ function context(overrides: Partial<WriteContext> = {}): WriteContext {
     tone: [],
     references: [],
     series: [],
+    casting: [],
     brands: [],
     places: [],
     leans: [],
@@ -79,6 +80,16 @@ describe("writeSchema", () => {
     expect(writeSchema(ctx).safeParse(draft([{ ref: "R1" }, { ref: "S1" }], "R1")).success).toBe(true);
     expect(writeSchema(ctx).safeParse(draft([{ ref: "R1" }, { ref: "S1" }], "S1")).success).toBe(false);
     expect(writeSchema(ctx).safeParse(draft([{ ref: "R1" }, { ref: "S9" }], "R1")).success).toBe(false);
+  });
+
+  it("lists the actors by name, asks for roles, and doesn't need a repair when the casting is left out", () => {
+    const withCast = { ...ctx, casting: [{ ref: "P1", item: entity("h1", "Tripti Dimri", { kind: "person", tags: ["Actor"] }) }] };
+    expect(writePrompt(withCast)).toContain("Actors (casting references):\nP1 Tripti Dimri\n");
+    expect(writePrompt(withCast)).toContain("never about the person's looks, life or past work");
+    const rest = draft([{ ref: "R1" }, { ref: "R2" }], "R1");
+    expect(writeSchema(withCast).safeParse({ ...rest, casting: [{ ref: "P1", role: "The lead." }] }).success).toBe(true);
+    expect(writeSchema(withCast).safeParse({ ...rest, casting: [] }).success).toBe(true);
+    expect(writeSchema(withCast).safeParse({ ...rest, casting: [{ ref: "P2", role: "The lead." }] }).success).toBe(false);
   });
 
   it("lists the series apart from the films in the prompt", () => {

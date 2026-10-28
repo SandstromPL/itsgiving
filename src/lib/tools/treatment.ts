@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { WEEKDAYS, compactEntity, entityList, entityUrn, type QlooParams } from "../qloo";
+import { ACTOR_TAG, CASTING_EXCLUDED_TAGS, WEEKDAYS, compactEntity, entityList, entityUrn, type QlooParams } from "../qloo";
 import { mockEntityId } from "../qloo/mock/catalog";
 import { withYear } from "../text";
 import { VENUE_KIND_VALUES, defineTool, entityIds, plural, tagIds, take, venueTagIds } from "./shared";
@@ -78,6 +78,50 @@ export const referenceFilms = defineTool({
               .join(", ")}.`
           : "No references matched; widen the era or raise max_popularity.",
       data: { references },
+      warnings: response.warnings,
+    };
+  },
+});
+
+export const castingReferences = defineTool({
+  name: "casting_references",
+  description:
+    "Find actors the audience of the given entities over-indexes on: casting references for the presence a role needs, " +
+    "never offers. People Qloo also tags as influencers, YouTubers, reality-TV names, athletes or musicians are left out " +
+    "unless actors_only is false. Use max_popularity to keep to names a budget can reach.",
+  inputSchema: z.strictObject({
+    signal_entity_ids: entityIds(10).describe("The artist and/or touchstones whose audience the faces should fit."),
+    max_popularity: z.number().min(0).max(1).optional().describe("Popularity percentile ceiling, 0-1; lower means less famous."),
+    actors_only: z
+      .boolean()
+      .default(true)
+      .describe("Leave out people also tagged as influencers, YouTubers, reality TV, athletes or musicians."),
+    exclude_ids: z.array(z.string().min(1)).max(50).optional().describe("Entity IDs to leave out."),
+    take: take(10, 20),
+  }),
+  example: { signal_entity_ids: [mockEntityId("Prateek Kuhad")] },
+  async run(input, { qloo }) {
+    const response = await qloo.insights({
+      "filter.type": entityUrn("person"),
+      "signal.interests.entities": input.signal_entity_ids,
+      "filter.tags": ACTOR_TAG,
+      "filter.exclude.tags": input.actors_only ? [...CASTING_EXCLUDED_TAGS] : undefined,
+      "filter.popularity.max": input.max_popularity,
+      "filter.exclude.entities": input.exclude_ids,
+      "feature.explainability": true,
+      take: input.take,
+    });
+    const people = entityList(response.data).map((e) => compactEntity(e, { maxTags: 4 }));
+    return {
+      status: people.length > 0 ? "ok" : "empty",
+      summary:
+        people.length > 0
+          ? `${plural(people.length, "actor")}: ${people
+              .slice(0, 5)
+              .map((p) => p.name)
+              .join(", ")}.`
+          : "No actors matched; raise max_popularity or allow everyone Qloo tags as an actor.",
+      data: { people },
       warnings: response.warnings,
     };
   },

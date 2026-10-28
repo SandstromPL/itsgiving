@@ -281,7 +281,14 @@ const TAG_PRIORITY: Partial<Record<EntityKind, string[]>> = {
   brand: ["urn:tag:aesthetic_property:qloo", "urn:tag:personal_style:qloo", "urn:tag:emotional_tone:qloo"],
   place: ["urn:tag:genre:place", "urn:tag:ambience:qloo", "urn:tag:decor:qloo", "urn:tag:setting:qloo"],
   artist: ["urn:tag:genre:music", "urn:tag:style:qloo"],
+  person: ["urn:tag:occupation:person", "urn:tag:genre:media"],
 };
+
+/**
+ * The only tag families kept for a person: what they do and the genres of their work. Their Wikipedia categories
+ * ("Marathi People", "Actors From Kolkata") say who they are and where they come from, which no treatment needs.
+ */
+const PERSON_TAG_FAMILIES = new Set(["urn:tag:occupation:person", "urn:tag:genre:person", "urn:tag:genre:media"]);
 
 /** Labels too generic to be evidence of anything. */
 const GENERIC_TAGS = new Set(["place", "website", "other"]);
@@ -318,7 +325,11 @@ export function compactEntity(entity: QlooEntity, options: { maxTags?: number; m
     image: isRecord(props.image) ? str(props.image.url) : undefined,
     popularity: round(num(entity.popularity)) ?? undefined,
     affinity: entity.query && "affinity" in entity.query ? round(entity.query.affinity ?? null) : undefined,
-    tags: pickTags(entity.tags ?? [], kind, options.maxTags ?? 8),
+    tags: pickTags(
+      (entity.tags ?? []).filter((tag) => kind !== "person" || PERSON_TAG_FAMILIES.has(tag.type ?? "")),
+      kind,
+      options.maxTags ?? 8,
+    ),
   };
 
   const because = extractContributions(entity.query?.explainability);

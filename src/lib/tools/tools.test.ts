@@ -235,6 +235,32 @@ describe("audience_heatmap", () => {
   });
 });
 
+describe("casting_references", () => {
+  const prateek = [mockEntityId("Prateek Kuhad")];
+  const names = (data: unknown) => (data as { people: { name: string }[] }).people.map((p) => p.name);
+
+  it("finds actors only, leaving out people Qloo also tags as YouTubers or influencers", async () => {
+    const result = await runTool("casting_references", { signal_entity_ids: prateek }, ctx);
+    expect(result.status).toBe("ok");
+    expect(names(result.data)).not.toContain("Prajakta Koli");
+    expect(names(result.data)).not.toContain("Raftaar");
+    expect(result.provenance[0].query).toMatchObject({
+      "filter.type": "urn:entity:person",
+      "filter.tags": "urn:tag:genre:person:actor",
+      "filter.exclude.tags": expect.stringContaining("urn:tag:genre:person:youtuber"),
+    });
+    const everyone = await runTool("casting_references", { signal_entity_ids: prateek, actors_only: false }, ctx);
+    expect(names(everyone.data)).toContain("Prajakta Koli");
+  });
+
+  it("keeps to faces a budget can reach", async () => {
+    const result = await runTool("casting_references", { signal_entity_ids: prateek, max_popularity: 0.85 }, ctx);
+    const people = (result.data as { people: { popularity?: number }[] }).people;
+    expect(people.length).toBeGreaterThan(0);
+    expect(people.every((p) => (p.popularity ?? 0) <= 0.85)).toBe(true);
+  });
+});
+
 describe("score_for_audience", () => {
   it("ranks only the titles it is given, for the signal's audience", async () => {
     const films = ["In the Mood for Love", "Donnie Darko", "Rockstar"].map((name) => mockEntityId(name));

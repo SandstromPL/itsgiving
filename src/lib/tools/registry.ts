@@ -3,7 +3,7 @@ import { QlooError, type Provenance } from "../qloo";
 import { audienceHeatmap } from "./heatmap";
 import { importExternalIds, resolveEntities } from "./resolve";
 import { findTags, readAudience, scoreForAudience, tasteOverlap } from "./taste";
-import { referenceFilms, scoutLocations, stylingBrands } from "./treatment";
+import { castingReferences, referenceFilms, scoutLocations, stylingBrands } from "./treatment";
 import type { AgentTool, ToolContext, ToolResult } from "./types";
 
 export const TOOLS: readonly AgentTool[] = [
@@ -15,6 +15,7 @@ export const TOOLS: readonly AgentTool[] = [
   scoreForAudience,
   audienceHeatmap,
   referenceFilms,
+  castingReferences,
   stylingBrands,
   scoutLocations,
 ];

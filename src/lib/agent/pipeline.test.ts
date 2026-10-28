@@ -145,6 +145,33 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     expect(t.references.find((r) => r.entity.id === t.cover)?.entity.kind).toBe("movie");
   });
 
+  it("finds actors this audience knows, and gives a few of them roles as casting references", async () => {
+    const { outcome, steps } = await run({ artist: "Prateek Kuhad", city: "Mumbai" });
+    const t = treatmentOf(outcome);
+    expect(t.casting?.length).toBeGreaterThan(0);
+    for (const c of t.casting ?? []) {
+      expect(c.entity.kind).toBe("person");
+      expect(c.notes.role).toBeTruthy();
+      expect(c.qloo).toMatchObject({ tool: "casting_references", rank: expect.any(Number), because: [{ name: "Prateek Kuhad" }] });
+    }
+    // Actors only, within an indie budget's reach, and never the YouTuber Qloo also tags as an actor.
+    expect(t.qloo.steps.casting?.[0].query).toMatchObject({
+      "filter.type": "urn:entity:person",
+      "filter.tags": "urn:tag:genre:person:actor",
+      "filter.popularity.max": "0.9",
+    });
+    const everyone = [...(t.casting ?? []).map((c) => c.entity), ...(t.extras.people ?? [])];
+    expect(everyone.every((e) => (e.popularity ?? 0) <= 0.9)).toBe(true);
+    expect(everyone.map((e) => e.name)).not.toContain("Prajakta Koli");
+    expect(steps.find((s) => s.id === "casting" && s.status !== "running")?.status).toBe("done");
+  });
+
+  it("lifts the popularity ceiling when too few actors are within a shoestring budget's reach", async () => {
+    const t = treatmentOf((await run({ artist: "Prateek Kuhad", city: "Mumbai", budget: "shoestring" })).outcome);
+    expect(t.qloo.steps.casting?.map((p) => p.query["filter.popularity.max"])).toEqual(["0.85", undefined]);
+    expect(t.notes.join(" ")).toMatch(/Casting references: only \d matched at first, so itsgiving lifted the popularity ceiling/);
+  });
+
   it("leaves the scores out when there are no director films", async () => {
     const t = treatmentOf((await run({ artist: "Prateek Kuhad", city: "Mumbai" })).outcome);
     expect(t.directorFit).toBeUndefined();
@@ -378,6 +405,9 @@ describe("runPipeline with a live provider", () => {
     expect(t.writtenBy).toEqual({ provider: "gemini", model: "fake-flash", mock: false });
     expect(t.mock.llm).toBe(false);
     expect(steps.filter((s) => s.id === "tags" && s.status !== "running")).toHaveLength(2);
+    // The faces need only the names: a re-plan doesn't look for them again.
+    expect(steps.filter((s) => s.id === "casting" && s.status !== "running")).toHaveLength(1);
+    expect(t.qloo.steps.casting).toHaveLength(1);
   });
 
   it("only lets the writer cite refs the tools returned (repairs an invented ref)", async () => {
@@ -675,6 +705,7 @@ describe("LLM schemas", () => {
       tone: [{ ref: "T1", tag: { id: "urn:tag:x", name: "x" }, source: "audience" }],
       references: [{ ref: "R1", item: entity }],
       series: [{ ref: "S1", item: entity }],
+      casting: [{ ref: "P1", item: entity }],
       brands: [{ ref: "B1", item: entity }],
       places: [{ ref: "L1", item: entity }],
     } as unknown as WriteContext;

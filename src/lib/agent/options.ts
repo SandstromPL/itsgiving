@@ -19,12 +19,13 @@ export const NUDGE_LABELS: Record<Nudge, string> = {
 
 /**
  * What a budget reaches. `brandReferenceFrom`: the US-dollar price a brand's pieces start at from which, on this
- * budget, its look is a reference to rent or match rather than buy.
+ * budget, its look is a reference to rent or match rather than buy. `castCeiling`: the popularity percentile above which
+ * a face is out of reach (live, an indie ceiling of 0.9 kept Tripti Dimri and Sayani Gupta and left out Sanya Malhotra).
  */
 export const BUDGETS = {
-  shoestring: { label: "Shoestring", priceLevelMax: 2, brandReferenceFrom: 75 },
-  indie: { label: "Indie", priceLevelMax: 3, brandReferenceFrom: 150 },
-  premium: { label: "Premium", priceLevelMax: undefined, brandReferenceFrom: undefined },
+  shoestring: { label: "Shoestring", priceLevelMax: 2, brandReferenceFrom: 75, castCeiling: 0.85 },
+  indie: { label: "Indie", priceLevelMax: 3, brandReferenceFrom: 150, castCeiling: 0.9 },
+  premium: { label: "Premium", priceLevelMax: undefined, brandReferenceFrom: undefined, castCeiling: undefined },
 } as const;
 export type Budget = keyof typeof BUDGETS;
 
@@ -210,6 +211,7 @@ export const STEP_ORDER: StepId[] = [
   "audience",
   "overlap",
   "heatmap",
+  "casting",
   "plan",
   "tags",
   "references",
@@ -225,6 +227,7 @@ export const STEP_LABELS: Record<StepId, string> = {
   audience: "Read the audience",
   overlap: "Compare with your taste",
   heatmap: "Map where the fans are",
+  casting: "Find casting references",
   plan: "Plan the creative direction",
   tags: "Translate style words into Qloo tags",
   references: "Pull reference films and series",

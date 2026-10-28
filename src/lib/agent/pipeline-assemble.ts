@@ -2,6 +2,7 @@ import type { CompactEntity } from "../qloo";
 import { priceLevelMax } from "./brief";
 import type { Audience } from "./pipeline-audience";
 import type { Execution } from "./pipeline-execute";
+import type { People } from "./pipeline-people";
 import type { Cast } from "./pipeline-resolve";
 import { clip, uniqueBy, type Run } from "./pipeline-run";
 import type { Plan } from "./plan";
@@ -26,11 +27,12 @@ export interface AssembleInput extends Written {
   audience: Audience;
   plan: Plan;
   execution: Execution;
+  people: People;
 }
 
 /** Map the draft's refs back to Qloo items and attach each item's evidence. */
 export function assemble(input: AssembleInput): Treatment {
-  const { run, cast, audience, draft, writeContext: ctx, execution } = input;
+  const { run, cast, audience, draft, writeContext: ctx, execution, people } = input;
   const prose = (text: string, max: number) => clip(input.scrub(text), max);
   const evidence = (list: CompactEntity[], tool: string, entity: CompactEntity): QlooEvidence => ({
     tool,
@@ -92,7 +94,8 @@ export function assemble(input: AssembleInput): Treatment {
   const cover = references.some((r) => r.entity.id === coverPick) ? coverPick : undefined;
   const wardrobe = cite(ctx.brands, execution.brands.items, "styling_brands", draft.wardrobe, ["look"], 4);
   const locations = cite(ctx.places, execution.places.items, "scout_locations", draft.locations, ["scene"], 4);
-  const cited = new Set([...references, ...wardrobe, ...locations].map((p) => p.entity.id));
+  const casting = cite(ctx.casting, people.casting.items, "casting_references", draft.casting, ["role"], 4);
+  const cited = new Set([...references, ...wardrobe, ...locations, ...casting].map((p) => p.entity.id));
   const uncited = (items: CompactEntity[]) => items.filter((e) => !cited.has(e.id));
 
   const directorFit = audience.directorFit.flatMap((list) =>
@@ -130,6 +133,7 @@ export function assemble(input: AssembleInput): Treatment {
     }),
     references,
     cover,
+    casting,
     wardrobe,
     locations,
     base: execution.base
@@ -145,6 +149,7 @@ export function assemble(input: AssembleInput): Treatment {
       references: uncited([...execution.references.items, ...execution.series.items]),
       brands: uncited(execution.brands.items),
       locations: uncited(execution.places.items),
+      people: uncited(people.casting.items),
     },
     audience: {
       taste_tags: audience.tasteTags,

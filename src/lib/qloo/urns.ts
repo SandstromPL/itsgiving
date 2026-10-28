@@ -44,6 +44,25 @@ export const TAG_TYPES = {
 
 export type TagKind = keyof typeof TAG_TYPES;
 
+/** Qloo's tag for actors (urn:tag:occupation:qloo:actor, which /v2/tags offers, matches nobody: live, 2026-10-28). */
+export const ACTOR_TAG = "urn:tag:genre:person:actor";
+
+/**
+ * People Qloo also tags as influencers, YouTubers, reality-TV names, TV personalities, athletes or musicians: casting
+ * references are actors, and live these crowded the actors out (Love Island names among Aftersun's audience).
+ */
+export const CASTING_EXCLUDED_TAGS = [
+  "urn:tag:genre:person:influencer",
+  "urn:tag:occupation:person:influencer",
+  "urn:tag:genre:person:youtuber",
+  "urn:tag:occupation:person:youtuber",
+  "urn:tag:occupation:person:video_blogger",
+  "urn:tag:occupation:person:reality_television_participant",
+  "urn:tag:occupation:person:television_personality",
+  "urn:tag:genre:person:athlete",
+  "urn:tag:genre:person:musician",
+] as const;
+
 export const AGE_BUCKETS = ["24_and_younger", "25_to_29", "30_to_34", "35_to_44", "45_to_54", "55_and_older"] as const;
 
 export const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const;

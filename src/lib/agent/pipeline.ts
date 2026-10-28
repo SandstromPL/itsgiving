@@ -6,6 +6,7 @@ import { STEP_LABELS, withYear, type Thinking } from "./options";
 import { assemble, type Written } from "./pipeline-assemble";
 import { readAudience, type Audience } from "./pipeline-audience";
 import { executePlan, type Execution } from "./pipeline-execute";
+import { findPeople, type People } from "./pipeline-people";
 import { resolveCast, type Cast } from "./pipeline-resolve";
 import { clip, startRun, toCredit, type PipelineDeps, type PipelineOutcome, type Run } from "./pipeline-run";
 import {
@@ -127,6 +128,11 @@ export async function runPipeline(
   const cast = await resolveCast(run);
   if (cast.kind !== "resolved") return cast;
 
+  // The faces this audience knows need only the names: they're found beside the audience read and the plan.
+  const pendingPeople = findPeople(run, cast);
+  // Awaited before the write; this only keeps a failure meanwhile from going unhandled.
+  pendingPeople.catch(() => {});
+
   // 2. Read the audience, where it meets the director's own taste, and where in the city it is. None depends on another.
   const audience = await readAudience(run, cast);
 
@@ -152,9 +158,10 @@ export async function runPipeline(
   }
 
   // 6. Write (the last LLM call).
-  const written = await writeDraft(run, cast, audience, plan, execution);
+  const people = await pendingPeople;
+  const written = await writeDraft(run, cast, audience, plan, execution, people);
 
-  const treatment = assemble({ run, cast, audience, plan, execution, ...written });
+  const treatment = assemble({ run, cast, audience, plan, execution, people, ...written });
   if (run.warnings.size > 0) console.warn(JSON.stringify({ evt: "qloo_warnings", id: run.id, warnings: [...run.warnings].slice(0, 10) }));
   // What made it partial: the kind of each failure (rate_limit, timeout, upstream…), never Qloo's own text.
   if (run.failures.length > 0) console.warn(JSON.stringify({ evt: "qloo_failed", id: run.id, failed: run.failures.slice(0, 10) }));
@@ -296,7 +303,7 @@ async function replan(run: Run, planContext: PlanContext, plan: Plan, execution:
 }
 
 /** The writer's draft of the treatment, from the final plan and what it found. */
-async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, execution: Execution): Promise<Written> {
+async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, execution: Execution, people: People): Promise<Written> {
   const { brief, deps, signal } = run;
   const { candidates } = audience;
   const chosenTone = (plan.tone ?? []).map((ref) => candidates.find((c) => c.ref === ref)).filter((c): c is ToneCandidate => Boolean(c));
@@ -310,6 +317,7 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
     tone,
     references: toRefs(execution.references.items, "R", 8),
     series: toRefs(execution.series.items, "S", 4),
+    casting: toRefs(people.casting.items, "P", 8),
     brands: toRefs(execution.brands.items, "B", 6),
     places: toRefs(execution.places.items, "L", 6),
     leans: audience.leans,
@@ -353,7 +361,7 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
   const scrub = refScrubber(
     new Map([
       ...candidates.map((c) => [c.ref, c.tag.name] as const),
-      ...[...writeContext.references, ...writeContext.series, ...writeContext.brands, ...writeContext.places].map(
+      ...[...writeContext.references, ...writeContext.series, ...writeContext.casting, ...writeContext.brands, ...writeContext.places].map(
         (r) => [r.ref, r.item.name] as const,
       ),
     ]),
