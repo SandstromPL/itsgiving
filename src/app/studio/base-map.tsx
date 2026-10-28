@@ -3,6 +3,7 @@ import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 import { heatContours } from "./contours";
 import { CREDIT_CORNER, MapCredit, StreetTiles, fixed, mapFrame, type Bounds } from "./street-map";
+import { evidenceTone, rankMark } from "./ui";
 
 // The shoot base: Qloo's heatmap around the strongest areas for this audience, as contour lines on the city's streets,
 // with the areas as rings, the one the planner chose, and the scouted locations as numbered pins. Lines, rings and
@@ -429,14 +430,10 @@ export function ShootBaseBlock({
   const chosen = base?.areas.find((a) => a.ref === base.chosen) ?? base?.areas[0];
   if (!base || !chosen) return null;
   const others = base.areas.filter((a) => a.ref !== chosen.ref);
-  const evidence = mock ? "text-tape" : "text-tungsten";
+  const evidence = evidenceTone(mock);
   const km = `${chosen.radius_m / 1000} km`;
   const locations = pins.length > 0 ? "Every location" : "Every location in the treatment";
-  const share = (
-    <span className={`rounded-md px-1.5 py-0.5 font-bold text-[#121211] ${mock ? "bg-[#ffd6ea]" : "bg-accent"}`}>
-      {percent(chosen.share)}
-    </span>
-  );
+  const share = <span className={`rounded-md px-1.5 py-0.5 font-bold ${rankMark(mock)}`}>{percent(chosen.share)}</span>;
   const map = base.map && base.map.tiles.length > 0 && base.map;
   if (compact) {
     return (

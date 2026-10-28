@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { primaryButton } from "@/app/studio/landing";
+import { primaryButton } from "@/app/studio/ui";
 import { ModeBadges } from "@/app/studio/parts";
 import { SiteHeader } from "@/app/studio/site-header";
 import { EXAMPLES } from "@/lib/agent/examples";

@@ -7,6 +7,7 @@ import type { FeaturedCover, FeaturedRun } from "@/lib/agent/featured";
 import { STEP_LABELS, tmdbSize } from "@/lib/agent/options";
 import { ShootBaseBlock } from "./base-map";
 import { darkOf } from "./color";
+import { evidenceTone, primaryButton, rankMark, secondaryButton, slip } from "./ui";
 import { briefLine, splitTitles, type FormState } from "./form";
 import { useLingo } from "./lingo";
 import { morphToCover } from "./morph";
@@ -15,11 +16,6 @@ import { suggestTitleFontFrom, titleFont, titleStyle } from "./title-fonts";
 
 // The homepage, the pitch: what itsgiving is, finished treatments to open, and one real run explained. No form here;
 // the tool has its own page (/studio), and every featured treatment has its own (/t/<slug>).
-
-export const primaryButton =
-  "press inline-flex min-h-14 items-center justify-center rounded-full bg-foreground px-7 text-[17px] font-bold text-background hover:opacity-90";
-export const secondaryButton =
-  "press inline-flex min-h-14 items-center justify-center rounded-full border border-foreground px-7 text-[17px] font-bold hover:bg-card";
 
 const posterTitle = "text-[clamp(1.6rem,2.3vw,2.15rem)] leading-[0.92] font-extrabold tracking-[-0.045em] text-balance";
 /** A poster's place in "Now showing": most of a phone's width in the sideways row, a grid cell from small screens up. */
@@ -86,12 +82,10 @@ function HeroCover({ cover, fontId, className = "" }: { cover: FeaturedCover; fo
           />
           <p
             data-receipt={proof.mock ? "mock" : "qloo"}
-            className={`mt-3 rounded-xl border border-dashed px-3 py-2 font-mono text-[12.5px] leading-[1.6] sm:hidden ${
-              proof.mock ? "border-[#e79ac0] bg-[#fff5fa] text-[#a3195b]" : "border-[#c9c1af] bg-[#fffdf6] text-[#2b2925]"
-            }`}
+            className={`mt-3 rounded-xl border border-dashed px-3 py-2 font-mono text-[12.5px] leading-[1.6] sm:hidden ${slip(proof.mock)}`}
           >
             {proof.mock ? "Mock receipt, not Qloo" : "Qloo receipt"}: {proof.name}, the still, ranks{" "}
-            <span className={`px-1 ${proof.mock ? "bg-[#ffd6ea]" : "bg-accent"} text-[#121211]`}>
+            <span className={`px-1 ${rankMark(proof.mock)}`}>
               {proof.qloo.rank} of {proof.qloo.of}
             </span>{" "}
             for this audience
@@ -282,7 +276,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
   const { t } = useLingo();
   const chosen = run.base.areas.find((a) => a.ref === run.base.chosen) ?? run.base.areas[0];
   const font = titleFont(suggestTitleFontFrom({ mock: run.mock, city: run.city, base: chosen?.name, tags: run.tags }).id);
-  const evidence = run.mock ? "text-tape" : "text-tungsten";
+  const evidence = evidenceTone(run.mock);
   const steps: { title: string; text: string; show: ReactNode }[] = [
     {
       title: STEP_LABELS.audience,
@@ -321,13 +315,13 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
           {run.receipts.map((r) => (
             <li
               key={r.kind}
-              className="rounded-xl border border-dashed border-slip-edge bg-slip px-4 py-3 font-mono text-[13px] leading-[1.65] text-[#2b2925] tabular-nums"
+              className={`rounded-xl border border-dashed px-4 py-3 font-mono text-[13px] leading-[1.65] tabular-nums ${slip(run.mock)}`}
             >
               <p className="font-semibold">
                 {r.kind}: {r.name}
               </p>
               <p>
-                <span className="bg-accent px-1 text-[#121211]">
+                <span className={`px-1 ${rankMark(run.mock)}`}>
                   rank {r.rank} of {r.of}
                 </span>{" "}
                 for this audience

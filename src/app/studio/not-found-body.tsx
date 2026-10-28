@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { primaryButton } from "./landing";
+import { primaryButton } from "./ui";
 import { useLingo } from "./lingo";
 
 /** The 404's words, in the reader's register: unc mode gets a plain heading. */

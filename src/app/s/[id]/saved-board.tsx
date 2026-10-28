@@ -6,8 +6,9 @@ import { useState } from "react";
 import { SignInButton, useAccount } from "@/app/studio/account";
 import { Board } from "@/app/studio/board";
 import { handOffBoard } from "@/app/studio/handoff";
-import { StartYourOwn, primaryButton } from "@/app/studio/landing";
-import { BackArrow } from "@/app/studio/parts";
+import { StartYourOwn } from "@/app/studio/landing";
+import { backButton, outlineButton as outline, pillButton as pill, primaryButton } from "@/app/studio/ui";
+import { BackArrow } from "@/app/studio/icons";
 import { copyText } from "@/app/studio/clipboard";
 import { savedUrl } from "@/app/studio/save";
 import { ShareButton } from "@/app/studio/share";
@@ -18,9 +19,6 @@ import type { Treatment } from "@/lib/agent/types";
 // A saved treatment's page, as its owner sees it (share link on or off, copy, delete) or as anyone with the link sees
 // it while it's shared (read-only, like an example). Either way a rework chip takes the board to the studio, which
 // re-runs it there as a new take: the owner's next version, or the reader's own, to save for themselves.
-
-const pill = "flex min-h-11 items-center gap-2 rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card";
-const outline = "rounded-full border border-foreground px-4 py-2.5 text-[15px] font-semibold hover:bg-foreground hover:text-background";
 
 export function SavedBoard({ id, treatment, own, shared }: { id: string; treatment: Treatment; own: boolean; shared: boolean }) {
   const router = useRouter();
@@ -55,7 +53,7 @@ export function SavedBoard({ id, treatment, own, shared }: { id: string; treatme
             href={own ? "/saved" : "/"}
             aria-label={own ? "Your treatments" : "Home"}
             title={own ? "Your treatments" : "Home"}
-            className="-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card"
+            className={backButton}
           >
             <BackArrow />
           </Link>

@@ -6,6 +6,8 @@ import type { Treatment } from "@/lib/agent/types";
 import { SignInWindow, useAccount } from "./account";
 import { handOffBoard } from "./handoff";
 import { ShareWindow } from "./share";
+import { CheckIcon } from "./icons";
+import { outlineButton as outline } from "./ui";
 
 // Save, on a board the studio built: it keeps the treatment in the director's account (its seal shows the server
 // built it), then offers its share link. Signed out, Save opens the sign-in window; the board waits in the handoff
@@ -14,7 +16,6 @@ import { ShareWindow } from "./share";
 type Status = { kind: "idle" } | { kind: "saving" } | { kind: "saved"; id: string; shared: boolean } | { kind: "problem"; message: string };
 
 const ink = "rounded-full bg-foreground px-4 py-2.5 text-[15px] font-bold text-background hover:opacity-90 disabled:opacity-60";
-const outline = "rounded-full border border-foreground px-4 py-2.5 text-[15px] font-semibold hover:bg-foreground hover:text-background";
 
 /** A saved treatment's link, for sharing: the same page its owner opens. */
 export const savedUrl = (id: string) => `${window.location.origin}/s/${id}`;
@@ -77,18 +78,7 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
     return (
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 px-1 text-[15px] font-bold">
-          <svg
-            aria-hidden
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-          >
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          </svg>
+          <CheckIcon size={16} />
           Saved
         </span>
         <button ref={shareButton} type="button" onClick={() => share(status)} className={outline}>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { SignInButton } from "@/app/studio/account";
-import { primaryButton } from "@/app/studio/landing";
+import { primaryButton } from "@/app/studio/ui";
 import { SiteHeader } from "@/app/studio/site-header";
 import { tmdbSize } from "@/lib/agent/options";
 import { SavedStoreError, savedList, type SavedSummary } from "@/lib/saved/store";

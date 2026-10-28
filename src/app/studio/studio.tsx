@@ -15,13 +15,15 @@ import { HandoffReader, type Handoff } from "./handoff";
 import { onScreen } from "./jump";
 import { YourPoster } from "./landing";
 import { useLingo } from "./lingo";
-import { BackArrow, ModeBadges } from "./parts";
+import { BackArrow } from "./icons";
+import { ModeBadges } from "./parts";
 import { Picker } from "./picker";
 import { SaveControl } from "./save";
 import { studioSession, type RunInput } from "./session";
 import { SiteHeader } from "./site-header";
 import { StreamError, streamTreatment } from "./stream";
 import { RunStage, Timeline, replaySteps } from "./timeline";
+import { backButton, pillButton, stopButton } from "./ui";
 
 type Phase = "idle" | "running" | "needs_input" | "done" | "error";
 
@@ -539,11 +541,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-10 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
         {onBoard ? (
           <div className="flex flex-col gap-8">
-            <button
-              type="button"
-              onClick={leaveBoard}
-              className="-mb-2 flex min-h-11 items-center gap-2 self-start rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card print:hidden"
-            >
+            <button type="button" onClick={leaveBoard} className={`${pillButton} -mb-2 self-start print:hidden`}>
               <BackArrow />
               Back to the brief
             </button>
@@ -553,11 +551,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 <span aria-hidden className="size-2.5 rounded-full bg-foreground motion-safe:animate-pulse" />
                 <span className="font-bold">{lingo.cookingAgain}</span>
                 {current && <span className="text-[15px] text-dim">{current}</span>}
-                <button
-                  type="button"
-                  onClick={() => stopActive.current()}
-                  className="ml-auto min-h-10 rounded-full border border-foreground px-4 text-sm font-semibold"
-                >
+                <button type="button" onClick={() => stopActive.current()} className={stopButton}>
                   Stop
                 </button>
               </div>
@@ -577,13 +571,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 ) : undefined
               }
               back={
-                <button
-                  type="button"
-                  onClick={leaveBoard}
-                  aria-label="Back to the brief"
-                  title="Back to the brief"
-                  className="-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card"
-                >
+                <button type="button" onClick={leaveBoard} aria-label="Back to the brief" title="Back to the brief" className={backButton}>
                   <BackArrow />
                 </button>
               }
@@ -595,11 +583,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-line bg-card py-2 pr-2 pl-5 sm:rounded-full">
               <span className="font-bold">{briefLine(pending.form)}</span>
               <span className="text-[15px] text-dim">{THINKING[pending.form.thinking].label} thinking</span>
-              <button
-                type="button"
-                onClick={() => stopActive.current()}
-                className="ml-auto min-h-10 rounded-full border border-foreground px-4 text-sm font-semibold"
-              >
+              <button type="button" onClick={() => stopActive.current()} className={stopButton}>
                 Stop
               </button>
             </div>

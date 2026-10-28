@@ -31,6 +31,8 @@ import { useLingo } from "./lingo";
 import { QlooTags, Still, Tape, Why, modelName } from "./parts";
 import { TitleCardPicker, type CoverStill, type EraPick } from "./title-card";
 import { suggestTitleFont, titleFont, titleStyle } from "./title-fonts";
+import { CheckIcon } from "./icons";
+import { evidenceTone, outlineButton, paperEvidence } from "./ui";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
 
@@ -114,9 +116,6 @@ function names(entities: CompactEntity[]): string {
   return entities.map((e) => withYear(e.name, e.year)).join(", ");
 }
 
-/** Qloo evidence set in prose: mono, tungsten for Qloo, tape pink for the synthetic mock standing in for it. */
-const evidenceTone = (mock: boolean) => (mock ? "text-tape" : "text-tungsten");
-
 function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boolean; shared?: boolean }) {
   return (
     <ul className="flex flex-wrap gap-2">
@@ -124,9 +123,7 @@ function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boole
         <li
           key={tag.id}
           className={`rounded-full px-3 py-1.5 font-mono text-[13px] ${
-            shared
-              ? "bg-accent font-semibold text-[#121211]"
-              : `border border-dashed border-slip-edge bg-slip ${mock ? "text-[#a3195b]" : "text-[#855000]"}`
+            shared ? "bg-accent font-semibold text-[#121211]" : `border border-dashed border-slip-edge bg-slip ${paperEvidence(mock)}`
           }`}
         >
           {tagLabel(tag.name)}
@@ -231,11 +228,7 @@ function Cover({
   );
 }
 
-const check = (
-  <svg aria-hidden width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-    <path d="M5 12.5l4.5 4.5L19 7.5" />
-  </svg>
-);
+const check = <CheckIcon size={13} />;
 
 /** The cover's colours, each a chip that copies its hex: "Copied" sits over the name, so the row doesn't shift. */
 function CoverPalette({ palette }: { palette: Treatment["palette"] }) {
@@ -407,11 +400,7 @@ function Rework({
         ))}
         <div className="ml-auto flex flex-wrap items-center gap-2.5">
           {save}
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="rounded-full border border-foreground px-4 py-2.5 text-[15px] font-semibold hover:bg-foreground hover:text-background"
-          >
+          <button type="button" onClick={() => window.print()} className={outlineButton}>
             Save as PDF
           </button>
         </div>

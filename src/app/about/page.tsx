@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { STEP_LABELS } from "@/lib/agent/options";
 import { accountsOn } from "@/lib/supabase/config";
 import { StartYourOwn } from "../studio/landing";
+import { slip } from "../studio/ui";
 import { SiteHeader } from "../studio/site-header";
 
 // About: who itsgiving is for (first, as Paritosh asked), what it is, what Qloo is, and how one uses the other. Static,
@@ -214,7 +215,9 @@ export default function About() {
                   <p className="text-[1.05rem] leading-[1.55] text-dim">{step.text}</p>
                 </div>
                 {step.qloo ? (
-                  <div className="self-start rounded-xl border border-dashed border-slip-edge bg-slip px-4 py-3 font-mono text-[13px] leading-[1.7] text-[#2b2925]">
+                  <div
+                    className={`self-start rounded-xl border border-dashed px-4 py-3 font-mono text-[13px] leading-[1.7] ${slip(false)}`}
+                  >
                     <p className="font-semibold">Qloo calls</p>
                     {step.qloo.map((call) => (
                       <p key={call}>{call}</p>

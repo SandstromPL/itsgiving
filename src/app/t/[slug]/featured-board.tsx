@@ -7,11 +7,12 @@ import { Board } from "@/app/studio/board";
 import { useReceipts } from "@/app/studio/eggs";
 import { handOff } from "@/app/studio/handoff";
 import { StartYourOwn } from "@/app/studio/landing";
-import { BackArrow } from "@/app/studio/parts";
+import { BackArrow } from "@/app/studio/icons";
 import { ShareButton } from "@/app/studio/share";
 import { Timeline, replaySteps } from "@/app/studio/timeline";
 import type { Nudge } from "@/lib/agent/options";
 import type { Treatment } from "@/lib/agent/types";
+import { backButton, pillButton } from "@/app/studio/ui";
 
 /**
  * A featured treatment's board, read-only: it was built when the site was deployed. A rework chip hands it to the
@@ -31,10 +32,7 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
   return (
     <div className="flex flex-col gap-8">
       <div className="-mb-2 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link
-          href="/#now-showing"
-          className="press flex min-h-11 items-center gap-2 rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card"
-        >
+        <Link href="/#now-showing" className={pillButton}>
           <BackArrow />
           All examples
         </Link>
@@ -49,12 +47,7 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
         take={1}
         log={<Timeline steps={replaySteps(treatment, "Built when the site was deployed: these are the calls that made it.", false)} />}
         back={
-          <Link
-            href="/#now-showing"
-            aria-label="All examples"
-            title="All examples"
-            className="-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card"
-          >
+          <Link href="/#now-showing" aria-label="All examples" title="All examples" className={backButton}>
             <BackArrow />
           </Link>
         }

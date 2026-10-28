@@ -7,25 +7,7 @@ import type { LlmMode } from "@/lib/llm/config";
 import type { ProducedBy } from "@/lib/llm/generate";
 import type { Reasoning } from "@/lib/llm/types";
 import type { QlooMode } from "@/lib/qloo/client";
-
-/** A left arrow, for the ways back from a treatment to the studio. */
-export function BackArrow() {
-  return (
-    <svg
-      aria-hidden
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 12H5M11 6l-6 6 6 6" />
-    </svg>
-  );
-}
+import { paperEvidence, rankMark, slip } from "./ui";
 
 /** Pink "camera tape" label for anything mocked. */
 export function Tape({ children, title }: { children: ReactNode; title?: string }) {
@@ -162,14 +144,12 @@ export function Receipt({
   return (
     <div
       data-receipt={mock ? "mock" : "qloo"}
-      className={`rounded-xl border border-dashed px-3.5 py-3 font-mono text-[12.5px] leading-[1.65] tabular-nums ${
-        mock ? "border-[#e79ac0] bg-[#fff5fa] text-[#a3195b]" : "border-[#c9c1af] bg-[#fffdf6] text-[#2b2925]"
-      } ${className}`}
+      className={`rounded-xl border border-dashed px-3.5 py-3 font-mono text-[12.5px] leading-[1.65] tabular-nums ${slip(mock)} ${className}`}
     >
       <p className="font-semibold">{mock ? "Mock receipt, not Qloo" : "Qloo receipt"}</p>
       {label && <p>{label}</p>}
       <p>
-        <span className={`px-1 ${mock ? "bg-[#ffd6ea]" : "bg-accent"} text-[#121211]`}>
+        <span className={`px-1 ${rankMark(mock)}`}>
           rank {qloo.rank} of {qloo.of}
         </span>{" "}
         for this audience
@@ -218,7 +198,7 @@ export function Why({
   className?: string;
 }) {
   const id = useId();
-  const evidence = mock ? "text-[#a3195b]" : "text-[#855000]";
+  const evidence = paperEvidence(mock);
   return (
     <>
       <Receipt
