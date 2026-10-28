@@ -385,7 +385,7 @@ const STEPS = [
   [STEP_LABELS.audience, "Qloo shows what the audience of an artist or a film over-indexes on, and where it meets your own taste."],
   [STEP_LABELS.heatmap, "A heatmap of the city picks the neighbourhood to base the shoot in."],
   ["Plan and write", "The model turns that evidence into a concept, beats, wardrobe and locations."],
-  ["Bring receipts", "Every film, brand and place shows why Qloo picked it, kept apart from the writing."],
+  ["Bring receipts", "Every film, face, brand and place shows why Qloo picked it, kept apart from the writing."],
 ] as const;
 
 /** The steps in words, for a server without a featured run to show (mock mode). */

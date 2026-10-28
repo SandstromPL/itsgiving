@@ -46,7 +46,12 @@ fast and cheap, and within the free fallback models' limits.
    beyond it. The shoot city is resolved too, as a Qloo locality: a state or county that shares its name with a city
    ("New York") is read as the city.
 3. **Read the audience** (`read_audience`), **map where the fans are** (`audience_heatmap`) and, when the director
-   lists films, **compare** their taste with the audience (`taste_overlap`). The calls run at once. The heatmap scores
+   lists films, **compare** their taste with the audience (`taste_overlap`) and **score each of their films** for it
+   (`score_for_audience`, which asks Qloo to rank exactly that list). The calls run at once. Beside them, from the
+   moment the names are resolved, run two searches that need nothing else: the **actors** this audience knows
+   (`casting_references`: actors only, leaving out people Qloo also tags as influencers, YouTubers, reality-TV names,
+   athletes or musicians, within the budget's reach) and the **artists** it plays (`music_references`, each with a few
+   of its notable songs). The writer is the first to wait for them, and a re-plan doesn't ask again. The heatmap scores
    every tile of the city for the audience; itsgiving groups the hottest tenth into the three strongest areas, 2 km in
    radius, and names each after the neighbourhoods Qloo lists around its centre. Tags that name who people are
    (sexual orientation, gender identity, religion, ethnicity, health, party politics) are dropped here: Qloo has some
@@ -54,14 +59,15 @@ fast and cheap, and within the free fallback models' limits.
    which film subgenres this audience loves; when one of them is a film tradition an era look borrows from (Bollywood
    for Bombay '75, say), the title card suggests that era, with the rank Qloo gave it.
 4. **Plan (LLM call 1).** The model picks the creative direction, the tone tags, how deep the cuts go, a few plain
-   style words for wardrobe and ambience, and which of the strongest areas to base the shoot in. Tags and areas are
+   style words for wardrobe and ambience, and which of the strongest areas to base the shoot in. It hears which of the
+   director's films this audience likes most. Tags and areas are
    shown to it as short refs (`T1`, `A1`, ...) and the output schema only accepts those refs, so it cannot invent a
    tag ID or a neighbourhood.
 5. **Execute in code.** The style words go through `find_tags` (preferring tags named like the word, never
    adult-themed ones). Three Qloo queries run in parallel; reference films start straight away, since they don't
    use the tags:
    - `reference_films`: the artist's audience, with a popularity ceiling for deep cuts and an era only when the
-     director asks for "more 90s".
+     director asks for "more 90s"; once for films and once, beside it, for series.
    - `styling_brands`: fashion brands only (`urn:tag:genre:brand:fashion`), ranked by the wardrobe style tags.
    - `scout_locations`: within 2 km of the chosen base, the venue kinds the plan chose (cafe, bar, bookstore, park
      and so on, mapped to Qloo place genres), ranked by the ambience tags, within the budget's price level, with photos.
@@ -70,8 +76,12 @@ fast and cheap, and within the free fallback models' limits.
    places match near it, widen the venue kinds, allow places without photos, lift the price ceiling, drop style tags,
    lift the deep-cut ceiling), and the treatment says what was relaxed.
 6. **Re-plan (optional LLM call 2)** only when a whole set of style words matched no Qloo tag.
-7. **Write (last LLM call).** The model writes the treatment as JSON, citing films, brands and places only by ref
-   (`R1`, `B1`, `L1`); refs not returned by a tool fail validation. Code maps refs back to Qloo items and attaches each
+7. **Write (last LLM call).** The model writes the treatment as JSON, citing films, series, actors, brands and
+   places only by ref (`R1`, `S1`, `P1`, `B1`, `L1`), and for a short film its music (`M1`); refs not returned by a
+   tool fail validation. Actors get a role in the story, written about the role, never the person. A song may be named
+   only from Qloo's list of that artist's notable songs, and code drops any other. A brand whose pieces start above
+   what the budget buys is written as a reference to rent or match, and a place's opening hours can set when a scene
+   is shot. Code maps refs back to Qloo items and attaches each
    item's evidence (rank within its call, affinity, popularity, the input entities that drove it) and the model that
    wrote it. A ref that slips into the prose is swapped for its name, and lighting or shot notes sent as objects are
    flattened, so neither costs a repair call. While the model writes, TMDB gives each reference film's still (its
@@ -224,9 +234,12 @@ status, a one-line summary, compact data, warnings and the provenance of every Q
 | `read_audience` | Taste vocabulary, age/gender skew and the film subgenres an audience loves | `GET /v2/insights` (`urn:tag` twice, `urn:demographics`) |
 | `taste_overlap` | Shared traits between the director's taste and the artist | `GET /v2/analysis/compare` |
 | `audience_heatmap` | Where in a city an audience over-indexes, as named areas to base a shoot in | `GET /v2/insights` (`urn:heatmap`), `GET /search` (localities near a point) |
+| `score_for_audience` | Ranks a given list (the director's own films) for an audience | `GET /v2/insights` (`filter.results.entities`) |
 | `reference_films` | Films/shows the audience loves, with era and deep-cut controls and explanations | `GET /v2/insights` (movie, tv_show) |
-| `styling_brands` | Fashion and lifestyle brands for wardrobe | `GET /v2/insights` (brand) |
-| `scout_locations` | Real places in the shoot city, or near a point, by ambience, budget and photo | `GET /v2/insights` (place) |
+| `casting_references` | Actors the audience knows, as casting references, within a popularity ceiling | `GET /v2/insights` (person, `urn:tag:genre:person:actor`) |
+| `music_references` | Artists the audience plays, with their genres and notable songs | `GET /v2/insights` (artist) |
+| `styling_brands` | Fashion and lifestyle brands for wardrobe, with each brand's style and price range | `GET /v2/insights` (brand) |
+| `scout_locations` | Real places in the shoot city, or near a point, by ambience, budget and photo, with hours and contact | `GET /v2/insights` (place) |
 
 ## Getting started
 

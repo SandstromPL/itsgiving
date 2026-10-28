@@ -30,7 +30,7 @@ const USERS = [
     who: "Labels, artist managers and producers",
     situation:
       "You brief directors and choose between their treatments. You need to know which one speaks to the artist's audience, not only to the director's taste.",
-    gets: "Treatments where every film, brand and place shows Qloo's receipt: how it ranks with that audience, and what put it there.",
+    gets: "Treatments where every film, face, brand and place shows Qloo's receipt: how it ranks with that audience, and what put it there.",
   },
 ] as const;
 
@@ -71,13 +71,19 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
   },
   {
     title: STEP_LABELS.audience,
-    text: "What the fans over-index on, in Qloo's own words (moods, genres, styles), the age and gender they lean to, and the film subgenres they love, which suggest an era look for the cover.",
-    qloo: ["/v2/insights, taste tags", "/v2/insights, demographics", "/v2/insights, film subgenres"],
+    text: "What the fans over-index on, in Qloo's own words (moods, genres, styles), the age and gender they lean to, and the film subgenres they love, which suggest an era look for the cover. Beside it, the actors they know, as casting references, and the artists they play, as a short film's music.",
+    qloo: [
+      "/v2/insights, taste tags",
+      "/v2/insights, demographics",
+      "/v2/insights, film subgenres",
+      "/v2/insights, actors",
+      "/v2/insights, artists",
+    ],
   },
   {
     title: STEP_LABELS.overlap,
-    text: "Add the films you love and Qloo compares them with the audience. What you share becomes the spine of the treatment: your voice, their taste.",
-    qloo: ["/v2/analysis/compare"],
+    text: "Add the films you love and Qloo compares them with the audience, and ranks each of your films for it. What you share becomes the spine of the treatment: your voice, their taste.",
+    qloo: ["/v2/analysis/compare", "/v2/insights, your films scored"],
   },
   {
     title: STEP_LABELS.heatmap,
@@ -91,19 +97,20 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
   },
   {
     title: "Find references, wardrobe and places",
-    text: "Films the audience over-indexes on, from the canon to deep cuts; fashion brands steered by the style words; and real places within 2 km of the base, inside the budget, with photos.",
-    qloo: ["/v2/tags, style words", "/v2/insights, films", "/v2/insights, brands", "/v2/insights, places"],
+    text: "Films and series the audience over-indexes on, from the canon to deep cuts; fashion brands steered by the style words, with their style and prices; and real places within 2 km of the base, inside the budget, with photos, opening hours and the venue's own contact.",
+    qloo: ["/v2/tags, style words", "/v2/insights, films and series", "/v2/insights, brands", "/v2/insights, places"],
   },
   {
     title: STEP_LABELS.write,
-    text: "The model writes the treatment and may cite only what Qloo returned. Every film, brand and place keeps its receipt: its rank for this audience, and its affinity.",
+    text: "The model writes the treatment and may cite only what Qloo returned. Every film, face, brand and place keeps its receipt: its rank for this audience, and its affinity.",
     model: "The model writes, citing only Qloo's picks.",
   },
 ];
 
 const LIMITS = [
   "Qloo describes groups. A treatment says what an audience tends to love, never what one person will do.",
-  "Qloo lists feature films and artists, not short films or songs. A short's audience comes from the feature films it's after, and a video's from the artist, not the track.",
+  "Qloo scores feature films, series and artists, not short films or songs. A short's audience comes from the feature films it's after, and a video's from the artist, not the track. A song named in a treatment comes from Qloo's list of the artist's notable songs: clear it before you use it.",
+  "Casting references are faces this audience knows, for the presence a role needs. Whether anyone is free or interested is for you to ask.",
   "Not every artist is in Qloo. When one is missing, stand-in artists carry the audience, and the treatment says so.",
   "Locations are a scout list. Availability and filming permission are yours to confirm with each venue.",
 ] as const;
