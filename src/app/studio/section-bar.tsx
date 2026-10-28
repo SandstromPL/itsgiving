@@ -20,7 +20,8 @@ export function boardSections(t: Pick<Treatment, "casting" | "music">): (readonl
     ...(t.casting ? [["casting", "Casting"] as const] : []),
     ["wardrobe", "Wardrobe"],
     ["locations", "Locations"],
-    ["camera", "Camera and light"],
+    // Short on the tab, whole as the section's heading: eleven tabs then fit from about 1280 px.
+    ["camera", "Camera"],
     ["palette", "Palette"],
     ...(t.music ? [["music", "Music"] as const] : []),
     ["audience", "Audience"],
@@ -216,7 +217,7 @@ export function SectionBar({
               aria-current={current === id ? "location" : undefined}
               // While the pill slides in, the lit label turns light as it arrives, never before.
               style={sliding && current === id ? { transitionDelay: "140ms" } : undefined}
-              className="shrink-0 rounded-full px-3 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim transition-colors duration-150 hover:text-foreground aria-[current=location]:text-background"
+              className="shrink-0 rounded-full px-2.5 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim transition-colors duration-150 hover:text-foreground aria-[current=location]:text-background"
             >
               {label}
             </a>

@@ -204,7 +204,9 @@ function openingHours(value: unknown): CompactPlace["hours"] {
     const slots = Array.isArray(value[day]) ? value[day].filter(isRecord) : [];
     if (slots.length === 0) continue;
     const open = slots.filter((slot) => slot.closed !== true && clock(slot.opens) && clock(slot.closes));
-    if (open.length > 0) hours[day] = open.map((slot) => `${clock(slot.opens)}–${clock(slot.closes)}`).join(", ");
+    // Live, a place open round the clock lists 00:00 to 00:00.
+    const span = (slot: Loose) => (clock(slot.opens) === clock(slot.closes) ? "24 hours" : `${clock(slot.opens)}–${clock(slot.closes)}`);
+    if (open.length > 0) hours[day] = open.map(span).join(", ");
     else if (slots.every((slot) => slot.closed === true)) hours[day] = "closed";
   }
   return Object.keys(hours).length > 0 ? hours : undefined;

@@ -439,21 +439,26 @@ export function Board({
           note={`Actors this audience over-indexes on, each with its rank from ${source}: references for the presence a role needs, not offers. itsgiving wrote the roles.`}
         >
           {t.casting.length > 0 ? (
+            // On paper too, each face is a small portrait beside its role, one under another: a page holds three of them
+            // and the line of other actors after them.
             <ul className="grid gap-5 lg:grid-cols-2 print:flex print:flex-col print:gap-4">
-              {t.casting.map((c) => (
-                <li key={c.entity.id} className={`${card} flex flex-col overflow-hidden sm:flex-row ${printRow}`}>
+              {t.casting.map((c, i, all) => (
+                <li
+                  key={c.entity.id}
+                  className={`${card} flex flex-col overflow-hidden sm:flex-row ${i === all.length - 1 && i % 2 === 0 ? "lg:col-span-2" : ""}`}
+                >
                   <Still
                     src={c.entity.image}
                     alt={`Photo of ${c.entity.name}`}
-                    className={`aspect-[4/5] w-full shrink-0 sm:w-40 print:aspect-[4/5] ${printPicture}`}
+                    className="aspect-[3/2] w-full shrink-0 object-[50%_22%] sm:aspect-[4/5] sm:w-40 sm:object-center"
                   />
-                  <div className="flex flex-1 flex-col gap-3 p-5 print:contents">
-                    <div className={printRead}>
+                  <div className="flex flex-1 flex-col gap-3 p-5">
+                    <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1">
                         <h3 className="type-head text-[1.6rem] leading-tight">{c.entity.name}</h3>
                         <QlooTags tags={c.qloo.tags} />
                       </div>
-                      <p className={prose}>{c.notes.role}</p>
+                      <p className={`${prose} max-w-[64ch]`}>{c.notes.role}</p>
                     </div>
                     <Why
                       label="why this face"
@@ -463,7 +468,7 @@ export function Board({
                       read={[{ term: "The role", text: c.notes.role }]}
                       writtenBy={t.writtenBy}
                       mock={mock}
-                      className={`mt-auto ${printReceipt}`}
+                      className="mt-auto"
                     />
                   </div>
                 </li>
@@ -515,7 +520,7 @@ export function Board({
                     )}
                   </div>
                   <QlooNote text={w.entity.brand?.style} mock={mock} />
-                  <p className={prose}>{w.notes.look}</p>
+                  <p className={`${prose} max-w-[64ch]`}>{w.notes.look}</p>
                   <Why
                     label="why this brand"
                     name={w.entity.name}
@@ -626,7 +631,7 @@ export function Board({
                         facts={[
                           { term: "Atmosphere", text: place?.ambience },
                           { term: "The space", text: place?.setting },
-                          { term: "Hours", text: hours },
+                          { term: "Open", text: hours },
                         ]}
                         read={[{ term: "The scene", text: l.notes.scene }]}
                         writtenBy={t.writtenBy}
@@ -651,7 +656,7 @@ export function Board({
                           {place?.website && (
                             <a href={place.website} target="_blank" rel="noreferrer" className={placeLink}>
                               {siteName(place.website)}
-                              <span className="sr-only">, {l.entity.name}&apos;s website (opens in a new tab)</span>
+                              <span className="sr-only">: the website of {l.entity.name} (opens in a new tab)</span>
                             </a>
                           )}
                         </div>
@@ -711,7 +716,7 @@ export function Board({
                     <QlooTags tags={m.entity.artist?.genres ?? m.qloo.tags} />
                     {m.notes.song && <p className="text-[14px] text-faint">Song: {m.notes.song}</p>}
                   </div>
-                  <p className={prose}>{m.notes.use}</p>
+                  <p className={`${prose} max-w-[64ch]`}>{m.notes.use}</p>
                   <Why
                     label="why this artist"
                     name={m.entity.name}

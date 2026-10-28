@@ -49,7 +49,10 @@ describe("openingLine", () => {
     const every = Object.fromEntries(
       ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((d) => [d, "08:00–22:00"]),
     );
-    expect(openingLine(every)).toBe("Daily 08:00–22:00");
+    expect(openingLine(every)).toBe("daily 08:00–22:00");
+    expect(openingLine(Object.fromEntries(Object.keys(every).map((d) => [d, "24 hours"])))).toBe("24 hours, every day");
+    expect(openingLine(Object.fromEntries(Object.keys(every).map((d) => [d, "closed"])))).toBeUndefined();
+    expect(openingLine(Object.fromEntries(Object.keys(every).map((d) => [d, "00:00–00:00"])))).toBe("24 hours, every day");
     expect(openingLine({ monday: "10:00–20:00", wednesday: "10:00–20:00" })).toBe("Mon 10:00–20:00; Wed 10:00–20:00");
     expect(openingLine(undefined)).toBeUndefined();
   });

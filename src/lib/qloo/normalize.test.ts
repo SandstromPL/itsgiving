@@ -128,6 +128,7 @@ describe("compactEntity details a director can use", () => {
       properties: {
         hours: {
           monday: [{ opens: null, closed: true, closes: null }],
+          sunday: [{ opens: "T00:00:00", closed: false, closes: "T00:00:00" }],
           tuesday: [{ opens: "T12:00:00", closed: false, closes: "T01:30:00" }],
           friday: [
             { opens: "T12:00:00", closed: false, closes: "T15:30:00" },
@@ -146,7 +147,7 @@ describe("compactEntity details a director can use", () => {
       ],
     });
     expect(compact.place).toMatchObject({
-      hours: { monday: "closed", tuesday: "12:00–01:30", friday: "12:00–15:30, 19:00–23:30" },
+      hours: { monday: "closed", tuesday: "12:00–01:30", friday: "12:00–15:30, 19:00–23:30", sunday: "24 hours" },
       phone: "+91 22 2600 0000",
       website: "https://thalassa.example/",
       setting: "A whitewashed terrace above Carter Road, open to the sea breeze.",

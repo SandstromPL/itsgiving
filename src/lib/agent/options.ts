@@ -64,22 +64,24 @@ const DAY_NAMES: Record<Weekday, string> = {
 const WEEK = Object.keys(DAY_NAMES) as Weekday[];
 
 /**
- * A place's week in one line, days with the same hours run together: "Tue–Sun 12:00–15:30; closed Mon", or "Daily
- * 09:00–23:00". Days Qloo doesn't list are left out.
+ * A place's week in one line, to read after "Open": days with the same hours run together ("Tue–Sun 12:00–15:30; closed
+ * Mon", "daily 09:00–23:00", "24 hours, every day"). Days Qloo doesn't list are left out, and a week listed as closed
+ * every day reads as unknown: live, those were places still trading.
  */
 export function openingLine(hours?: CompactPlace["hours"]): string | undefined {
   if (!hours) return undefined;
   const runs: { from: Weekday; to: Weekday; value: string }[] = [];
   for (const day of WEEK) {
-    const value = hours[day];
+    // Hours kept before 2026-10-28 say "00:00–00:00" for open round the clock.
+    const value = hours[day]?.replace(/^(\d\d:\d\d)–\1$/, "24 hours");
     const last = runs.at(-1);
     if (value === undefined) continue;
     if (last && last.value === value && WEEK.indexOf(day) === WEEK.indexOf(last.to) + 1) last.to = day;
     else runs.push({ from: day, to: day, value });
   }
-  if (runs.length === 0) return undefined;
+  if (runs.length === 0 || runs.every((r) => r.value === "closed")) return undefined;
   if (runs.length === 1 && runs[0].from === "monday" && runs[0].to === "sunday") {
-    return runs[0].value === "closed" ? "Closed all week" : `Daily ${runs[0].value}`;
+    return runs[0].value === "24 hours" ? "24 hours, every day" : `daily ${runs[0].value}`;
   }
   const days = ({ from, to }: { from: Weekday; to: Weekday }) => (from === to ? DAY_NAMES[from] : `${DAY_NAMES[from]}–${DAY_NAMES[to]}`);
   const open = runs.filter((r) => r.value !== "closed").map((r) => `${days(r)} ${r.value}`);
