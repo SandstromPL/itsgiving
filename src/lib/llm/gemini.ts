@@ -1,6 +1,7 @@
 import type { FetchLike } from "../qloo";
+import { failFor, postJson } from "./post";
 import { GEMINI_KEYWORDS, sanitizeSchema } from "./schema";
-import { LlmError, classifyHttpStatus, retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
+import { retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
 
 // Gemini through Google AI Studio, REST generateContent. Shapes checked against
 // https://ai.google.dev/api/generate-content (GenerationConfig, ThinkingConfig)
@@ -42,46 +43,30 @@ export function geminiProvider(options: {
   thinkingLevel?: "low" | "medium" | "high";
 }): LlmProvider {
   const { apiKey, model } = options;
-  const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
-    new LlmError({ kind, message: `Gemini ${model}: ${message}`, provider: "gemini", model, status, retryAfterMs });
+  const fail = failFor("Gemini", "gemini", model);
 
   return {
     kind: "gemini",
     model,
     async complete(call: LlmCall): Promise<LlmCompletion> {
-      const body = {
-        systemInstruction: { parts: [{ text: call.system }] },
-        contents: [{ role: "user", parts: [{ text: call.prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseJsonSchema: sanitizeSchema(call.schema, GEMINI_KEYWORDS),
-          maxOutputTokens: call.maxOutputTokens,
-          thinkingConfig: { thinkingLevel: options.thinkingLevel ?? call.effort },
+      const json = await postJson<GeminiResponse>({
+        url: `${options.baseUrl ?? GEMINI_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`,
+        headers: { "x-goog-api-key": apiKey },
+        body: {
+          systemInstruction: { parts: [{ text: call.system }] },
+          contents: [{ role: "user", parts: [{ text: call.prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseJsonSchema: sanitizeSchema(call.schema, GEMINI_KEYWORDS),
+            maxOutputTokens: call.maxOutputTokens,
+            thinkingConfig: { thinkingLevel: options.thinkingLevel ?? call.effort },
+          },
         },
-      };
-      const url = `${options.baseUrl ?? GEMINI_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`;
-      const response = await (options.fetch ?? fetch)(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify(body),
         signal: call.signal,
+        fetch: options.fetch,
+        fail,
+        retryAfterMs: (reply, headers) => retryDelayMs(reply, headers.get("retry-after")),
       });
-      const raw = await response.text();
-      let json: GeminiResponse = {};
-      try {
-        json = raw ? (JSON.parse(raw) as GeminiResponse) : {};
-      } catch {
-        if (response.ok) throw fail("upstream", "returned invalid JSON", response.status);
-      }
-      if (!response.ok) {
-        const reason = json.error?.message ?? raw.slice(0, 200);
-        throw fail(
-          classifyHttpStatus(response.status),
-          `HTTP ${response.status}${reason ? `: ${reason}` : ""}`,
-          response.status,
-          retryDelayMs(json, response.headers.get("retry-after")),
-        );
-      }
 
       if (json.promptFeedback?.blockReason) throw fail("blocked", `prompt blocked (${json.promptFeedback.blockReason})`);
       const candidate = json.candidates?.[0];

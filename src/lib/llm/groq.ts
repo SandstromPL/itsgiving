@@ -1,6 +1,7 @@
 import type { FetchLike } from "../qloo";
+import { failFor, postJson } from "./post";
 import { BASE_KEYWORDS, sanitizeSchema } from "./schema";
-import { LlmError, classifyHttpStatus, retryAfterHeader, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
+import { classifyHttpStatus, type LlmCall, type LlmCompletion, type LlmProvider } from "./types";
 
 // Groq's OpenAI-compatible chat completions. Shapes checked against
 // https://console.groq.com/docs/structured-outputs and /docs/reasoning on
@@ -27,52 +28,39 @@ export function groqProvider(options: {
   reasoningEffort?: "low" | "medium" | "high";
 }): LlmProvider {
   const { apiKey, model } = options;
-  const fail = (kind: LlmError["kind"], message: string, status?: number, retryAfterMs?: number) =>
-    new LlmError({ kind, message: `Groq ${model}: ${message}`, provider: "groq", model, status, retryAfterMs });
+  const fail = failFor("Groq", "groq", model);
 
   return {
     kind: "groq",
     model,
     async complete(call: LlmCall): Promise<LlmCompletion> {
-      const body = {
-        model,
-        messages: [
-          { role: "system", content: call.system },
-          { role: "user", content: call.prompt },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: { name: call.schemaName, strict: true, schema: sanitizeSchema(call.schema, BASE_KEYWORDS) },
+      const json = await postJson<GroqResponse>({
+        url: `${options.baseUrl ?? GROQ_BASE_URL}/chat/completions`,
+        headers: { authorization: `Bearer ${apiKey}` },
+        body: {
+          model,
+          messages: [
+            { role: "system", content: call.system },
+            { role: "user", content: call.prompt },
+          ],
+          response_format: {
+            type: "json_schema",
+            json_schema: { name: call.schemaName, strict: true, schema: sanitizeSchema(call.schema, BASE_KEYWORDS) },
+          },
+          reasoning_effort: options.reasoningEffort ?? "low",
+          include_reasoning: false,
+          max_completion_tokens: call.maxOutputTokens,
         },
-        reasoning_effort: options.reasoningEffort ?? "low",
-        include_reasoning: false,
-        max_completion_tokens: call.maxOutputTokens,
-      };
-      const response = await (options.fetch ?? fetch)(`${options.baseUrl ?? GROQ_BASE_URL}/chat/completions`, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify(body),
         signal: call.signal,
+        fetch: options.fetch,
+        fail,
+        kind: (status, reply, reason) => {
+          const kind = classifyHttpStatus(status);
+          // A best-effort schema miss also comes back as 400; treat it as bad output, not a bad request.
+          const schemaMiss = kind === "bad_request" && /schema|json_validate/i.test(`${reason} ${reply.error?.code ?? ""}`);
+          return schemaMiss ? "invalid_output" : kind;
+        },
       });
-      const raw = await response.text();
-      let json: GroqResponse = {};
-      try {
-        json = raw ? (JSON.parse(raw) as GroqResponse) : {};
-      } catch {
-        if (response.ok) throw fail("upstream", "returned invalid JSON", response.status);
-      }
-      if (!response.ok) {
-        const reason = json.error?.message ?? raw.slice(0, 200);
-        const kind = classifyHttpStatus(response.status);
-        // A best-effort schema miss also comes back as 400; treat it as bad output, not a bad request.
-        const schemaMiss = kind === "bad_request" && /schema|json_validate/i.test(`${reason} ${json.error?.code ?? ""}`);
-        throw fail(
-          schemaMiss ? "invalid_output" : kind,
-          `HTTP ${response.status}${reason ? `: ${reason}` : ""}`,
-          response.status,
-          retryAfterHeader(response.headers.get("retry-after")),
-        );
-      }
 
       const choice = json.choices?.[0];
       if (choice?.finish_reason === "length") throw fail("truncated", "hit max_completion_tokens before finishing the JSON");
