@@ -6,6 +6,7 @@ import { useRef, type ReactNode } from "react";
 import type { FeaturedCover, FeaturedRun } from "@/lib/agent/featured";
 import { STEP_LABELS, tmdbSize } from "@/lib/agent/options";
 import { ShootBaseBlock } from "./base-map";
+import { useLetterbox } from "./letterbox";
 import { darkOf } from "./color";
 import { evidenceTone, primaryButton, rankMark, secondaryButton, slip } from "./ui";
 import { briefLine, splitTitles, type FormState } from "./form";
@@ -41,14 +42,16 @@ function useMorphLink(slug: string) {
 function HeroCover({ cover, fontId, className = "" }: { cover: FeaturedCover; fontId: string; className?: string }) {
   const proof = cover.evidence;
   const [still, onNavigate] = useMorphLink(cover.slug);
+  const letterbox = useLetterbox();
   return (
     <div className={`relative ${className}`}>
       <Link
         href={`/t/${cover.slug}`}
         prefetch
         onNavigate={onNavigate}
+        onAnimationEnd={letterbox.onAnimationEnd}
         aria-label={`${cover.title}: open this finished treatment`}
-        className="letterbox-open surface-dark relative isolate flex aspect-[2.39/1] flex-col justify-between gap-2 overflow-hidden rounded-[2rem] p-4 [--hero-title:2.1rem] sm:aspect-auto sm:min-h-[27rem] sm:gap-8 sm:p-8 sm:[--hero-title:clamp(2.6rem,4.6vw,4.5rem)]"
+        className={`${letterbox.className} surface-dark relative isolate flex aspect-[2.39/1] flex-col justify-between gap-2 overflow-hidden rounded-[2rem] p-4 [--hero-title:2.1rem] sm:aspect-auto sm:min-h-[27rem] sm:gap-8 sm:p-8 sm:[--hero-title:clamp(2.6rem,4.6vw,4.5rem)]`}
         style={{ background: darkOf(cover.palette) }}
       >
         <span ref={still} aria-hidden className="absolute inset-0 -z-10">
@@ -102,17 +105,14 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
       {/* On a phone the column opens up (`contents`) so the cover can sit between the headline and the paragraph: the
           first screen then holds a finished treatment and its receipt as well as the pitch. */}
       <div className="contents sm:flex sm:flex-col sm:gap-7">
-        <span className="order-1 -rotate-3 self-start justify-self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-ink">
-          for music-video and short-film directors
-        </span>
         <h1 className="order-2 type-poster text-[3.9rem] sm:text-[clamp(4.25rem,8vw,7.5rem)]">
           your voice,
           <br />
           their taste.
         </h1>
         <p className="order-4 max-w-[34ch] text-[1.15rem] leading-[1.45] text-dim sm:text-[1.3rem]">
-          Give it an artist, or the films your short is after, and a city. It reads what that audience actually loves on Qloo and writes a
-          treatment you can pitch, with receipts for every pick.
+          For music-video and short-film directors: give it an artist, or the films your short is after, and a city. It reads what that
+          audience actually loves on Qloo and writes a treatment you can pitch, with receipts for every pick.
         </p>
         <div className="order-5 flex flex-wrap gap-3">
           <Link href="/studio" className={primaryButton}>
@@ -214,7 +214,7 @@ export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; 
             <Link
               href="/studio"
               aria-label={`${t.nextUp.title}: start a treatment`}
-              className="press flex w-full flex-col overflow-hidden rounded-[26px] bg-frame transition-transform duration-200 [--press:0.98] [outline:2px_dashed_var(--accent)] [outline-offset:-10px] hover:-translate-y-1"
+              className="press flex w-full flex-col overflow-hidden rounded-[26px] bg-frame transition-transform duration-200 [--press:0.98] [outline:2px_dashed_var(--edge)] [outline-offset:-10px] hover:-translate-y-1"
             >
               <BlankPosterBody label={t.nextUp.label} title={t.nextUp.title} line="Your artist or film, your city" />
             </Link>
@@ -231,7 +231,7 @@ function BlankPosterBody({ label, title, titleClass = "", line }: { label: strin
   return (
     <>
       <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
-        <span className="font-mono text-[12px] text-dim">{label}</span>
+        <span className="text-[13px] font-semibold text-dim">{label}</span>
         <span className="flex flex-col gap-3">
           <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
             {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
@@ -259,7 +259,7 @@ export function YourPoster({ form }: { form: FormState }) {
   return (
     <div
       aria-hidden
-      className="surface-dark flex flex-col overflow-hidden rounded-[26px] bg-frame [outline:2px_dashed_var(--accent)] [outline-offset:-10px]"
+      className="surface-dark flex flex-col overflow-hidden rounded-[26px] bg-frame [outline:2px_dashed_var(--edge)] [outline-offset:-10px]"
     >
       <BlankPosterBody
         label={t.yourPoster}

@@ -162,7 +162,6 @@ export function SavedMissing() {
   const account = useAccount();
   return (
     <>
-      <span className="-rotate-3 self-start rounded-xl bg-accent px-3.5 py-2 text-[15px] font-bold text-ink">404</span>
       <h1 className="type-poster max-w-[14ch] text-[clamp(3rem,7vw,6rem)]">nothing to show here</h1>
       <p className="max-w-[46ch] text-[1.2rem] leading-[1.45] text-dim">
         This treatment is private, deleted, or its link is wrong.{account.state === "out" && " If it's yours, sign in to open it."}

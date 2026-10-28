@@ -55,3 +55,14 @@ export function listWithYears(items: readonly { name: string; year?: number | nu
 export function withYear(name: string, year?: number | null): string {
   return year ? `${name} (${year})` : name;
 }
+
+/**
+ * A note shown after its label, without the label's word when the note opens with it too: a film's borrow note under
+ * "Borrow" sometimes begins "Borrow the slow push-ins…", which read "Borrow Borrow the slow push-ins…". The rest keeps
+ * its case, so it reads on from the label.
+ */
+export function afterLabel(label: string, note: string): string {
+  const word = label.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rest = note.replace(new RegExp(`^${word}(?:ing)?\\b[\\s:,.-]*`, "i"), "");
+  return rest || note;
+}

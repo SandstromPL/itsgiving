@@ -39,13 +39,13 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
   const writer = treatment?.writtenBy;
   const mockedSteps = treatment?.llm.filter((t) => t.producedBy.mock && t.step !== "write").map((t) => t.step) ?? [];
   return (
-    <div className="flex flex-wrap items-center gap-2 text-[13px]">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
       {qloo === "mock" ? (
         <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>
       ) : (
         // Below laptop width the header keeps to its rows (the switches would drop under the logo at a tablet's 768 px);
         // only the mock warnings must show there.
-        <span className="hidden items-center gap-2 rounded-full border border-foreground px-3 py-1.5 whitespace-nowrap lg:inline-flex">
+        <span className="hidden items-center gap-2 whitespace-nowrap lg:inline-flex">
           <span aria-hidden className="size-2 rounded-full bg-[#1f8a4c]" />
           Live Qloo data
         </span>
@@ -55,7 +55,7 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
           <Tape title="A deterministic template wrote this treatment, not a language model.">Mock LLM</Tape>
         ) : (
           // Phones keep the header short; the run log and the credits name the model too.
-          <span className="hidden rounded-full border border-line bg-card px-3 py-1.5 text-dim lg:inline">
+          <span className="hidden text-dim lg:inline">
             Written by <span className="font-semibold text-foreground">{writer.model}</span>
             {writer.reasoning && `, ${thinkingName(writer.reasoning)}`}
           </span>
@@ -201,15 +201,18 @@ export function Why({
   const evidence = paperEvidence(mock);
   return (
     <>
+      {/* The slip is the target: the button's hit area is stretched over it, so the press shows on the slip. The button
+          itself mustn't scale (--press: none): a scaled button would hold that hit area inside its own small box, and a
+          press begun on the slip would end outside the button and never open the window. */}
       <Receipt
         qloo={qloo}
         mock={mock}
-        className={`group relative hover:border-solid has-focus-visible:outline-2 has-focus-visible:outline-offset-3 has-focus-visible:outline-foreground ${className}`}
+        className={`group relative transition-[scale] duration-150 hover:border-solid has-focus-visible:outline-2 has-focus-visible:outline-offset-3 has-focus-visible:outline-foreground motion-safe:has-[button:active]:scale-[0.98] ${className}`}
       >
         <button
           type="button"
           popoverTarget={id}
-          className="mt-1 cursor-pointer font-semibold underline decoration-1 underline-offset-[3px] group-hover:decoration-2 after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none print:hidden"
+          className="mt-1 cursor-pointer font-semibold underline decoration-1 underline-offset-[3px] [--press:none] group-hover:decoration-2 after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:outline-none print:hidden"
         >
           {label}
           <span className="sr-only">: {name}</span>

@@ -554,7 +554,7 @@ export function ShootBaseBlock({
         {pinned && <div aria-hidden className={PINNED.bg} />}
         <div className={`flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1 ${pin.head}`}>
           <div>
-            <h4 className="text-[14px] font-semibold text-dim">Shoot base</h4>
+            <p className="text-[14px] font-semibold text-dim">Shoot base</p>
             <p className="type-poster mt-1.5 text-[clamp(2rem,3.2vw,2.75rem)]">{chosen.name}</p>
           </div>
           <p className="text-[14px] leading-6">
@@ -583,7 +583,7 @@ export function ShootBaseBlock({
         <p className="text-sm text-dim">The heatmap itself didn&apos;t come back with this treatment.</p>
       )}
       <div>
-        <h4 className="text-[14px] font-semibold text-dim">Shoot base</h4>
+        <p className="text-[14px] font-semibold text-dim">Shoot base</p>
         <p className="type-poster mt-2 text-[clamp(2.4rem,4vw,3.25rem)]">{chosen.name}</p>
         {chosen.district && <p className="mt-2 text-[15px] text-dim">{chosen.district}</p>}
         <p className="mt-4 text-[15px] leading-6">
@@ -597,7 +597,7 @@ export function ShootBaseBlock({
         {chosen.near.length > 0 && <p className="mt-3 text-xs leading-5 text-dim">Around it: {chosen.near.join(", ")}.</p>}
         {others.length > 0 && (
           <div className="mt-6">
-            <h5 className="text-[13px] font-medium text-dim">Other strong areas</h5>
+            <p className="text-[13px] font-medium text-dim">Other strong areas</p>
             <ul className="mt-2 divide-y divide-line border-y border-line">
               {others.map((a) => (
                 <li key={a.ref} className="flex items-baseline justify-between gap-3 py-2 text-sm">

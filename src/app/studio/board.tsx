@@ -21,7 +21,7 @@ import { QlooTags, Still, Tape, Why, modelName } from "./parts";
 import { type CoverStill } from "./title-card";
 import { suggestTitleFont } from "./title-fonts";
 import { evidenceTone, outlineButton, paperEvidence } from "./ui";
-import { listWithYears } from "@/lib/text";
+import { afterLabel, listWithYears } from "@/lib/text";
 import { Cover, PaletteSwatches } from "./cover";
 import { SectionBar } from "./section-bar";
 import { FilmEdge, Interval, dateStamp } from "./board-cut";
@@ -380,7 +380,7 @@ export function Board({
                     <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
                     <p className={prose}>
                       <span className="font-sans text-[13px] font-semibold text-faint">Borrow </span>
-                      {r.notes.borrow}
+                      {afterLabel("Borrow", r.notes.borrow)}
                     </p>
                   </div>
                   <Why

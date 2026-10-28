@@ -14,7 +14,7 @@ const ROLE: Record<Role, string> = {
 };
 
 const optionCard =
-  "group flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-card p-2.5 hover:border-edge has-checked:border-foreground has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
+  "press group flex cursor-pointer items-center gap-3 rounded-2xl border-2 border-line bg-card p-2.5 hover:border-edge has-checked:border-foreground has-checked:bg-field has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
 
 /**
  * Asks which entity a name means instead of guessing; only Qloo's own candidates can be picked. When none has the name

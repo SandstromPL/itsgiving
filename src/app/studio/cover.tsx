@@ -5,6 +5,7 @@ import { BUDGETS, FORMATS, joinNames, treatmentSubject, treatmentWho } from "@/l
 import type { Treatment } from "@/lib/agent/types";
 import { useCopied } from "./clipboard";
 import { EraLayer } from "./era-layer";
+import { useLetterbox } from "./letterbox";
 import { landCover } from "./morph";
 import { darkOf } from "./color";
 import { Still, Tape } from "./parts";
@@ -46,13 +47,16 @@ export function Cover({
   useLayoutEffect(() => {
     if (morph) landCover(morph, stillLayer.current?.parentElement ?? null, stillLayer.current);
   }, [morph]);
+  const take = `${t.id}-${t.createdAt}`;
+  const letterbox = useLetterbox(take);
   const who = treatmentWho(t);
   const subject = treatmentSubject(t);
   return (
     <header
       ref={ref}
-      key={`${t.id}-${t.createdAt}`}
-      className="letterbox-open surface-dark relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10 print:min-h-[225mm]"
+      key={take}
+      onAnimationEnd={letterbox.onAnimationEnd}
+      className={`${letterbox.className} surface-dark relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10 print:min-h-[225mm]`}
       style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
     >
       {/* A reference film's still, never its poster (or a mock placeholder): their own lettering would fight the title. */}
@@ -86,7 +90,7 @@ export function Cover({
           era={era}
         />
       </div>
-      <EraLayer id={era.id} title={t.title} />
+      <EraLayer id={era.id} title={t.title} play={era.moment} />
       <div
         data-morph="words"
         className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]"

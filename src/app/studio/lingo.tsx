@@ -156,7 +156,7 @@ export function UncSwitch() {
         className={`relative h-7 w-[46px] shrink-0 rounded-full border-2 border-foreground transition-colors duration-200 ease-in-out ${unc ? "bg-foreground" : "bg-card"}`}
       >
         <span
-          className={`absolute top-[3px] left-[3px] size-[18px] rounded-full transition-[translate,background-color] duration-200 ease-in-out ${unc ? "translate-x-[18px] bg-accent" : "bg-foreground"}`}
+          className={`absolute top-[3px] left-[3px] size-[18px] rounded-full transition-[translate,background-color] duration-200 ease-in-out ${unc ? "translate-x-[18px] bg-background" : "bg-foreground"}`}
         />
       </span>
       {/* "unc" alone below laptop width, so the account button fits beside it: in the first row on phones, in the one

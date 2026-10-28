@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useRef } from "react";
 import { tmdbSize } from "@/lib/agent/options";
 import { ERAS, ERA_LINES, eraName, type EraId, type EraSuggestion } from "./eras";
 import { useLingo } from "./lingo";
@@ -24,7 +24,10 @@ export interface EraPick {
   none?: string;
   /** The subgenres came from the synthetic mock, so the receipt is pink, never Qloo's. */
   mock: boolean;
-  onPick: (id: EraId | null) => void;
+  /** `moment`: whether the era's moment plays, only for a pick made with a pointer (arrowing through is browsing). */
+  onPick: (id: EraId | null, moment: boolean) => void;
+  /** Whether the latest pick plays its moment. */
+  moment: boolean;
 }
 
 const check = <CheckIcon size={14} />;
@@ -59,8 +62,15 @@ export function TitleCardPicker({
   const label = (f: TitleFont) => (unc ? f.plain : f.name);
   const eraLines = unc ? ERA_LINES.unc : ERA_LINES.genz;
   const eraReceipt = slip(era.mock);
+  // Arrow keys move through the eras one change at a time; only a pick made with a pointer plays the era's moment. A
+  // key press clears a press that changed nothing (on the era already picked).
+  const pointer = useRef(false);
+  const pickEra = (next: EraId | null) => {
+    era.onPick(next, pointer.current);
+    pointer.current = false;
+  };
   const eraOption =
-    "flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 border-[#e5e0d5] bg-white px-3.5 py-2 text-ink hover:border-edge has-checked:border-ink has-checked:bg-field has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink";
+    "press flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border-2 border-[#e5e0d5] bg-white px-3.5 py-2 text-ink hover:border-edge has-checked:border-ink has-checked:bg-field has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink";
   const picked = <span className="ml-auto grid size-6 shrink-0 place-items-center rounded-full bg-ink text-white">{check}</span>;
   return (
     <>
@@ -96,7 +106,7 @@ export function TitleCardPicker({
         </div>
         {/* An era is a film tradition's look over the cover. Picking one also sets its face, which stays the
               director's to change below. The one the audience points to carries Qloo's receipt. */}
-        <fieldset className="mt-5 flex flex-col gap-2 px-5">
+        <fieldset className="mt-5 flex flex-col gap-2 px-5" onKeyDown={() => (pointer.current = false)}>
           <legend className="mb-2.5 text-[14px] font-semibold text-dim">{eraLines.legend}</legend>
           {era.suggestion ? (
             <div className={`mb-1 rounded-xl border border-dashed px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] ${eraReceipt}`}>
@@ -113,13 +123,13 @@ export function TitleCardPicker({
           ) : (
             era.none && <p className="mb-1 text-[13px] leading-5 text-dim">{era.none}</p>
           )}
-          <label className={eraOption}>
+          <label className={eraOption} onPointerDown={() => (pointer.current = true)}>
             <input
               type="radio"
               name={`${id}-era`}
               value=""
               checked={era.id === null}
-              onChange={() => era.onPick(null)}
+              onChange={() => pickEra(null)}
               autoFocus={era.id === null}
               className="sr-only"
             />
@@ -130,13 +140,13 @@ export function TitleCardPicker({
             {era.id === null && picked}
           </label>
           {ERAS.map((e) => (
-            <label key={e.id} className={eraOption}>
+            <label key={e.id} className={eraOption} onPointerDown={() => (pointer.current = true)}>
               <input
                 type="radio"
                 name={`${id}-era`}
                 value={e.id}
                 checked={era.id === e.id}
-                onChange={() => era.onPick(e.id)}
+                onChange={() => pickEra(e.id)}
                 autoFocus={era.id === e.id}
                 className="sr-only"
               />
@@ -201,7 +211,7 @@ export function TitleCardPicker({
           {TITLE_FONTS.map((f) => (
             <label
               key={f.id}
-              className="flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-2xl border-2 border-[#e5e0d5] bg-white px-3.5 py-2.5 text-ink hover:border-edge has-checked:border-ink has-checked:bg-accent has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink"
+              className="press flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-2xl border-2 border-[#e5e0d5] bg-white px-3.5 py-2.5 text-ink hover:border-edge has-checked:border-ink has-checked:bg-field has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ink"
             >
               <input
                 type="radio"

@@ -34,7 +34,7 @@ const hint = "text-[13px] leading-5 text-faint";
 /** A two-way switch: the chosen side is a solid pill inside a soft track. */
 const track = "grid grid-cols-2 gap-1 rounded-full bg-track p-1";
 const option =
-  "cursor-pointer rounded-full px-3 py-2.5 text-center text-[15px] text-dim hover:text-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
+  "press cursor-pointer rounded-full px-3 py-2.5 text-center text-[15px] text-dim hover:text-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
 const chip = "flex items-center gap-0.5 rounded-full border border-line bg-card py-0.5 pr-0.5 pl-3 text-[13px]";
 
 /** A labelled field: the label, then whatever the field holds (its control, a hint, its message). */
@@ -440,7 +440,9 @@ export function BriefForm({
             </span>
           </span>
           <span className="flex items-center gap-2.5">
-            {extras > 0 && <span className="rounded-full bg-accent px-2.5 py-1 text-[12px] font-bold text-ink">{extras} added</span>}
+            {extras > 0 && (
+              <span className="rounded-full bg-foreground px-2.5 py-1 text-[12px] font-bold text-background">{extras} added</span>
+            )}
             <svg
               aria-hidden
               width="18"

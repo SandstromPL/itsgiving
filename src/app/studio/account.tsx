@@ -206,7 +206,7 @@ export function AccountButton({ className = "" }: { className?: string }) {
         popoverTarget={`${id}-menu`}
         aria-label={`Account: ${account.name}`}
         title={account.name}
-        className={`grid size-11 place-items-center rounded-full border border-foreground bg-accent text-[17px] font-extrabold text-ink sm:size-12 ${className}`}
+        className={`grid size-11 place-items-center rounded-full border border-foreground bg-foreground text-[17px] font-extrabold text-background sm:size-12 ${className}`}
       >
         {initial}
       </button>

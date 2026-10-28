@@ -97,6 +97,8 @@ export function StreetTiles({ frame }: { frame: MapFrame }) {
           loading="lazy"
           decoding="async"
           draggable={false}
+          // A tile that doesn't come (offline, or refused) leaves the dark frame, not the browser's broken-image mark.
+          onError={(event) => (event.currentTarget.style.visibility = "hidden")}
           className="absolute max-w-none select-none"
           style={{
             left: at(x * TILE - world.left, world.width),

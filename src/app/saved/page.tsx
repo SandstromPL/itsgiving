@@ -108,7 +108,7 @@ function SavedGrid({ items }: { items: SavedSummary[] }) {
                 <img src={tmdbSize(item.cover, "w780")} alt="" loading="lazy" className="size-full object-cover opacity-80" />
               )}
               {item.shared && (
-                <span className="absolute top-3 left-3 rounded-full bg-accent px-2.5 py-1 text-[13px] font-bold text-ink">Shared</span>
+                <span className="absolute top-3 left-3 rounded-full bg-ink px-2.5 py-1 text-[13px] font-bold text-white">Shared</span>
               )}
             </span>
             <span className="flex flex-1 flex-col gap-1.5 p-5">

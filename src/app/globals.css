@@ -152,10 +152,11 @@
 }
 
 /* Bricolage at full weight with tight tracking carries the hierarchy; headlines are lowercase by choice, not by CSS. */
-/* Headings wrap in even lines: no last line of one word ("producers", "places"). */
+/* Headings wrap in even lines: no last line of one word ("producers", "places"). Tighter than -0.04em, letters touch
+   at the hero's size ("ir" in "their"). */
 @utility type-poster {
   font-weight: 800;
-  letter-spacing: -0.055em;
+  letter-spacing: -0.04em;
   line-height: 0.88;
   text-wrap: balance;
 }
@@ -197,6 +198,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-bricolage), system-ui, sans-serif;
+}
+
+/* Selected text in the site's inks, not the browser's blue: paper on ink, and the other way round on a dark frame. */
+::selection {
+  background: var(--foreground);
+  color: var(--background);
 }
 
 /* The focus ring is the surface's own ink, so it shows on the room and on a dark frame alike. */
@@ -400,13 +407,15 @@ body {
 }
 
 /* The one orchestrated moment on each page: a cover's letterbox opens, the homepage's on load, a board's when it
-   lands. Reduced motion skips it (below). */
+   lands, once (letterbox.ts). Reduced motion skips it (below). The insets are square, as a letterbox's bars are: a
+   rounded inset keeps the animation off the compositor, on the main thread while the page hydrates. The cover's own
+   rounded corners show as it opens. */
 @keyframes letterbox-open {
   from {
-    clip-path: inset(50% 0 50% 0 round 2rem);
+    clip-path: inset(50% 0 50% 0);
   }
   to {
-    clip-path: inset(0 0 0 0 round 2rem);
+    clip-path: inset(0 0 0 0);
   }
 }
 .letterbox-open {
@@ -421,7 +430,7 @@ body {
   initial-value: 0deg;
 }
 .leader {
-  background: conic-gradient(var(--accent) 0 var(--sweep), #3a3936 var(--sweep) 360deg);
+  background: conic-gradient(var(--foreground) 0 var(--sweep), #3a3936 var(--sweep) 360deg);
   transition: --sweep 600ms var(--ease-out);
 }
 
@@ -459,14 +468,33 @@ body {
 }
 
 /* Reduced motion means gentler, not none: nothing moves, grows or plays, but fades and colour changes still ease, so a
-   window or a toast doesn't flash into place. */
+   window or a toast doesn't flash into place. A window keeps `display` and `overlay` on its transition, so it stays up
+   while it fades out, and the phone's sheet fades where it would rise. */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
   ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-property: opacity, color, background-color, border-color, outline-color, text-decoration-color, fill, stroke !important;
+    transition-property:
+      opacity, color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, display, overlay !important;
+  }
+  [popover]:is(.why, .window, .dialog, .menu) {
+    transition-behavior: allow-discrete;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 40rem) {
+  [popover].window {
+    translate: 0 0;
+    opacity: 0;
+  }
+  [popover].window:popover-open {
+    opacity: 1;
+  }
+  @starting-style {
+    [popover].window:popover-open {
+      opacity: 0;
+    }
   }
 }
 

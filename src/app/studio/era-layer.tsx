@@ -19,14 +19,17 @@ export function useEra(
   setFace: (id: string) => void,
 ): { pick: EraPick; wear: { "data-era"?: EraId; style?: CSSProperties } } {
   const [id, setId] = useState<EraId | null>(null);
+  const [moment, setMoment] = useState(false);
   return {
     pick: {
       id,
       suggestion: suggestEra(t),
       none: noEraLine(t),
       mock: t.mock.qloo,
-      onPick: (next) => {
+      moment,
+      onPick: (next, play) => {
         setId(next);
+        setMoment(play);
         if (next) setFace(eraOf(next).font);
       },
     },
@@ -39,15 +42,16 @@ export function useEra(
  * the era is picked, its moment. It sits in the cover's column between the top row and the words, so the stickers and
  * the credit never cover the title; the texture and the moment fill the whole frame.
  */
-export function EraLayer({ id, title }: { id: EraId | null; title: string }) {
+export function EraLayer({ id, title, play }: { id: EraId | null; title: string; play: boolean }) {
   const { unc } = useLingo();
   const era: Era | null = id ? eraOf(id) : null;
-  // The moment answers a pick: a board that opens in an era, or comes back into view, doesn't play it again.
+  // The moment answers a pick made with a pointer (`play`): a board that opens in an era, comes back into view, or
+  // is arrowed through era by era in the window doesn't play it.
   const [shown, setShown] = useState(id);
   const [moment, setMoment] = useState<EraId | null>(null);
   if (id !== shown) {
     setShown(id);
-    setMoment(id);
+    setMoment(play ? id : null);
   }
   useEffect(() => {
     if (!moment) return;

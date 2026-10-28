@@ -19,7 +19,7 @@ export const pillButton =
   "press flex min-h-11 items-center gap-2 rounded-full border border-foreground py-2 pr-5 pl-4 text-[15px] font-bold hover:bg-card";
 
 /** The round back arrow before a treatment's title. */
-export const backButton = "-ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card";
+export const backButton = "press -ml-1.5 grid size-10 shrink-0 place-items-center rounded-full hover:bg-card";
 
 /** Stop, beside the brief while a treatment builds. */
 export const stopButton = "ml-auto min-h-10 rounded-full border border-foreground px-4 text-sm font-semibold";

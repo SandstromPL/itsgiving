@@ -25,7 +25,7 @@ export function shareLinks(url: string, title: string): { whatsapp: string; emai
   };
 }
 
-const outline = "rounded-full border border-ink px-4 py-2.5 text-[15px] font-semibold hover:bg-ink hover:text-white";
+const outline = "press rounded-full border border-ink px-4 py-2.5 text-[15px] font-semibold hover:bg-ink hover:text-white";
 
 /** The QR code as an SVG path in module units, with a quiet zone of four modules around it. */
 interface Qr {
@@ -94,7 +94,7 @@ export function ShareWindow({ id, title, path, ref }: { id: string; title: strin
               readOnly
               value={url ?? ""}
               onFocus={(event) => event.currentTarget.select()}
-              className="min-w-0 flex-1 rounded-xl border border-[#c9c1af] bg-[#fffdf6] px-3 py-2.5 font-mono text-[13px] text-slip-ink"
+              className="min-w-0 flex-1 rounded-xl border border-[#c9c1af] bg-[#fffdf6] px-3 py-2.5 font-mono text-[16px] text-slip-ink sm:text-[13px]"
             />
             <button
               type="button"
