@@ -118,3 +118,107 @@ describe("compactEntity names", () => {
     expect(compactEntity({ name: "Cafe 1,000  Steps", entity_id: "2" }).name).toBe("Cafe 1,000 Steps");
   });
 });
+
+describe("compactEntity details a director can use", () => {
+  it("keeps a place's hours, contact, setting, best times of day and view, and nothing about its customers", () => {
+    const compact = compactEntity({
+      name: "Thalassa",
+      entity_id: "P2",
+      subtype: "urn:entity:place",
+      properties: {
+        hours: {
+          monday: [{ opens: null, closed: true, closes: null }],
+          tuesday: [{ opens: "T12:00:00", closed: false, closes: "T01:30:00" }],
+          friday: [
+            { opens: "T12:00:00", closed: false, closes: "T15:30:00" },
+            { opens: "T19:00:00", closed: false, closes: "T23:30:00" },
+          ],
+        },
+        phone: "+91 22 2600 0000",
+        website: "https://thalassa.example/",
+        physical_setting_description: "A whitewashed terrace above Carter Road, open to the sea breeze.",
+        customer_demographics_description: "Mostly couples in their thirties.",
+      },
+      tags: [
+        { id: "urn:tag:time_of_day_fit:qloo:evening", name: "Evening", type: "urn:tag:time_of_day_fit:qloo" },
+        { id: "urn:tag:view:qloo:waterfront", name: "Waterfront view", type: "urn:tag:view:qloo" },
+        { id: "urn:tag:customer_identity:qloo:couples", name: "Couples", type: "urn:tag:customer_identity:qloo" },
+      ],
+    });
+    expect(compact.place).toMatchObject({
+      hours: { monday: "closed", tuesday: "12:00–01:30", friday: "12:00–15:30, 19:00–23:30" },
+      phone: "+91 22 2600 0000",
+      website: "https://thalassa.example/",
+      setting: "A whitewashed terrace above Carter Road, open to the sea breeze.",
+      fits: ["Evening"],
+      views: ["Waterfront view"],
+    });
+    expect(compact.place?.hours).not.toHaveProperty("wednesday");
+    expect(JSON.stringify(compact)).not.toContain("thirties");
+  });
+
+  it("links only to http and https, and keeps only a phone number that dials", () => {
+    const place = (website: unknown, phone: unknown) =>
+      compactEntity({ name: "X", entity_id: "P3", subtype: "urn:entity:place", properties: { website, phone } }).place;
+    expect(place("javascript:alert(1)", "call us")).toMatchObject({ website: undefined, phone: undefined });
+    expect(place("ftp://files.example", "+12")).toMatchObject({ website: undefined, phone: undefined });
+    expect(place("not a url", null)).toMatchObject({ website: undefined, phone: undefined });
+  });
+
+  it("keeps a brand's style sentence, traits and price range, but not who it targets", () => {
+    const compact = compactEntity({
+      name: "Suta",
+      entity_id: "B1",
+      subtype: "urn:entity:brand",
+      properties: {
+        style_description: "Traditional Indian silhouettes with clean, modern lines.",
+        aesthetic_properties: ["Earthy Tones", "Textured Fabrics", null, "Hand-Finished Details"],
+        price_range_usd_min: 20,
+        price_range_usd_max: 150,
+        target_income_level: ["Middle Income"],
+        audience_identity: ["Urban Women"],
+      },
+    });
+    expect(compact.brand).toEqual({
+      style: "Traditional Indian silhouettes with clean, modern lines.",
+      traits: ["Earthy Tones", "Textured Fabrics", "Hand-Finished Details"],
+      price: { min: 20, max: 150 },
+    });
+    expect(JSON.stringify(compact)).not.toMatch(/Income|Urban Women/);
+    expect(compactEntity({ name: "Plain", entity_id: "B2", subtype: "urn:entity:brand", properties: {} }).brand).toBeUndefined();
+  });
+
+  it("keeps an artist's notable songs, genres and lyrical themes, without themes that say who people are", () => {
+    const compact = compactEntity({
+      name: "Phoebe Bridgers",
+      entity_id: "A1",
+      subtype: "urn:entity:artist",
+      properties: {
+        notable_songs: ["Motion Sickness", "Kyoto", "Garden Song", "I Know The End", "Scott Street"],
+        primary_genres: ["Indie Rock", "Indie Folk"],
+        lyrical_themes: ["Heartbreak", "Mental Health", "Memory", "Nostalgia"],
+      },
+    });
+    expect(compact.artist).toEqual({
+      songs: ["Motion Sickness", "Kyoto", "Garden Song", "I Know The End"],
+      genres: ["Indie Rock", "Indie Folk"],
+      themes: ["Heartbreak", "Memory", "Nostalgia"],
+    });
+  });
+
+  it("keeps nothing personal about a person", () => {
+    const compact = compactEntity({
+      name: "Tripti Dimri",
+      entity_id: "H1",
+      subtype: "urn:entity:person",
+      properties: {
+        date_of_birth: "1994-02-23",
+        gender: ["female"],
+        citizenship: ["India"],
+        image: { url: "https://images.qloo.com/i/h1.jpg" },
+      },
+    });
+    expect(compact).toMatchObject({ kind: "person", image: "https://images.qloo.com/i/h1.jpg" });
+    expect(JSON.stringify(compact)).not.toMatch(/1994|female|citizenship/);
+  });
+});
