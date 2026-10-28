@@ -138,25 +138,25 @@ export function writeSchema(ctx: WriteContext): z.ZodType<Draft> {
       .array(
         z.strictObject({
           name: text.describe("Invented, fitting the city and the story."),
-          who: text.describe("One sentence: their age range, what they do, where they stand in the story."),
-          wants: text.describe("One sentence."),
-          hides: text.describe("One sentence: what they keep back, which an actor can play."),
-          presence: text.describe("How they move and speak: what the part asks of an actor."),
-          look: text.describe("Garments, fabrics, colours."),
-          arc: text.describe("Where we meet them and where we leave them."),
+          who: text.describe("Under 20 words: their age range, what they do, where they stand in the story."),
+          wants: text.describe("Under 12 words."),
+          hides: text.describe("Under 12 words: what they keep back, which an actor can play."),
+          presence: text.describe("Under 16 words: how they move and speak, what the part asks of an actor."),
+          look: text.describe("Under 12 words: garments, fabrics, colours."),
+          arc: text.describe("Under 16 words: where we meet them and where we leave them."),
           beats: z.array(z.number()).describe("The beats they're in, by number."),
           from:
             characters.length > 0
               ? refEnum(characters).nullable().describe("The listed character (C ref) they're drawn from, or null.")
               : z.null().describe("Null: no characters are listed."),
-          take: z.string().describe("One sentence: what to take from that character, not a copy. Empty when from is null."),
+          take: z.string().describe("Under 12 words: what to take from that character, not a copy. Empty when from is null."),
           face:
             casting.length > 0
               ? refEnum(casting).nullable().describe("An actor (P ref) as a reference for the part, a different one each, or null.")
               : z.null().describe("Null: no actors are listed."),
         }),
       )
-      .describe("2-4 characters."),
+      .describe("2-3 characters."),
     ...(music.length > 0
       ? {
           // No minimum, like casting: a draft without music keeps the rest rather than costing a repair.
@@ -325,13 +325,14 @@ export function writePrompt(ctx: WriteContext): string {
     );
   }
   parts.push(
-    `Characters: 2-4 people for this story${ctx.brief.format === "music_video" ? "; the artist plays themselves and isn't one of them, so sketch the people around them" : ""}.`,
+    `Characters: 2-3 people for this story${ctx.brief.format === "music_video" ? "; the artist plays themselves and isn't one of them, so sketch the people around them" : ""}.`,
     `Give each an invented name that fits ${ctx.brief.city} and the story, who they are (age range, what they do, where they stand in the story),`,
     "what they want, what they hide, how they move and speak, their look, where we meet and leave them, and the beats they're in by number.",
+    "Keep every line short, as in a casting breakdown: the sketch is read at a glance.",
   );
   if (ctx.characters.length > 0) {
     parts.push(
-      "Draw each from one of the characters listed under the titles (C refs), and say in one sentence what to take, not a copy; or set from to null.",
+      "Draw each from one of the characters listed under the titles (C refs), and say in a few words what to take, not a copy; or set from to null.",
     );
   }
   if (ctx.casting.length > 0) {

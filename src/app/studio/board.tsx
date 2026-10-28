@@ -172,23 +172,11 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
                     alt={`Photo of ${c.face.entity.name}`}
                     className="aspect-[3/2] w-full object-[50%_22%] sm:aspect-[4/5] sm:object-center"
                   />
-                  <div className="flex flex-1 flex-col gap-3 p-4">
-                    <div className="flex flex-col gap-1">
-                      <p className="text-[15px] leading-5 font-semibold">{c.face.entity.name}</p>
-                      {c.face.known.length > 0 && (
-                        <p className="text-[13px] leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
-                      )}
-                    </div>
-                    <Why
-                      label="why this face"
-                      name={c.face.entity.name}
-                      qloo={c.face.qloo}
-                      of="actors"
-                      read={[{ term: "The part", text: c.presence }]}
-                      writtenBy={t.writtenBy}
-                      mock={mock}
-                      className="mt-auto"
-                    />
+                  <div className="flex flex-col gap-1 p-4">
+                    <p className="text-[15px] leading-5 font-semibold">{c.face.entity.name}</p>
+                    {c.face.known.length > 0 && (
+                      <p className="text-[13px] leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -226,6 +214,18 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
                       </p>
                     )}
                   </div>
+                )}
+                {c.face && (
+                  <Why
+                    label="why this face"
+                    name={c.face.entity.name}
+                    qloo={c.face.qloo}
+                    of="actors"
+                    read={[{ term: "The part", text: c.presence }]}
+                    writtenBy={t.writtenBy}
+                    mock={mock}
+                    className="mt-auto max-w-sm"
+                  />
                 )}
               </div>
             </li>

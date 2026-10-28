@@ -275,8 +275,11 @@ async function replan(run: Run, planContext: PlanContext, plan: Plan, execution:
   return replanned;
 }
 
-/** The titles whose characters (TMDB's) the writer sees: the first films and series, so the prompt stays small. */
-const CHARACTER_TITLES = { films: 6, series: 2 };
+/**
+ * The titles whose characters (TMDB's) the writer sees, and how many of each: the first films and series, top-billed
+ * first. Every one is a choice the model weighs while it thinks, and its thinking is most of a write's time.
+ */
+const CHARACTER_TITLES = { films: 5, series: 1, each: 2 };
 
 /** The writer's draft of the treatment, from the final plan and what it found. */
 async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, execution: Execution, people: People): Promise<Written> {
@@ -294,7 +297,9 @@ async function writeDraft(run: Run, cast: Cast, audience: Audience, plan: Plan, 
   ];
   const looked = await run.tmdb.settled(titles, 1_500);
   const characters = titles.flatMap((title) =>
-    (looked.get(title.id)?.characters ?? []).map((c): TitleCharacter => ({ title, name: c.name, actor: c.actor })),
+    (looked.get(title.id)?.characters ?? [])
+      .slice(0, CHARACTER_TITLES.each)
+      .map((c): TitleCharacter => ({ title, name: c.name, actor: c.actor })),
   );
   const writeContext: WriteContext = {
     brief,
