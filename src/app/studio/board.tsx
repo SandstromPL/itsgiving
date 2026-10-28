@@ -13,6 +13,7 @@ import {
   siteName,
   tagLabel,
   tmdbSize,
+  withYear,
   withoutIdentity,
   type Nudge,
 } from "@/lib/agent/options";
@@ -24,7 +25,7 @@ import { useLingo } from "./lingo";
 import { QlooNote, QlooTags, Still, Tape, Why, modelName } from "./parts";
 import { type CoverStill } from "./title-card";
 import { suggestTitleFont } from "./title-fonts";
-import { evidenceTone, outlineButton, paperEvidence } from "./ui";
+import { evidenceTone, outlineButton, paperEvidence, rankMark } from "./ui";
 import { afterLabel, listWithYears } from "@/lib/text";
 import { Cover, PaletteSwatches } from "./cover";
 import { SectionBar } from "./section-bar";
@@ -653,6 +654,35 @@ export function Board({
                 <dt className="text-[15px] font-semibold">Shared by {whose} films and the audience</dt>
                 <dd>
                   <EvidenceChips tags={overlap} mock={mock} shared />
+                </dd>
+              </>
+            )}
+            {t.directorFit && t.directorFit.length > 0 && (
+              <>
+                <dt className="text-[15px] font-semibold">How the audience ranks {whose} films</dt>
+                <dd>
+                  <ol className="flex max-w-[34rem] flex-col gap-1.5">
+                    {t.directorFit.map(({ entity, qloo }) => (
+                      <li key={entity.id} className="flex items-baseline gap-3 text-[15px] leading-6">
+                        <span
+                          className={`min-w-6 rounded-md px-1.5 text-center font-mono text-[12px] font-semibold tabular-nums ${
+                            qloo.rank === 1 ? rankMark(mock) : "text-faint"
+                          }`}
+                        >
+                          {qloo.rank}
+                        </span>
+                        <span>
+                          {withYear(entity.name, entity.year)}
+                          {entity.kind === "tv_show" && <span className="text-faint"> (series)</span>}
+                        </span>
+                        {typeof qloo.affinity === "number" && (
+                          <span className={`ml-auto font-mono text-[13px] tabular-nums ${evidenceTone(mock)}`}>
+                            affinity {qloo.affinity.toFixed(3)}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
                 </dd>
               </>
             )}

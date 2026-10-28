@@ -107,6 +107,37 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     expect(finished.get("replan")).toBe("skipped");
   });
 
+  it("scores the director's own films for this audience, and tells the planner their order", async () => {
+    const { provider, seen } = scriptedProvider({});
+    const prompts: string[] = [];
+    const recording: LlmProvider = {
+      ...provider,
+      async complete(call) {
+        prompts.push(`${call.schemaName}: ${call.prompt}`);
+        return provider.complete(call);
+      },
+    };
+    const { outcome } = await run(
+      { artist: "Prateek Kuhad", city: "Mumbai", director_films: ["In the Mood for Love", "Donnie Darko", "Rockstar"] },
+      liveWith(recording),
+    );
+    const t = treatmentOf(outcome);
+    const fit = t.directorFit ?? [];
+    expect(fit.map((f) => f.entity.name).sort()).toEqual(t.director.map((d) => d.name).sort());
+    expect(fit.map((f) => f.qloo.rank)).toEqual([1, 2, 3]);
+    expect(fit.every((f) => f.qloo.tool === "score_for_audience" && f.qloo.of === 3)).toBe(true);
+    // Qloo ranks exactly the films it was given, in the overlap step.
+    const scoring = t.qloo.steps.overlap?.find((p) => p.query["filter.results.entities"]);
+    expect(scoring?.query["filter.results.entities"]?.split(",").sort()).toEqual(t.director.map((d) => d.id).sort());
+    const plan = prompts.find((p) => p.startsWith(`${seen[0]}:`)) ?? "";
+    expect(plan).toContain(`Of the director's films, this audience likes, best first: ${fit[0].entity.name}`);
+  });
+
+  it("leaves the scores out when there are no director films", async () => {
+    const t = treatmentOf((await run({ artist: "Prateek Kuhad", city: "Mumbai" })).outcome);
+    expect(t.directorFit).toBeUndefined();
+  });
+
   it("asks which title is meant, then continues once the user picks one of Qloo's candidates", async () => {
     const first = await run({ touchstones: ["Forgotten"], city: "New York" });
     expect(first.outcome.kind).toBe("needs_input");

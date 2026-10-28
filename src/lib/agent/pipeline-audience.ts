@@ -1,4 +1,4 @@
-import type { CompactTag } from "../qloo";
+import type { CompactEntity, CompactTag } from "../qloo";
 import type { HeatArea, HeatGrid } from "../tools/heatmap";
 import { normalizeName } from "../tools/shared";
 import type { RankedTag } from "../tools/taste";
@@ -29,6 +29,11 @@ export interface Audience {
   leans: string[];
   /** The traits the audience shares with the director's films. */
   overlap: CompactTag[];
+  /**
+   * The director's own films as this audience scores them, best first: one list per kind of title (films, then series),
+   * because Qloo's affinities compare only within a call. Empty without director films.
+   */
+  directorFit: CompactEntity[][];
   /** Where in the city the audience over-indexes, strongest first, each with the ref the planner picks it by. */
   areas: BaseArea[];
   heatMap?: HeatGrid;
@@ -41,7 +46,7 @@ export async function readAudience(run: Run, cast: Cast): Promise<Audience> {
   const endAudience = begin("audience", STEP_LABELS.audience);
   const endOverlap = director.length > 0 ? begin("overlap", STEP_LABELS.overlap) : undefined;
   const endHeatmap = begin("heatmap", STEP_LABELS.heatmap);
-  const [audience, shared, heat] = await Promise.all([
+  const [audience, shared, fit, heat] = await Promise.all([
     tool<AudienceRead>("audience", "read_audience", {
       entity_ids: subjectIds,
       take: 15,
@@ -54,6 +59,7 @@ export async function readAudience(run: Run, cast: Cast): Promise<Audience> {
           take: 10,
         })
       : undefined,
+    endOverlap ? scoreDirector(run, cast) : [],
     tool<{ areas: HeatArea[]; map?: HeatGrid }>("heatmap", "audience_heatmap", {
       signal_entity_ids: subjectIds,
       city: brief.city,
@@ -90,7 +96,25 @@ export async function readAudience(run: Run, cast: Cast): Promise<Audience> {
     });
   }
 
-  return { tasteTags, subgenres, leans, overlap, areas, heatMap, candidates: toneCandidates(overlap, tasteTags) };
+  return { tasteTags, subgenres, leans, overlap, directorFit: fit, areas, heatMap, candidates: toneCandidates(overlap, tasteTags) };
+}
+
+/** The director's films scored for this audience (score_for_audience), in the overlap step: one call per kind of title. */
+async function scoreDirector(run: Run, cast: Cast): Promise<CompactEntity[][]> {
+  const kinds = (["movie", "tv_show"] as const).filter((kind) => cast.director.some((d) => (d.kind ?? "movie") === kind));
+  const lists = await Promise.all(
+    kinds.map((kind) =>
+      run.tool<{ scored: CompactEntity[] }>("overlap", "score_for_audience", {
+        signal_entity_ids: cast.subjectIds,
+        entity_ids: cast.director
+          .filter((d) => (d.kind ?? "movie") === kind)
+          .map((d) => d.id)
+          .slice(0, 25),
+        kind,
+      }),
+    ),
+  );
+  return lists.map((result) => result.data?.scored ?? []).filter((list) => list.length > 0);
 }
 
 /** The tones the plan may choose from, as refs T1, T2…: up to six traits shared with the director's films, then the audience's. */

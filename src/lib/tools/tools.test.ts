@@ -235,6 +235,22 @@ describe("audience_heatmap", () => {
   });
 });
 
+describe("score_for_audience", () => {
+  it("ranks only the titles it is given, for the signal's audience", async () => {
+    const films = ["In the Mood for Love", "Donnie Darko", "Rockstar"].map((name) => mockEntityId(name));
+    const result = await runTool("score_for_audience", { signal_entity_ids: [mockEntityId("Prateek Kuhad")], entity_ids: films }, ctx);
+    expect(result.status).toBe("ok");
+    const { scored } = result.data as { scored: { id: string; affinity?: number | null }[] };
+    expect(scored.map((e) => e.id).sort()).toEqual([...films].sort());
+    expect(scored.every((e, i) => i === 0 || (e.affinity ?? 0) <= (scored[i - 1].affinity ?? 0))).toBe(true);
+    expect(result.provenance[0].query).toMatchObject({
+      "filter.type": "urn:entity:movie",
+      "filter.results.entities": films.join(","),
+      take: "3",
+    });
+  });
+});
+
 describe("reference_films", () => {
   it("returns different references for different artists", async () => {
     const run = async (artist: string) => {

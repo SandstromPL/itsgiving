@@ -174,6 +174,11 @@ export interface Treatment {
   /** Missing on treatments built before stand-ins (2026-10-26); treatmentWho() falls back to the subjects. */
   who?: TreatmentWho;
   director: CompactEntity[];
+  /**
+   * The director's own films as this audience scores them (score_for_audience), best first, films then series, each with
+   * its place in its list. Missing on treatments built before 2026-10-28, and without director films.
+   */
+  directorFit?: { entity: CompactEntity; qloo: QlooEvidence }[];
   /** Relaxations, skipped items and other caveats, in plain words. */
   notes: string[];
   llm: LlmTrace[];

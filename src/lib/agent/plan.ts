@@ -43,6 +43,8 @@ export interface PlanContext extends Who {
   leans: string[];
   /** Areas of the shoot city where the audience over-indexes, strongest first (Qloo heatmap). */
   areas?: BaseArea[];
+  /** The director's films as this audience scores them, best first, as "Title (Year)" (score_for_audience). */
+  directorFit?: string[];
   /** Set on the one re-plan: why the first plan's words found nothing. */
   feedback?: string;
 }
@@ -152,6 +154,8 @@ export function planPrompt(ctx: PlanContext): string {
   const audience = ctx.candidates.filter((c) => c.source === "audience");
   const parts = [describeBrief(ctx.brief, ctx), "", "QLOO EVIDENCE (aggregate taste)"];
   if (overlap.length > 0) parts.push("Shared by the director's taste and the audience:", ...overlap.map(tagLine));
+  if (ctx.directorFit?.length)
+    parts.push(`Of the director's films, this audience likes, best first: ${ctx.directorFit.slice(0, 8).join(", ")}`);
   if (audience.length > 0) parts.push("The audience over-indexes on:", ...audience.map(tagLine));
   if (ctx.candidates.length === 0) parts.push("No taste tags came back for this audience.");
   if (ctx.leans.length > 0) parts.push(`Audience skew: ${ctx.leans.join("; ")}`);

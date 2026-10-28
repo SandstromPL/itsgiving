@@ -73,6 +73,10 @@ export function assemble(input: AssembleInput): Treatment {
   const cited = new Set([...references, ...wardrobe, ...locations].map((p) => p.entity.id));
   const uncited = (items: CompactEntity[]) => items.filter((e) => !cited.has(e.id));
 
+  const directorFit = audience.directorFit.flatMap((list) =>
+    list.map((entity) => ({ entity, qloo: evidence(list, "score_for_audience", entity) })),
+  );
+
   const writtenBy = run.traces.find((t) => t.step === "write")?.producedBy ?? {
     provider: "mock",
     model: "itsgiving-template",
@@ -130,6 +134,7 @@ export function assemble(input: AssembleInput): Treatment {
     // Plain names for the board; the prompts carry the films' years.
     who: { artists: cast.who.artistNames, films: cast.touchstones.map((e) => e.name), standIns: cast.standIns.map((e) => e.name) },
     director: cast.director,
+    ...(directorFit.length > 0 ? { directorFit } : {}),
     notes: run.notes,
     llm: run.traces,
     writtenBy,

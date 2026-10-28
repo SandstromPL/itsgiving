@@ -4,7 +4,9 @@ import {
   INSIGHT_MODES,
   QlooError,
   TAG_TYPES,
+  compactEntity,
   compactTag,
+  entityList,
   entityUrn,
   tagList,
   type CompactTag,
@@ -12,7 +14,7 @@ import {
   type InsightsResponse,
 } from "../qloo";
 import { mockEntityId } from "../qloo/mock/catalog";
-import { withoutIdentity } from "../text";
+import { withYear, withoutIdentity } from "../text";
 import { SEARCHABLE_KINDS, TAG_KIND_VALUES, defineTool, entityIds, plural, take } from "./shared";
 
 /**
@@ -170,6 +172,46 @@ export const readAudience = defineTool({
         (audience[0] ? ` ${audience[0].leans.charAt(0).toUpperCase()}${audience[0].leans.slice(1)}.` : ""),
       data: { taste_tags: tasteTags, demographics: audience, film_subgenres: subgenres },
       warnings,
+    };
+  },
+});
+
+export const scoreForAudience = defineTool({
+  name: "score_for_audience",
+  description:
+    "Score a given list of films or series for an audience: how strongly fans of the signal entities over-index on each, " +
+    "best first. Use it to see which of the director's own favourite films this audience shares. Affinities compare only " +
+    "within this one list.",
+  inputSchema: z.strictObject({
+    signal_entity_ids: entityIds(10).describe("The artist and/or touchstones whose audience does the scoring."),
+    entity_ids: entityIds(25).describe("The films or series to score, e.g. the director's own favourites."),
+    kind: z.enum(["movie", "tv_show"]).default("movie").describe("Whether the list holds films or TV shows."),
+  }),
+  example: {
+    signal_entity_ids: [mockEntityId("Prateek Kuhad")],
+    entity_ids: [mockEntityId("In the Mood for Love"), mockEntityId("Donnie Darko"), mockEntityId("Rockstar")],
+  },
+  async run(input, { qloo }) {
+    // filter.results.entities keeps Qloo to exactly this list: it ranks what it's given rather than finding more.
+    const response = await qloo.insights({
+      "filter.type": entityUrn(input.kind),
+      "signal.interests.entities": input.signal_entity_ids,
+      "filter.results.entities": input.entity_ids,
+      "feature.explainability": true,
+      take: input.entity_ids.length,
+    });
+    const scored = entityList(response.data).map((e) => compactEntity(e, { maxTags: 4 }));
+    return {
+      status: scored.length > 0 ? "ok" : "empty",
+      summary:
+        scored.length > 0
+          ? `This audience's order: ${scored
+              .slice(0, 5)
+              .map((e) => withYear(e.name, e.year))
+              .join(", ")}.`
+          : "Qloo scored none of these for this audience.",
+      data: { scored },
+      warnings: response.warnings,
     };
   },
 });

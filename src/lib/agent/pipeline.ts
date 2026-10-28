@@ -2,7 +2,7 @@ import { describeKind, generateJson, type LlmResult, type Reasoning } from "../l
 import { defaultSleep, type CompactEntity } from "../qloo";
 import type { TmdbClient } from "../tmdb";
 import type { Brief } from "./brief";
-import { STEP_LABELS, type Thinking } from "./options";
+import { STEP_LABELS, withYear, type Thinking } from "./options";
 import { assemble, type Written } from "./pipeline-assemble";
 import { readAudience, type Audience } from "./pipeline-audience";
 import { executePlan, type Execution } from "./pipeline-execute";
@@ -131,7 +131,14 @@ export async function runPipeline(
   const audience = await readAudience(run, cast);
 
   // 3. Plan (LLM call 1).
-  const planContext: PlanContext = { brief, ...cast.who, candidates: audience.candidates, leans: audience.leans, areas: audience.areas };
+  const planContext: PlanContext = {
+    brief,
+    ...cast.who,
+    candidates: audience.candidates,
+    leans: audience.leans,
+    areas: audience.areas,
+    directorFit: audience.directorFit.flat().map((e) => withYear(e.name, e.year)),
+  };
   let plan = await askPlan(run, planContext, "plan");
 
   // 4. Execute the plan in code.
