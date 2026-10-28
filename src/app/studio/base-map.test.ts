@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeLabels, placePinName } from "./base-map";
+import { mapName, placeLabels, placePinName } from "./base-map";
 import { CREDIT_CORNER } from "./street-map";
 
 // A 480 × 600 frame at a pixel per unit, so the credit takes its corner at full size.
@@ -85,5 +85,19 @@ describe("placePinName", () => {
   it("takes the place that hides least when nowhere is clear", () => {
     // A map too small for the name anywhere, with the credit across its lower half: above loses only its top 10.
     expect(place({ x: 50, y: 30 }, [], 100, 60)).toEqual({ side: "above", slide: 0 });
+  });
+});
+
+describe("mapName", () => {
+  it("labels a pin with the place's own name, without what Qloo adds after it", () => {
+    expect(mapName("Fresh Catch By Francis - Coastal and Seafood Restaurant")).toBe("Fresh Catch By Francis");
+    expect(mapName("Poco Loco Tapas & Bar, Khar")).toBe("Poco Loco Tapas & Bar");
+    expect(mapName("Joe's Pizza (Broadway)")).toBe("Joe's Pizza");
+    expect(mapName("Hotel | Rooftop Bar")).toBe("Hotel");
+  });
+
+  it("keeps a name that has nothing added, or would be left too short", () => {
+    for (const name of ["Bombay Salad Co.", "McDonald's", "A-1 Diner", "Nehru Nagar ST Stand Canteen"]) expect(mapName(name)).toBe(name);
+    expect(mapName("Q - The Bar")).toBe("Q - The Bar");
   });
 });

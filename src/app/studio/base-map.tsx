@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { flushSync } from "react-dom";
 import type { ShootBase, Treatment } from "@/lib/agent/types";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 import { heatContours } from "./contours";
-import { CREDIT_CORNER, MapCredit, StreetTiles, fixed, mapFrame, type Bounds } from "./street-map";
+import { CREDIT_CORNER, MapCredit, StreetTiles, fixed, mapFrame, widen, type Bounds } from "./street-map";
 import { evidenceTone, rankMark } from "./ui";
 
 // The shoot base: Qloo's heatmap around the strongest areas for this audience, as contour lines on the city's streets,
@@ -12,6 +13,8 @@ import { evidenceTone, rankMark } from "./ui";
 
 /** The frame's longer side in SVG units; about a pixel each on a desktop screen. */
 const W = 600;
+/** The street tiles' zoom puts at least this many of their pixels across the frame's longer side (mapFrame). */
+const SHARP = 560;
 /** Pins closer than this (in SVG units) are nudged apart, each with a leader line to its true spot. */
 const PIN_GAP = 26;
 
@@ -189,6 +192,16 @@ export interface PinName {
 const PIN_NAME_OFFSET = 20;
 
 /**
+ * A place's name as the map labels its pin: without a description or a neighbourhood added after it ("Fresh Catch By
+ * Francis - Coastal and Seafood Restaurant", "Poco Loco Tapas & Bar, Khar"), so it fits among the others. The location
+ * card beside the map, and the pin's tooltip, have the whole name.
+ */
+export function mapName(name: string): string {
+  const head = name.split(/\s+[-–—|]\s+|,\s+|\s+\(/)[0].trim();
+  return head.length >= 3 ? head : name;
+}
+
+/**
  * The lit pin's name, 12px bold in its pill: on the dot's roomier side as before when that's clear, else the other
  * side, then above, then below, whichever first stays in the frame and clear of the area names, the other pins and the
  * credit; where none is clear, the one that hides least of it. A small map left the name over its own shoot base's.
@@ -204,8 +217,9 @@ export function placePinName(
   scale = 1,
 ): PinName {
   const px = (n: number) => n / scale;
+  // The pill as drawn: 12px bold on the page's line height, with its padding.
   const w = px(name.length * 6.6 + 12);
-  const h = px(20);
+  const h = px(22);
   const off = px(PIN_NAME_OFFSET);
   const taken = [...fixtures(others, width, height, scale), ...rings.map((ring, i) => nameBox(ring, names[i], scale))];
   const sides: Side[] = pin.x > width / 2 ? ["left", "right", "above", "below"] : ["right", "left", "above", "below"];
@@ -247,24 +261,67 @@ const labelShift = ({ side, along }: Placement) =>
       : `translate(${(along - 1) * 50}%, ${side === "above" ? "calc(-100% - 4px)" : "4px"})`;
 
 /**
- * A board's map block beside its locations. On a screen at least 44rem tall (globals.css) the whole block pins. From
- * 34rem to 44rem it wouldn't fit under the section bar with a map worth reading, so only the map pins: the block becomes
- * a grid whose last row runs the length of the locations, its words in a card of their own above (`bg`, painted behind
- * rows 1 to 4) that scrolls on, and the map, as tall as the screen allows, in that last row. The block's card and the
- * HeatMap's wrapper step aside (`contents`) so their parts can take cells of the grid. Each part names its cell: placed
- * by the grid, the words would go beside the card's background instead of over it. None of it applies on paper.
+ * A board's map block beside its locations, on a desktop-wide screen at least 34rem tall (`pin`, globals.css): its words
+ * scroll on above, in a card of their own, and the map pins under the section bar, as wide as its column and as tall as
+ * the screen leaves room for (at most 3:2), its frame widened to fill that (HeatMap). The block becomes a grid whose last
+ * row runs the length of the locations, with the card's background (`bg`) painted behind rows 1 to 4. The block's card
+ * and the HeatMap's wrapper step aside (`contents`) so their parts can take cells of the grid. Each part names its cell:
+ * placed by the grid, the words would go beside the card's background instead of over it. None of it applies on paper.
  */
 export const PINNED = {
-  wrap: "lg:tall:sticky lg:tall:top-20 lg:short:grid lg:short:grid-rows-[repeat(4,auto)_minmax(0,1fr)] lg:short:self-stretch",
-  card: "lg:short:contents",
-  bg: "hidden rounded-[28px] bg-background lg:short:block lg:short:[grid-area:1/1/5/2]",
-  head: "lg:short:[grid-area:1/1] lg:short:px-6 lg:short:pt-6",
-  heat: "lg:short:contents",
-  caption: "lg:short:[grid-area:2/1] lg:short:mx-6 lg:short:mt-4 lg:short:mb-0",
-  map: "lg:short:[grid-area:5/1] lg:short:sticky lg:short:top-20 lg:short:mt-4 lg:short:self-start lg:short:[--map-height:min(30rem,100dvh_-_6rem)]",
-  legend: "lg:short:[grid-area:3/1] lg:short:mx-6",
-  note: "lg:short:[grid-area:4/1] lg:short:mx-6 lg:short:mt-4 lg:short:mb-6",
+  wrap: "lg:pin:grid lg:pin:grid-rows-[repeat(4,auto)_minmax(0,1fr)] lg:pin:self-stretch",
+  card: "lg:pin:contents",
+  bg: "hidden rounded-[28px] bg-background lg:pin:block lg:pin:[grid-area:1/1/5/2]",
+  head: "lg:pin:[grid-area:1/1] lg:pin:px-6 lg:pin:pt-6",
+  heat: "lg:pin:contents",
+  caption: "lg:pin:[grid-area:2/1] lg:pin:mx-6 lg:pin:mt-4 lg:pin:mb-0",
+  map: "lg:pin:[grid-area:5/1] lg:pin:sticky lg:pin:top-20 lg:pin:mt-4 lg:pin:self-start lg:pin:aspect-2/3 lg:pin:max-h-[calc(100dvh-6rem)] lg:pin:max-w-none lg:pin:[container-type:size]",
+  // The drawing at its frame's shape, as large as the box holds it (the same as the box, once the frame fills it).
+  layer: "lg:pin:h-[min(100%,calc(100cqw/var(--frame-aspect)))] lg:pin:w-[min(100%,calc(100cqh*var(--frame-aspect)))]",
+  legend: "lg:pin:[grid-area:3/1] lg:pin:mx-6",
+  note: "lg:pin:[grid-area:4/1] lg:pin:mx-6 lg:pin:mt-4 lg:pin:mb-6",
 };
+
+/** Where a board's pinned map fills its column: PINNED's `lg:pin:`, and so never on paper. */
+const FILL = "screen and (min-width: 64rem) and (min-height: 34rem)";
+
+/**
+ * A pinned map's box, in screen pixels, while it fills its column (PINNED.map), for the frame to fill it too: undefined
+ * where the box takes the frame's own shape. Measured before the first paint, and again whenever the box changes. The
+ * page prints in the state it's in, so the frame goes back to its own shape just before.
+ */
+function useFill(box: RefObject<HTMLDivElement | null>, on: boolean) {
+  const [size, setSize] = useState<{ width: number; height: number }>();
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!on || !el) return;
+    const media = matchMedia(FILL);
+    const measure = () => {
+      if (!media.matches) return setSize(undefined);
+      // The drawing goes inside the border.
+      const rect = el.getBoundingClientRect();
+      const width = fixed(rect.width - 2 * el.clientLeft);
+      const height = fixed(rect.height - 2 * el.clientTop);
+      // A page Next keeps hidden after you leave it measures nothing: the last size stays for when it shows again.
+      if (width <= 0 || height <= 0) return;
+      setSize((now) => (now?.width === width && now.height === height ? now : { width, height }));
+    };
+    const paper = () => flushSync(() => setSize(undefined));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    media.addEventListener("change", measure);
+    addEventListener("beforeprint", paper);
+    addEventListener("afterprint", measure);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", measure);
+      removeEventListener("beforeprint", paper);
+      removeEventListener("afterprint", measure);
+    };
+  }, [box, on]);
+  return size;
+}
 
 function HeatMap({
   base,
@@ -291,23 +348,37 @@ function HeatMap({
   /** In a board's block beside its locations, which pins (PINNED). */
   pinned?: boolean;
 }) {
-  // The frame and its lines are kept while the bounds stay the same: the board draws the map again as each location is
-  // read, and tracing the lines takes a few milliseconds.
+  // The frame and its lines are kept while the bounds and the box stay the same: the board draws the map again as each
+  // location is read, and tracing the lines takes a few milliseconds.
   const { south, west, north, east } = frameBounds(map, pins);
-  const f = useMemo(() => mapFrame({ south, west, north, east }, W), [south, west, north, east]);
+  const box = useRef<HTMLDivElement>(null);
+  const fill = useFill(box, pinned);
+  const own = useMemo(() => mapFrame({ south, west, north, east }, W, SHARP), [south, west, north, east]);
+  // Filling its column, the map is drawn larger, and wider or taller than the frame: the frame grows to the box's shape
+  // where the grid has the heat for it (`reach`; older grids stay at their own shape, centred), and the tiles come at the
+  // zoom that keeps them at least as sharp as the box is large.
+  const { reach } = map;
+  const f = useMemo(() => {
+    if (!fill) return own;
+    const bounds = { south, west, north, east };
+    return mapFrame(reach ? widen(bounds, fill.width / fill.height, reach) : bounds, W, Math.max(SHARP, fill.width, fill.height));
+  }, [own, fill, reach, south, west, north, east]);
   const lines = useMemo(() => heatContours(map, f, LEVELS), [map, f]);
   // The lines' colour, as `--heat`: the highlighter on screen and ink on paper, or tape pink, both places, when mocked.
   const heat = mock ? "[--heat:var(--tape)]" : "[--heat:var(--accent)] print:[--heat:var(--foreground)]";
-  // Screen pixels per SVG unit, once the map is on screen: where the names fit depends on it.
-  const box = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  // Screen pixels per SVG unit, once the map is on screen: where the names fit depends on it. Filling its box, the
+  // drawing is as wide as the box holds it at the frame's shape (PINNED.layer).
+  const layer = useRef<HTMLDivElement>(null);
+  const [drawn, setDrawn] = useState<number>();
   useEffect(() => {
-    const el = box.current;
+    const el = layer.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => setScale(el.clientWidth / f.width || 1));
+    const observer = new ResizeObserver(() => setDrawn(el.clientWidth));
     observer.observe(el);
     return () => observer.disconnect();
-  }, [f.width]);
+  }, []);
+  const width = fill ? Math.min(fill.width, (fill.height * f.width) / f.height) : drawn;
+  const scale = width ? width / f.width : 1;
   const at = (p: Point) => ({ left: `${(p.x / f.width) * 100}%`, top: `${(p.y / f.height) * 100}%` });
   // The chosen area is labelled first, so it gets the best spot.
   const rings = [...base.areas]
@@ -332,7 +403,7 @@ function HeatMap({
         legend: "print:col-start-2 print:row-start-3 print:mt-0",
       }
     : { wrap: "", caption: "", map: "", legend: "" };
-  const pin = pinned ? PINNED : { heat: "", caption: "", map: "", legend: "" };
+  const pin = pinned ? PINNED : { heat: "", caption: "", map: "", layer: "", legend: "" };
 
   return (
     <div className={`${heat} ${paper.wrap} ${pin.heat}`}>
@@ -342,131 +413,134 @@ function HeatMap({
       </p>
       <div
         ref={box}
-        className={`relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] print:bg-white ${paper.map} ${pin.map}`}
+        className={`relative mx-auto aspect-(--map-aspect) w-full max-w-(--map-max) overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] print:bg-white ${paper.map} ${pin.map}`}
         style={
           {
-            aspectRatio: `${f.width} / ${f.height}`,
-            // Pinned beside the locations, the whole block must fit under the section bar: the rest of it (caption,
-            // legend, the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900. Where
-            // only the map pins, it takes the screen's height less its offset and a margin (PINNED.map).
-            maxWidth: compact
-              ? `calc(var(--map-height, max(16rem, min(30rem, 100dvh - 28rem))) * ${f.width / f.height})`
-              : `${(34 * f.width) / f.height}rem`,
-            "--map-ratio": f.width / f.height,
+            // The box takes the frame's own shape, except where it fills its column (PINNED.map).
+            "--map-aspect": `${own.width} / ${own.height}`,
+            // In the compact block, a phone's or the homepage's, the map stays clear of the screen's edges: the rest
+            // of the block takes about 28rem.
+            "--map-max": compact
+              ? `calc(var(--map-height, max(16rem, min(30rem, 100dvh - 28rem))) * ${own.width / own.height})`
+              : `${(34 * own.width) / own.height}rem`,
+            "--map-ratio": own.width / own.height,
+            "--frame-aspect": f.width / f.height,
           } as CSSProperties
         }
       >
-        <StreetTiles frame={f} />
-        <svg viewBox={`0 0 ${f.width} ${f.height}`} role="img" aria-label={summary} className="absolute inset-0 size-full">
-          {lines.map((line, i) => (
-            <Fragment key={line.level}>
-              {i === lines.length - 1 && <path d={line.area} fill="var(--heat)" fillOpacity={TOP_FILL} fillRule="evenodd" />}
-              <path
-                d={line.line}
-                fill="none"
-                stroke="var(--heat)"
-                strokeOpacity={LINES[i].opacity}
-                strokeWidth={LINES[i].width}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-              />
-            </Fragment>
-          ))}
-          {rings.map(({ area, x, y, r }) => (
-            <circle
-              key={area.ref}
-              cx={x}
-              cy={y}
-              r={r}
-              fill="none"
-              stroke={area.ref === base.chosen ? "var(--foreground)" : "var(--dim)"}
-              strokeWidth={area.ref === base.chosen ? 2 : 1.25}
-              strokeDasharray={area.ref === base.chosen ? undefined : "4 4"}
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-          {spots.map((spot, i) => (
-            <g key={i}>
-              {(placed[i].x !== spot.x || placed[i].y !== spot.y) && (
-                <line
-                  x1={spot.x}
-                  y1={spot.y}
-                  x2={placed[i].x}
-                  y2={placed[i].y}
-                  stroke="var(--foreground)"
-                  strokeWidth={1}
+        <div ref={layer} className={`absolute inset-0 m-auto ${pin.layer}`}>
+          <StreetTiles frame={f} />
+          <svg viewBox={`0 0 ${f.width} ${f.height}`} role="img" aria-label={summary} className="absolute inset-0 size-full">
+            {lines.map((line, i) => (
+              <Fragment key={line.level}>
+                {i === lines.length - 1 && <path d={line.area} fill="var(--heat)" fillOpacity={TOP_FILL} fillRule="evenodd" />}
+                <path
+                  d={line.line}
+                  fill="none"
+                  stroke="var(--heat)"
+                  strokeOpacity={LINES[i].opacity}
+                  strokeWidth={LINES[i].width}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   vectorEffect="non-scaling-stroke"
                 />
-              )}
-              <circle cx={spot.x} cy={spot.y} r={2.5} fill="var(--foreground)" />
-            </g>
-          ))}
-        </svg>
-        {rings.map((ring, i) => {
-          const anchor = {
-            above: { x: ring.x, y: ring.y - ring.r },
-            below: { x: ring.x, y: ring.y + ring.r },
-            right: { x: ring.x + ring.r, y: ring.y },
-            left: { x: ring.x - ring.r, y: ring.y },
-          }[names[i].side];
-          return (
-            <span
-              key={ring.area.ref}
-              aria-hidden
-              className={`absolute whitespace-nowrap rounded-[4px] bg-frame/85 px-1.5 py-[3px] text-[12px] leading-none ${
-                ring.area.ref === base.chosen ? "font-bold text-foreground" : "text-dim"
-              }`}
-              style={{ ...at(anchor), transform: labelShift(names[i]) }}
-            >
-              {ring.name}
-            </span>
-          );
-        })}
-        {pins.map((p, i) => {
-          const on = active !== undefined && p.n === active + 1;
-          return (
-            <Fragment key={p.n}>
+              </Fragment>
+            ))}
+            {rings.map(({ area, x, y, r }) => (
+              <circle
+                key={area.ref}
+                cx={x}
+                cy={y}
+                r={r}
+                fill="none"
+                stroke={area.ref === base.chosen ? "var(--foreground)" : "var(--dim)"}
+                strokeWidth={area.ref === base.chosen ? 2 : 1.25}
+                strokeDasharray={area.ref === base.chosen ? undefined : "4 4"}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            {spots.map((spot, i) => (
+              <g key={i}>
+                {(placed[i].x !== spot.x || placed[i].y !== spot.y) && (
+                  <line
+                    x1={spot.x}
+                    y1={spot.y}
+                    x2={placed[i].x}
+                    y2={placed[i].y}
+                    stroke="var(--foreground)"
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                )}
+                <circle cx={spot.x} cy={spot.y} r={2.5} fill="var(--foreground)" />
+              </g>
+            ))}
+          </svg>
+          {rings.map((ring, i) => {
+            const anchor = {
+              above: { x: ring.x, y: ring.y - ring.r },
+              below: { x: ring.x, y: ring.y + ring.r },
+              right: { x: ring.x + ring.r, y: ring.y },
+              left: { x: ring.x - ring.r, y: ring.y },
+            }[names[i].side];
+            return (
               <span
+                key={ring.area.ref}
                 aria-hidden
-                title={p.name}
-                className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full font-bold ring-2 ring-frame ${
-                  on
-                    ? "z-10 size-[30px] bg-accent text-[13px] text-ink shadow-[0_0_0_6px_rgb(228_255_58/0.3)]"
-                    : "size-[20px] bg-foreground text-[11px] text-frame"
+                className={`absolute whitespace-nowrap rounded-[4px] bg-frame/85 px-1.5 py-[3px] text-[12px] leading-none ${
+                  ring.area.ref === base.chosen ? "font-bold text-foreground" : "text-dim"
                 }`}
-                style={at(placed[i])}
+                style={{ ...at(anchor), transform: labelShift(names[i]) }}
               >
-                {p.n}
+                {ring.name}
               </span>
-              {on && (
+            );
+          })}
+          {pins.map((p, i) => {
+            const on = active !== undefined && p.n === active + 1;
+            return (
+              <Fragment key={p.n}>
                 <span
                   aria-hidden
-                  className="absolute z-10 truncate rounded-md bg-(--light-background) px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-ink"
-                  style={{
-                    ...at(placed[i]),
-                    ...pinNameStyle(
-                      placePinName(
-                        placed[i],
-                        p.name,
-                        rings,
-                        names,
-                        placed.filter((_, j) => j !== i),
-                        f.width,
-                        f.height,
+                  title={p.name}
+                  className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full font-bold ring-2 ring-frame ${
+                    on
+                      ? "z-10 size-[30px] bg-accent text-[13px] text-ink shadow-[0_0_0_6px_rgb(228_255_58/0.3)]"
+                      : "size-[20px] bg-foreground text-[11px] text-frame"
+                  }`}
+                  style={at(placed[i])}
+                >
+                  {p.n}
+                </span>
+                {on && (
+                  <span
+                    aria-hidden
+                    className="absolute z-10 truncate rounded-md bg-(--light-background) px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-ink"
+                    style={{
+                      ...at(placed[i]),
+                      ...pinNameStyle(
+                        placePinName(
+                          placed[i],
+                          mapName(p.name),
+                          rings,
+                          names,
+                          placed.filter((_, j) => j !== i),
+                          f.width,
+                          f.height,
+                          scale,
+                        ),
+                        (placed[i].x / f.width) * 100,
                         scale,
                       ),
-                      (placed[i].x / f.width) * 100,
-                      scale,
-                    ),
-                  }}
-                >
-                  {p.name}
-                </span>
-              )}
-            </Fragment>
-          );
-        })}
+                    }}
+                  >
+                    {mapName(p.name)}
+                  </span>
+                )}
+              </Fragment>
+            );
+          })}
+        </div>
         <MapCredit />
       </div>
       <div className={`mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim ${paper.legend} ${pin.legend}`}>

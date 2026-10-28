@@ -26,6 +26,34 @@ function project(lat: number, lon: number, zoom: number) {
   return { x: ((lon + 180) / 360) * world, y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * world };
 }
 
+/** The latitude and longitude at world pixel (x, y) at `zoom`. */
+function unproject(x: number, y: number, zoom: number) {
+  const world = TILE * 2 ** zoom;
+  return { lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / world))) * 180) / Math.PI, lon: (x / world) * 360 - 180 };
+}
+
+/**
+ * `bounds` grown about its centre on whichever side falls short of `aspect` (width over height, as drawn), for a frame
+ * that fills a box of that shape; never past `limit`, the ground the heat is known for, though never inside `bounds`.
+ */
+export function widen(bounds: Bounds, aspect: number, limit?: Bounds): Bounds {
+  const nw = project(bounds.north, bounds.west, 0);
+  const se = project(bounds.south, bounds.east, 0);
+  const width = Math.max(se.x - nw.x, (se.y - nw.y) * aspect);
+  const height = Math.max(se.y - nw.y, width / aspect);
+  const [cx, cy] = [(nw.x + se.x) / 2, (nw.y + se.y) / 2];
+  const corner = unproject(cx - width / 2, cy - height / 2, 0);
+  const opposite = unproject(cx + width / 2, cy + height / 2, 0);
+  const grown = { north: corner.lat, west: corner.lon, south: opposite.lat, east: opposite.lon };
+  if (!limit) return grown;
+  return {
+    south: Math.max(grown.south, Math.min(limit.south, bounds.south)),
+    north: Math.min(grown.north, Math.max(limit.north, bounds.north)),
+    west: Math.max(grown.west, Math.min(limit.west, bounds.west)),
+    east: Math.min(grown.east, Math.max(limit.east, bounds.east)),
+  };
+}
+
 export interface MapFrame {
   /** What the frame shows, edge to edge. */
   bounds: Bounds;
@@ -97,8 +125,12 @@ export function StreetTiles({ frame }: { frame: MapFrame }) {
           loading="lazy"
           decoding="async"
           draggable={false}
-          // A tile that doesn't come (offline, or refused) leaves the dark frame, not the browser's broken-image mark.
+          // A tile that doesn't come (offline, or refused) leaves the dark frame, not the browser's broken-image mark,
+          // including one that failed before the page came to life, when no handler was listening yet.
           onError={(event) => (event.currentTarget.style.visibility = "hidden")}
+          ref={(img) => {
+            if (img?.complete && img.naturalWidth === 0) img.style.visibility = "hidden";
+          }}
           className="absolute max-w-none select-none"
           style={{
             left: at(x * TILE - world.left, world.width),

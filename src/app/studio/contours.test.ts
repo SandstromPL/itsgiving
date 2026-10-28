@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 import { heatContours } from "./contours";
-import { mapFrame } from "./street-map";
+import { mapFrame, widen } from "./street-map";
 
 const LEVELS = [0.2, 0.4, 0.6, 0.8];
 
@@ -132,6 +132,26 @@ describe("heatContours", () => {
     for (const value of contours.flatMap((c) => `${c.line}${c.area}`.match(/[\d.]+/g) ?? []).map(Number)) {
       expect(Math.round(value * 100) / 100).toBe(value);
     }
+  });
+
+  it("draws the heat around the bounds where a frame widened to fill a box shows it", () => {
+    // The strongest spot is 5 squares west of the bounds, in the ground the grid keeps around them (its reach).
+    const { map } = grid(() => 0);
+    const { bounds, cell } = map as Required<HeatGrid>;
+    const tiles = [];
+    for (let row = 0; row < 20; row++) {
+      for (let col = -10; col < 20; col++) {
+        const heat = cone(10, -5)(row, col);
+        if (heat > 0) tiles.push({ lat: bounds.south + (row + 0.5) * cell.lat, lon: bounds.west + (col + 0.5) * cell.lon, heat });
+      }
+    }
+    const reach = { ...bounds, west: bounds.west - 10 * cell.lon };
+    const frame = mapFrame(widen(bounds, 2, reach));
+    const [top] = subpaths(heatContours({ bounds, reach, cell, tiles }, frame, LEVELS)[3].line);
+    expect(top.closed).toBe(true);
+    const ring = box(top.points);
+    expect((ring.left + ring.right) / 2).toBeCloseTo(frame.x(bounds.west - 4.5 * cell.lon), -1);
+    expect(ring.right).toBeLessThan(frame.x(bounds.west));
   });
 
   it("draws nothing for a map with no heat", () => {

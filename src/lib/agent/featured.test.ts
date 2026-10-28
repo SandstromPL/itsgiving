@@ -126,12 +126,15 @@ describe("featured examples", () => {
         ],
         map: {
           bounds: { south: 19, west: 72.8, north: 19.1, east: 72.9 },
+          reach: { south: 18.95, west: 72.75, north: 19.15, east: 72.95 },
           cell: { lat: 0.01, lon: 0.01 },
           tiles: [
             { lat: 19.005, lon: 72.805, heat: 0.2 },
             { lat: 19.005, lon: 72.815, heat: 0.9 },
             { lat: 19.015, lon: 72.805, heat: 0.5 },
             { lat: 19.055, lon: 72.835, heat: 1 },
+            // Around the frame, for the board's pinned map only.
+            { lat: 18.965, lon: 72.835, heat: 0.4 },
           ],
         },
       },
@@ -167,8 +170,9 @@ describe("featured examples", () => {
       writtenBy: "deepseek-flash",
       tags: ["Introspective", "Indie folk"],
     });
-    // The same shoot base the board draws, not a cut-down copy.
-    expect(story?.base).toBe(run.base);
+    // The same shoot base the board draws, with only the heat inside the frame the homepage draws.
+    const { bounds, cell, tiles } = run.base!.map!;
+    expect(story?.base).toEqual({ ...run.base, map: { bounds, cell, tiles: tiles.slice(0, 4) } });
     // The best-ranked film, brand and place, the place with its distance from the chosen base (Bandra West).
     expect(story?.receipts).toEqual([
       { kind: "film", name: "Darlings (2022)", rank: 2, of: 10, affinity: 0.945 },

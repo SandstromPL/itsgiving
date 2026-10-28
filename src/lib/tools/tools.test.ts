@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { QlooClient, createQlooClient } from "../qloo";
 import { createMockFetch } from "../qloo/mock/server";
 import { mockEntityId } from "../qloo/mock/catalog";
-import { distanceM, heatGrid, hotAreas, type HeatArea, type HeatGrid } from "./heatmap";
+import { distanceM, framedGrid, heatGrid, hotAreas, type HeatArea, type HeatGrid } from "./heatmap";
 import { TOOLS, runTool, toolDefinitions } from "./registry";
 import { readAudience, tasteOverlap } from "./taste";
 import { oneBranchEach } from "./treatment";
@@ -190,9 +190,36 @@ describe("audience_heatmap", () => {
     // 2 km ring plus 1.5 km margin either side, at least 6 km: about 7 km each way, centred on the area.
     expect((north - south) * 111.32).toBeCloseTo(7, 0);
     expect((east - west) * kx * 111.32).toBeCloseTo(7, 0);
-    expect(grid.tiles.every((t) => t.lat >= south && t.lat <= north && t.lon >= west && t.lon <= east)).toBe(true);
     // A geohash-6 tile is 360/2^15 degrees of longitude wide: the squares are at least that wide.
     expect(grid.cell.lon).toBeGreaterThanOrEqual(360 / 2 ** 15 - 1e-6);
+  });
+
+  it("keeps the heat around the frame, for a map drawn wider or taller than it", () => {
+    const tiles = Array.from({ length: 800 }, (_, i) => ({
+      ...cell(18.9 + (i % 80) * 0.005, 72.75 + Math.floor(i / 80) * 0.015, 0.5),
+      precision: 6,
+    }));
+    const grid = heatGrid(tiles, [{ lat: 19.0, lon: 72.82, radius_m: 2_000 }]) as HeatGrid;
+    const { bounds, reach } = grid as Required<HeatGrid>;
+    const kx = Math.cos((19 * Math.PI) / 180);
+    const km = (b: typeof bounds) => ({ tall: (b.north - b.south) * 111.32, wide: (b.east - b.west) * kx * 111.32 });
+    // The frame is the 7 km square above; around it, room for a map half again as tall or nearly half again as wide.
+    expect(km(bounds).tall).toBeCloseTo(7, 0);
+    expect(km(reach).tall / km(bounds).wide).toBeCloseTo(1.55, 2);
+    expect(km(reach).wide / km(bounds).tall).toBeCloseTo(1.45, 2);
+    expect((reach.south + reach.north) / 2).toBeCloseTo((bounds.south + bounds.north) / 2, 4);
+    // Squares beyond the frame are kept, on the same lattice, up to the reach and no further.
+    const beyond = grid.tiles.filter((t) => t.lat < bounds.south || t.lat > bounds.north || t.lon < bounds.west || t.lon > bounds.east);
+    expect(beyond.length).toBeGreaterThan(0);
+    expect(grid.tiles.every((t) => t.lat >= reach.south && t.lat <= reach.north && t.lon >= reach.west && t.lon <= reach.east)).toBe(true);
+    for (const t of grid.tiles) {
+      const row = (t.lat - bounds.south) / grid.cell.lat - 0.5;
+      expect(Math.abs(row - Math.round(row))).toBeLessThan(0.01);
+    }
+    // A map never drawn past its frame can drop them.
+    const framed = framedGrid(grid);
+    expect(framed.reach).toBeUndefined();
+    expect(framed.tiles.length).toBe(grid.tiles.length - beyond.length);
   });
 
   it("names the strongest areas of a city after their neighbourhoods", async () => {

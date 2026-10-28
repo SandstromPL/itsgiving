@@ -2,7 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { llmConfigFromEnv } from "../llm/config";
 import { qlooConfigFromEnv } from "../qloo";
-import { distanceM } from "../tools/heatmap";
+import { distanceM, framedGrid } from "../tools/heatmap";
 import { briefKey, briefSchema, normalizeBrief } from "./brief";
 import { EXAMPLES } from "./examples";
 import { FORMATS, audiencePhrase, coverReference, tagLabel, treatmentSubject, withYear, withoutIdentity } from "./options";
@@ -169,7 +169,8 @@ export function featuredRun(items: FeaturedItem[] = loadFeatured()): FeaturedRun
       .slice(0, 5)
       .map((tone) => ({ name: tagLabel(tone.tag.name), shared: tone.source === "overlap" })),
     leans: t.audience.leans[0],
-    base,
+    // The homepage never draws the map past its frame, so it carries none of the heat around it.
+    base: base.map ? { ...base, map: framedGrid(base.map) } : base,
     receipts,
     title: t.title,
     logline: t.logline,

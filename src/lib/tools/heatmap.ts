@@ -32,12 +32,32 @@ export interface HeatTile {
   heat: number;
 }
 
-/** The heatmap as the board draws it: equal squares, sized in degrees (square on the ground), within `bounds`. */
+interface Bounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
+/** The heatmap as the board draws it: equal squares, sized in degrees (square on the ground), on a lattice from `bounds`. */
 export interface HeatGrid {
   /** The frame; missing on grids saved by the first version of this tool, which covered the whole city. */
-  bounds?: { south: number; west: number; north: number; east: number };
+  bounds?: Bounds;
+  /**
+   * The ground the squares cover, around the frame, so a map drawn wider or taller than the frame to fill its space
+   * (base-map.tsx) has the heat for every street it shows. Missing on grids saved before it, whose squares stop at the
+   * frame.
+   */
+  reach?: Bounds;
   cell: { lat: number; lon: number };
   tiles: HeatTile[];
+}
+
+/** Only the squares inside the frame: for a map that's never drawn past it, such as the homepage's. */
+export function framedGrid({ bounds, cell, tiles }: HeatGrid): HeatGrid {
+  if (!bounds) return { cell, tiles };
+  const inside = (t: HeatTile) => t.lat >= bounds.south && t.lat <= bounds.north && t.lon >= bounds.west && t.lon <= bounds.east;
+  return { bounds, cell, tiles: tiles.filter(inside) };
 }
 
 /**
@@ -96,6 +116,13 @@ const MIN_FRAME_M = 6_000;
 /** No frame taller than 5:4 or wider than 8:5: a long city (Mumbai) gets more of the land and sea beside it. */
 const MAX_TALL = 1.25;
 const MAX_WIDE = 1.6;
+/**
+ * How much taller than wide, and wider than tall, a board's pinned map may be drawn when it fills its column
+ * (base-map.tsx): its box is at most 3:2 tall, and about 1.4:1 wide in an 80rem page on a screen 34rem tall. The grid
+ * keeps heat that far around the frame, with a little to spare.
+ */
+const FILL_TALL = 1.55;
+const FILL_WIDE = 1.45;
 
 /** A geohash tile's longer side on the ground, in degrees of latitude. */
 function tileSize(precision: number, kx: number): number {
@@ -107,6 +134,7 @@ function tileSize(precision: number, kx: number): number {
  * The heatmap as the board draws it, framed on the strongest areas so their rings and the scouted places read
  * clearly (the whole city when there are none). Qloo's tiles (150 m to 5 km, thousands per city) are binned
  * into squares about 1/`across` of the frame, never finer than Qloo's own tiles, each keeping its hottest tile.
+ * Squares are kept some way around the frame too (`reach`), for a map drawn wider or taller than it.
  */
 export function heatGrid(
   cells: HeatCell[],
@@ -127,15 +155,24 @@ export function heatGrid(
   const [midLat, midLon] = [(north + south) / 2, (east + west) / 2];
   [south, north, west, east] = [midLat - tall / 2, midLat + tall / 2, midLon - wide / kx / 2, midLon + wide / kx / 2];
 
-  const inside = cells.filter((c) => c.lat >= south && c.lat <= north && c.lon >= west && c.lon <= east);
+  const within = (b: Bounds) => (c: HeatCell) => c.lat >= b.south && c.lat <= b.north && c.lon >= b.west && c.lon <= b.east;
+  const inside = cells.filter(within({ south, north, west, east }));
   if (inside.length === 0) return undefined;
   const precisions = new Map<number, number>();
   for (const c of inside) precisions.set(c.precision, (precisions.get(c.precision) ?? 0) + 1);
   const typical = [...precisions].sort((a, b) => b[1] - a[1])[0][0];
   const size = Math.max(Math.max(tall, wide) / across, typical > 0 ? tileSize(typical, kx) : 0);
   const cell = { lat: size, lon: size / kx };
+  const [reachTall, reachWide] = [Math.max(tall, wide * FILL_TALL), Math.max(wide, tall * FILL_WIDE)];
+  const reach = {
+    south: midLat - reachTall / 2,
+    north: midLat + reachTall / 2,
+    west: midLon - reachWide / kx / 2,
+    east: midLon + reachWide / kx / 2,
+  };
+  // Squares sit on a lattice from the frame's south-west corner, so those around the frame have rows and columns below 0.
   const bins = new Map<string, HeatTile>();
-  for (const c of inside) {
+  for (const c of cells.filter(within(reach))) {
     const row = Math.floor((c.lat - south) / cell.lat);
     const col = Math.floor((c.lon - west) / cell.lon);
     const bin = bins.get(`${row}:${col}`);
@@ -144,8 +181,10 @@ export function heatGrid(
     }
   }
   const top = Math.max(...[...bins.values()].map((b) => b.heat));
+  const rounded = (b: Bounds) => ({ south: round(b.south, 5), west: round(b.west, 5), north: round(b.north, 5), east: round(b.east, 5) });
   return {
-    bounds: { south: round(south, 5), west: round(west, 5), north: round(north, 5), east: round(east, 5) },
+    bounds: rounded({ south, west, north, east }),
+    reach: rounded(reach),
     cell: { lat: round(cell.lat, 6), lon: round(cell.lon, 6) },
     tiles: [...bins.values()].map((b) => ({ lat: round(b.lat, 5), lon: round(b.lon, 5), heat: top > 0 ? round(b.heat / top, 3) : 0 })),
   };
