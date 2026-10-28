@@ -3,8 +3,8 @@ import type { Treatment } from "@/lib/agent/types";
 import { withoutIdentity } from "@/lib/text";
 import type { RankedTag } from "@/lib/tools/taste";
 
-// Era looks for a treatment's cover: one film tradition's craft worn over the house look, never in place of it (see
-// research/world-cinema-eras.md). An era sets the title's face and colour, a texture over the still, the receipts'
+// Era looks for a treatment's cover: one film tradition's craft worn over the house look, never in place of it, as
+// homage rather than copy, with each tradition credited. An era sets the title's face and colour, a texture over the still, the receipts'
 // shape, two stickers, a credit line and one moment when it's picked; the layout, the reader's theme, Qloo's evidence
 // and the treatment's words stay as they are. Plain data and functions, like title-fonts.ts: era-layer.tsx draws an era
 // on the cover, and the title-card window offers them.
@@ -139,8 +139,6 @@ export const ERAS: Era[] = [
 ];
 
 export const eraOf = (id: EraId): Era => ERAS.find((e) => e.id === id) ?? ERAS[0];
-
-export const isEraId = (id: string): id is EraId => ERAS.some((e) => e.id === id);
 
 /** The era's name in the reader's register. */
 export const eraName = (era: Era, unc: boolean) => (unc ? era.plain : era.name);

@@ -10,6 +10,7 @@ import { StartYourOwn } from "@/app/studio/landing";
 import { backButton, outlineButton as outline, pillButton as pill, primaryButton } from "@/app/studio/ui";
 import { BackArrow } from "@/app/studio/icons";
 import { copyText } from "@/app/studio/clipboard";
+import { useReceipts } from "@/app/studio/eggs";
 import { savedUrl } from "@/app/studio/save";
 import { ShareButton } from "@/app/studio/share";
 import { Timeline, replaySteps } from "@/app/studio/timeline";
@@ -22,6 +23,7 @@ import type { Treatment } from "@/lib/agent/types";
 
 export function SavedBoard({ id, treatment, own, shared }: { id: string; treatment: Treatment; own: boolean; shared: boolean }) {
   const router = useRouter();
+  useReceipts(treatment);
   const rework = (nudge: Nudge) => {
     handOffBoard({ treatment, nudge });
     router.push("/studio");

@@ -5,8 +5,8 @@ import { StartYourOwn } from "../studio/landing";
 import { slip } from "../studio/ui";
 import { SiteHeader } from "../studio/site-header";
 
-// About: who itsgiving is for (first, as Paritosh asked), what it is, what Qloo is, and how one uses the other. Static,
-// like the homepage. Qloo's facts come from research/qloo-company-and-judges.md, each dated there.
+// About: who itsgiving is for (first), what it is, what Qloo is, and how one uses the other. Static, like the homepage.
+// Qloo's facts are from its own site and the hackathon's page (the 250M+ entries is the hackathon's count).
 
 export const metadata: Metadata = {
   title: "About: itsgiving",

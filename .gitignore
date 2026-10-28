@@ -55,3 +55,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Snapshots the Playwright MCP writes into the repo root; they can hold Qloo data.
+/.playwright-mcp/

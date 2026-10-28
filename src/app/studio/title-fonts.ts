@@ -5,8 +5,8 @@ import type { Treatment } from "@/lib/agent/types";
 // homepage (built on the server) and its "How it works", so none needs another's component code.
 
 /**
- * Cinematic faces for a treatment's title card, each a free Google font standing in for a film look (see
- * research/world-cinema-eras.md). `scale` keeps wide faces inside the cover; the window previews the real title.
+ * Cinematic faces for a treatment's title card, each a free Google font standing in for a film look. `scale` keeps
+ * wide faces inside the cover; the window previews the real title.
  */
 export interface TitleFont {
   id: string;

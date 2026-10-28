@@ -134,9 +134,16 @@ const NOTE = [
 ].join("\n");
 
 /** A note in DevTools for whoever opens it, printed once a visit (layout.tsx). */
+/** receipts() on a page with no treatment on screen: the note names it on every page, so it answers on every page. */
+function noReceipts() {
+  return "No treatment on screen. Open one (an example, or a build in the studio) and call receipts() again.";
+}
+
 export function ConsoleNote() {
   useEffect(() => {
     console.log(`%c${NOTE}`, "font-family: monospace; line-height: 1.5");
+    // A board on screen has already set the real one: its effects run before this layout's.
+    if (!("receipts" in window)) Object.assign(window, { receipts: noReceipts });
   }, []);
   return null;
 }
@@ -160,5 +167,6 @@ export function useReceipts(treatment: Treatment | null) {
       return `${rows.length} Qloo calls`;
     };
     Object.assign(window, { receipts });
+    return () => void Object.assign(window, { receipts: noReceipts });
   }, [treatment]);
 }
