@@ -231,8 +231,9 @@ function HeatMap({
   const paper = compact
     ? {
         wrap: "print:contents",
-        caption: "print:col-start-2 print:row-start-2 print:mb-0",
-        map: "print:col-start-1 print:row-span-5 print:row-start-1 print:mx-0 print:w-[calc(var(--map-height)*var(--map-ratio))] print:[--map-height:26rem]",
+        // Pinned on a short screen (globals.css), the caption gives its lines to the map, and the map may go below 16rem.
+        caption: "print:col-start-2 print:row-start-2 print:mb-0 lg:pin:short:hidden",
+        map: "print:col-start-1 print:row-span-5 print:row-start-1 print:mx-0 print:w-[calc(var(--map-height)*var(--map-ratio))] print:[--map-height:26rem] lg:pin:short:[--map-floor:10rem] lg:pin:short:[--map-rest:24rem]",
         legend: "print:col-start-2 print:row-start-3 print:mt-0",
       }
     : { wrap: "", caption: "", map: "", legend: "" };
@@ -250,9 +251,10 @@ function HeatMap({
           {
             aspectRatio: `${f.width} / ${f.height}`,
             // Pinned beside the locations, the whole block must fit under the section bar: the rest of it (caption,
-            // legend, the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900.
+            // legend, the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900, and
+            // about 22rem on a short screen, where the caption is hidden (--map-rest and --map-floor above).
             maxWidth: compact
-              ? `calc(var(--map-height, max(16rem, min(30rem, 100dvh - 28rem))) * ${f.width / f.height})`
+              ? `calc(var(--map-height, max(var(--map-floor, 16rem), min(30rem, 100dvh - var(--map-rest, 28rem)))) * ${f.width / f.height})`
               : `${(34 * f.width) / f.height}rem`,
             "--map-ratio": f.width / f.height,
           } as CSSProperties

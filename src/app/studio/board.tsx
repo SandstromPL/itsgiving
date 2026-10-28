@@ -466,7 +466,7 @@ export function Board({
         note={`Real places in ${t.brief.city} whose regulars share this audience's taste, found by ${source}. Confirm availability and filming permission with each venue.`}
       >
         <div className={pinned ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "contents"}>
-          <div className={pinned ? "lg:tall:sticky lg:tall:top-20" : ""}>
+          <div className={pinned ? "lg:pin:sticky lg:pin:top-20" : ""}>
             <ShootBaseBlock
               base={t.base}
               pins={locationPins(t)}
