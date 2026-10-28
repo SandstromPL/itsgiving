@@ -124,45 +124,118 @@ const overlap = (a: Box, b: Box) =>
     bottom: Math.min(a.bottom, b.bottom),
   });
 
+interface Ring {
+  name: string;
+  x: number;
+  y: number;
+  r: number;
+}
+
 /**
- * Each area's name beside its ring, in the first place that stays in the frame and clear of the pins, the
- * OpenStreetMap credit and the names placed before it; where no place is clear, in the one that hides least of it.
- * Names are HTML at a fixed size, so in SVG units they grow as the map shrinks: `scale` is screen pixels per SVG
- * unit (1 before the map is measured).
+ * The box an area's name takes beside its ring. Names are HTML at a fixed size, so in SVG units they grow as the map
+ * shrinks: `scale` is screen pixels per SVG unit (1 before the map is measured).
  */
-export function placeLabels(
-  rings: { name: string; x: number; y: number; r: number }[],
-  pins: Point[],
-  width: number,
-  height: number,
-  scale = 1,
-): Placement[] {
+export function nameBox(ring: Ring, { side, along }: Placement, scale = 1): Box {
+  const w = (ring.name.length * 6.6 + 10) / scale;
+  const h = 18 / scale;
+  const gap = 4 / scale;
+  if (side === "right" || side === "left") {
+    const left = side === "right" ? ring.x + ring.r + gap : ring.x - ring.r - gap - w;
+    return { left, right: left + w, top: ring.y - h / 2, bottom: ring.y + h / 2 };
+  }
+  const left = ring.x + ((along - 1) * w) / 2;
+  const top = side === "above" ? ring.y - ring.r - gap - h : ring.y + ring.r + gap;
+  return { left, right: left + w, top, bottom: top + h };
+}
+
+/** The pins' dots and the OpenStreetMap credit's corner: what nothing written on the map may cover. */
+function fixtures(pins: Point[], width: number, height: number, scale: number): Box[] {
   const px = (n: number) => n / scale;
-  const taken: Box[] = [
+  return [
     ...pins.map((p) => ({ left: p.x - px(10), top: p.y - px(10), right: p.x + px(10), bottom: p.y + px(10) })),
     { left: width - px(CREDIT_CORNER.width), top: height - px(CREDIT_CORNER.height), right: width, bottom: height },
   ];
-  const frame = { left: 0, top: 0, right: width, bottom: height };
-  // How much of a name would be hidden: under what's taken, or cut off by the frame.
-  const hidden = (b: Box) => taken.reduce((sum, t) => sum + overlap(b, t), 0) + area(b) - overlap(b, frame);
+}
+
+/** How much of a box would be hidden: under what's taken, or cut off by the frame. */
+function hiddenArea(b: Box, taken: Box[], width: number, height: number): number {
+  return taken.reduce((sum, t) => sum + overlap(b, t), 0) + area(b) - overlap(b, { left: 0, top: 0, right: width, bottom: height });
+}
+
+/**
+ * Each area's name beside its ring, in the first place that stays in the frame and clear of the pins, the
+ * OpenStreetMap credit and the names placed before it; where no place is clear, in the one that hides least of it.
+ */
+export function placeLabels(rings: Ring[], pins: Point[], width: number, height: number, scale = 1): Placement[] {
+  const taken = fixtures(pins, width, height, scale);
+  const hidden = (b: Box) => hiddenArea(b, taken, width, height);
   return rings.map((ring) => {
-    const w = px(ring.name.length * 6.6 + 10);
-    const h = px(18);
-    const gap = px(4);
-    const box = ({ side, along }: Placement): Box => {
-      if (side === "right" || side === "left") {
-        const left = side === "right" ? ring.x + ring.r + gap : ring.x - ring.r - gap - w;
-        return { left, right: left + w, top: ring.y - h / 2, bottom: ring.y + h / 2 };
-      }
-      const left = ring.x + ((along - 1) * w) / 2;
-      const top = side === "above" ? ring.y - ring.r - gap - h : ring.y + ring.r + gap;
-      return { left, right: left + w, top, bottom: top + h };
-    };
+    const box = (p: Placement) => nameBox(ring, p, scale);
     const placement =
       PLACEMENTS.find((p) => hidden(box(p)) === 0) ?? PLACEMENTS.reduce((best, p) => (hidden(box(p)) < hidden(box(best)) ? p : best));
     taken.push(box(placement));
     return placement;
   });
+}
+
+/** Where the lit pin's name goes: the side of its dot, and how far it slides sideways when above or below. */
+export interface PinName {
+  side: Side;
+  /** Above or below, the slide (SVG units) from centred over the dot that keeps the name inside the frame. */
+  slide: number;
+}
+
+/** From a lit dot's centre to its name, in screen pixels: clear of the dot (30px) and most of its halo. */
+const PIN_NAME_OFFSET = 20;
+
+/**
+ * The lit pin's name, 12px bold in its pill: on the dot's roomier side as before when that's clear, else the other
+ * side, then above, then below, whichever first stays in the frame and clear of the area names, the other pins and the
+ * credit; where none is clear, the one that hides least of it. A small map left the name over its own shoot base's.
+ */
+export function placePinName(
+  pin: Point,
+  name: string,
+  rings: Ring[],
+  names: Placement[],
+  others: Point[],
+  width: number,
+  height: number,
+  scale = 1,
+): PinName {
+  const px = (n: number) => n / scale;
+  const w = px(name.length * 6.6 + 12);
+  const h = px(20);
+  const off = px(PIN_NAME_OFFSET);
+  const taken = [...fixtures(others, width, height, scale), ...rings.map((ring, i) => nameBox(ring, names[i], scale))];
+  const sides: Side[] = pin.x > width / 2 ? ["left", "right", "above", "below"] : ["right", "left", "above", "below"];
+  const place = (side: Side): PinName & { box: Box } => {
+    if (side === "right" || side === "left") {
+      const left = side === "right" ? pin.x + off : pin.x - off - w;
+      return { side, slide: 0, box: { left, right: left + w, top: pin.y - h / 2, bottom: pin.y + h / 2 } };
+    }
+    // Centred over the dot, slid back inside the frame where it would run off a side.
+    const centred = pin.x - w / 2;
+    const left = w >= width ? 0 : Math.min(Math.max(centred, 0), width - w);
+    const top = side === "above" ? pin.y - off - h : pin.y + off;
+    return { side, slide: fixed(left - centred), box: { left, right: left + w, top, bottom: top + h } };
+  };
+  const options = sides.map(place);
+  const hidden = (o: { box: Box }) => hiddenArea(o.box, taken, width, height);
+  const { side, slide } = options.find((o) => hidden(o) === 0) ?? options.reduce((best, o) => (hidden(o) < hidden(best) ? o : best));
+  return { side, slide };
+}
+
+/**
+ * The lit pin's name placed as CSS, from the dot's centre: beside it, cut short at the frame's edge if it must be, or
+ * centred above or below it, slid back inside the frame. `x` is the dot's position across the frame, in percent.
+ */
+function pinNameStyle({ side, slide }: PinName, x: number, scale: number): CSSProperties {
+  const off = `${PIN_NAME_OFFSET}px`;
+  if (side === "right") return { transform: `translate(${off}, -50%)`, maxWidth: `calc(${fixed(100 - x)}% - 28px)` };
+  if (side === "left") return { transform: `translate(calc(-100% - ${off}), -50%)`, maxWidth: `calc(${fixed(x)}% - 28px)` };
+  const along = `calc(-50% + ${fixed(slide * scale)}px)`;
+  return { transform: `translate(${along}, ${side === "above" ? `calc(-100% - ${off})` : off})`, maxWidth: "calc(100% - 8px)" };
 }
 
 /** A name's offset from the point of its ring it's placed at, matching the boxes above. */
@@ -173,6 +246,26 @@ const labelShift = ({ side, along }: Placement) =>
       ? "translate(calc(-100% - 4px), -50%)"
       : `translate(${(along - 1) * 50}%, ${side === "above" ? "calc(-100% - 4px)" : "4px"})`;
 
+/**
+ * A board's map block beside its locations. On a screen at least 44rem tall (globals.css) the whole block pins. From
+ * 34rem to 44rem it wouldn't fit under the section bar with a map worth reading, so only the map pins: the block becomes
+ * a grid whose last row runs the length of the locations, its words in a card of their own above (`bg`, painted behind
+ * rows 1 to 4) that scrolls on, and the map, as tall as the screen allows, in that last row. The block's card and the
+ * HeatMap's wrapper step aside (`contents`) so their parts can take cells of the grid. Each part names its cell: placed
+ * by the grid, the words would go beside the card's background instead of over it. None of it applies on paper.
+ */
+export const PINNED = {
+  wrap: "lg:tall:sticky lg:tall:top-20 lg:short:grid lg:short:grid-rows-[repeat(4,auto)_minmax(0,1fr)] lg:short:self-stretch",
+  card: "lg:short:contents",
+  bg: "hidden rounded-[28px] bg-background lg:short:block lg:short:[grid-area:1/1/5/2]",
+  head: "lg:short:[grid-area:1/1] lg:short:px-6 lg:short:pt-6",
+  heat: "lg:short:contents",
+  caption: "lg:short:[grid-area:2/1] lg:short:mx-6 lg:short:mt-4 lg:short:mb-0",
+  map: "lg:short:[grid-area:5/1] lg:short:sticky lg:short:top-20 lg:short:mt-4 lg:short:self-start lg:short:[--map-height:min(30rem,100dvh_-_6rem)]",
+  legend: "lg:short:[grid-area:3/1] lg:short:mx-6",
+  note: "lg:short:[grid-area:4/1] lg:short:mx-6 lg:short:mt-4 lg:short:mb-6",
+};
+
 function HeatMap({
   base,
   map,
@@ -182,6 +275,7 @@ function HeatMap({
   mock,
   active,
   compact = false,
+  pinned = false,
 }: {
   base: ShootBase;
   map: HeatGrid;
@@ -192,8 +286,10 @@ function HeatMap({
   mock: boolean;
   /** The location being read (0-based, as on the cards): its pin grows and shows its name. */
   active?: number;
-  /** Pinned beside the locations: never taller than the screen leaves room for. */
+  /** In the compact block, a board's or the homepage's: never taller than the screen leaves room for. */
   compact?: boolean;
+  /** In a board's block beside its locations, which pins (PINNED). */
+  pinned?: boolean;
 }) {
   // The frame and its lines are kept while the bounds stay the same: the board draws the map again as each location is
   // read, and tracing the lines takes a few milliseconds.
@@ -231,30 +327,30 @@ function HeatMap({
   const paper = compact
     ? {
         wrap: "print:contents",
-        // Pinned on a short screen (globals.css), the caption gives its lines to the map, and the map may go below 16rem.
-        caption: "print:col-start-2 print:row-start-2 print:mb-0 lg:pin:short:hidden",
-        map: "print:col-start-1 print:row-span-5 print:row-start-1 print:mx-0 print:w-[calc(var(--map-height)*var(--map-ratio))] print:[--map-height:26rem] lg:pin:short:[--map-floor:10rem] lg:pin:short:[--map-rest:24rem]",
+        caption: "print:col-start-2 print:row-start-2 print:mb-0",
+        map: "print:col-start-1 print:row-span-5 print:row-start-1 print:mx-0 print:w-[calc(var(--map-height)*var(--map-ratio))] print:[--map-height:26rem]",
         legend: "print:col-start-2 print:row-start-3 print:mt-0",
       }
     : { wrap: "", caption: "", map: "", legend: "" };
+  const pin = pinned ? PINNED : { heat: "", caption: "", map: "", legend: "" };
 
   return (
-    <div className={`${heat} ${paper.wrap}`}>
-      <p className={`mb-3 max-w-[60ch] text-[14px] leading-5 text-dim ${paper.caption}`}>
+    <div className={`${heat} ${paper.wrap} ${pin.heat}`}>
+      <p className={`mb-3 max-w-[60ch] text-[14px] leading-5 text-dim ${paper.caption} ${pin.caption}`}>
         <span className="font-semibold text-foreground">Where the fans are.</span> {mock ? "A synthetic heatmap" : "Qloo's heatmap"} of{" "}
         {audience} across {city}, drawn as contour lines: the bolder the line, the stronger this audience is inside it.
       </p>
       <div
         ref={box}
-        className={`relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] print:bg-white ${paper.map}`}
+        className={`relative mx-auto w-full overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] print:bg-white ${paper.map} ${pin.map}`}
         style={
           {
             aspectRatio: `${f.width} / ${f.height}`,
             // Pinned beside the locations, the whole block must fit under the section bar: the rest of it (caption,
-            // legend, the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900, and
-            // about 22rem on a short screen, where the caption is hidden (--map-rest and --map-floor above).
+            // legend, the base's panel) and the 5rem offset take about 26rem, measured at 1280x720 and 1440x900. Where
+            // only the map pins, it takes the screen's height less its offset and a margin (PINNED.map).
             maxWidth: compact
-              ? `calc(var(--map-height, max(var(--map-floor, 16rem), min(30rem, 100dvh - var(--map-rest, 28rem)))) * ${f.width / f.height})`
+              ? `calc(var(--map-height, max(16rem, min(30rem, 100dvh - 28rem))) * ${f.width / f.height})`
               : `${(34 * f.width) / f.height}rem`,
             "--map-ratio": f.width / f.height,
           } as CSSProperties
@@ -329,9 +425,6 @@ function HeatMap({
         })}
         {pins.map((p, i) => {
           const on = active !== undefined && p.n === active + 1;
-          // The name goes on the pin's roomier side, and a long one is cut short there rather than by the frame.
-          const x = (placed[i].x / f.width) * 100;
-          const left = x > 50;
           return (
             <Fragment key={p.n}>
               <span
@@ -352,8 +445,20 @@ function HeatMap({
                   className="absolute z-10 truncate rounded-md bg-(--light-background) px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-ink"
                   style={{
                     ...at(placed[i]),
-                    transform: left ? "translate(calc(-100% - 20px), -50%)" : "translate(20px, -50%)",
-                    maxWidth: `calc(${fixed(left ? x : 100 - x)}% - 28px)`,
+                    ...pinNameStyle(
+                      placePinName(
+                        placed[i],
+                        p.name,
+                        rings,
+                        names,
+                        placed.filter((_, j) => j !== i),
+                        f.width,
+                        f.height,
+                        scale,
+                      ),
+                      (placed[i].x / f.width) * 100,
+                      scale,
+                    ),
                   }}
                 >
                   {p.name}
@@ -364,7 +469,7 @@ function HeatMap({
         })}
         <MapCredit />
       </div>
-      <div className={`mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim ${paper.legend}`}>
+      <div className={`mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim ${paper.legend} ${pin.legend}`}>
         <span className="flex items-center gap-1.5">
           Weaker
           {/* The four lines as small loops, drawn as on the map. */}
@@ -416,6 +521,7 @@ export function ShootBaseBlock({
   mock,
   active,
   compact = false,
+  pinned = false,
 }: {
   base?: ShootBase;
   /** The scouted places, numbered as on the location cards. */
@@ -426,8 +532,10 @@ export function ShootBaseBlock({
   mock: boolean;
   /** The location being read, highlighted on the map. */
   active?: number;
-  /** Beside the location cards, or on the homepage: the map with a short header instead of the side panel. */
+  /** On the homepage: the map with a short header instead of the side panel. */
   compact?: boolean;
+  /** Beside a board's location cards: compact, and pinned while they scroll (PINNED; the board's wrapper takes `wrap`). */
+  pinned?: boolean;
 }) {
   const chosen = base?.areas.find((a) => a.ref === base.chosen) ?? base?.areas[0];
   if (!base || !chosen) return null;
@@ -437,12 +545,14 @@ export function ShootBaseBlock({
   const locations = pins.length > 0 ? "Every location" : "Every location in the treatment";
   const share = <span className={`rounded-md px-1.5 py-0.5 font-bold ${rankMark(mock)}`}>{percent(chosen.share)}</span>;
   const map = base.map && base.map.tiles.length > 0 && base.map;
-  if (compact) {
+  if (compact || pinned) {
+    const pin = pinned ? PINNED : { card: "", head: "", note: "" };
     return (
       <div
-        className={`surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6 print:grid print:break-inside-avoid print:grid-cols-[auto_minmax(0,1fr)] print:grid-rows-[auto_auto_auto_auto_1fr] print:items-start print:gap-x-6 print:gap-y-3 ${PAPER}`}
+        className={`surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6 print:grid print:break-inside-avoid print:grid-cols-[auto_minmax(0,1fr)] print:grid-rows-[auto_auto_auto_auto_1fr] print:items-start print:gap-x-6 print:gap-y-3 ${PAPER} ${pin.card}`}
       >
-        <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1">
+        {pinned && <div aria-hidden className={PINNED.bg} />}
+        <div className={`flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1 ${pin.head}`}>
           <div>
             <h4 className="text-[14px] font-semibold text-dim">Shoot base</h4>
             <p className="type-poster mt-1.5 text-[clamp(2rem,3.2vw,2.75rem)]">{chosen.name}</p>
@@ -451,8 +561,10 @@ export function ShootBaseBlock({
             {share} of this audience&apos;s strongest spots in {city}
           </p>
         </div>
-        {map && <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} active={active} compact />}
-        <p className="text-sm leading-6 text-dim print:col-start-2 print:row-start-4">
+        {map && (
+          <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} active={active} compact pinned={pinned} />
+        )}
+        <p className={`text-sm leading-6 text-dim print:col-start-2 print:row-start-4 ${pin.note}`}>
           {base.held
             ? `${locations} is within ${km} of ${chosen.name}, so the unit can stay in one area.`
             : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${city}.`}

@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
-/* Screen heights for a board's shoot-base map pinned beside its locations (board.tsx, base-map.tsx). It pins on screens
-   at least 34rem tall. Below 44rem the whole block wouldn't fit under the section bar at its usual size, so there the
-   map drops its caption and may shrink below its 16rem floor. Shorter than 34rem, it scrolls with the page. */
-@custom-variant pin (@media (min-height: 34rem));
-@custom-variant short (@media (max-height: 43.99rem));
+/* Screen heights for a board's shoot-base map beside its locations (base-map.tsx, PINNED). On screens at least 44rem tall
+   the whole block pins. From 34rem to 44rem the block wouldn't fit under the section bar with a map worth reading, so
+   only the map pins and the block's words scroll on above it. Shorter than 34rem, it all scrolls with the page. */
+@custom-variant tall (@media (min-height: 44rem));
+@custom-variant short (@media (min-height: 34rem) and (max-height: 43.99rem));
 
 /*
  * itsgiving: Gen Z, professionally. A warm off-white room, ink type and ink pill buttons, and one highlighter accent
