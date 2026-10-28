@@ -42,13 +42,20 @@ export class TmdbError extends Error {
  * A GET over IPv4 only, as a fetch. TMDB's API sits on CloudFront, which lists eight IPv6 addresses and four IPv4 ones.
  * From a network whose IPv6 route to them is broken, Node's own fetch (it gives each address 250 ms) failed whole
  * bursts of lookups with ETIMEDOUT once its first connections had closed: 16 of 32 in a local test (2026-10-27), and
- * still 8 of 32 with 1.5 s an address. Over IPv4 alone, none of 32 failed. Connections are kept alive between calls.
+ * still 8 of 32 with 1.5 s an address. Over IPv4 alone, none of 32 failed. Connections are kept alive between calls,
+ * unless `fresh` asks for a new one.
  */
-export const ipv4Fetch: FetchLike = (url, init) =>
-  new Promise((resolve, reject) => {
+function ipv4Get(url: string, init: RequestInit | undefined, fresh: boolean): Promise<Response> {
+  return new Promise((resolve, reject) => {
     const req = request(
       url,
-      { method: "GET", family: 4, headers: Object.fromEntries(new Headers(init?.headers)), signal: init?.signal ?? undefined },
+      {
+        method: "GET",
+        family: 4,
+        headers: Object.fromEntries(new Headers(init?.headers)),
+        signal: init?.signal ?? undefined,
+        ...(fresh ? { agent: false } : {}),
+      },
       (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -62,6 +69,17 @@ export const ipv4Fetch: FetchLike = (url, init) =>
     req.on("error", reject);
     req.end();
   });
+}
+
+export const ipv4Fetch: FetchLike = (url, init) => ipv4Get(url, init, false);
+
+/**
+ * The same GET over a connection of its own, for a retry. A run's lookups come in bursts with long gaps between them
+ * (the writer thinks for 40 s or more), and a kept-alive connection TMDB has dropped meanwhile fails with ECONNRESET;
+ * the retry could draw another such connection from the pool, and did for 1 of 8 actors in each of two featured
+ * builds (2026-10-29).
+ */
+export const freshIpv4Fetch: FetchLike = (url, init) => ipv4Get(url, init, true);
 
 export interface TmdbListItem {
   tmdbId: number;
@@ -201,7 +219,7 @@ export class TmdbClient {
       let response: Response;
       try {
         response = await this.inTurn(() =>
-          (this.options.fetch ?? ipv4Fetch)(`${this.options.baseUrl}${path}?${query}`, {
+          (this.options.fetch ?? (attempt === 1 ? ipv4Fetch : freshIpv4Fetch))(`${this.options.baseUrl}${path}?${query}`, {
             headers: { Accept: "application/json", ...(bearer ? { Authorization: `Bearer ${key}` } : {}) },
             signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
           }),
