@@ -22,14 +22,14 @@ export function NotFoundBody() {
   const offerSignIn = savedLink && account.state === "out";
   return (
     <>
-      <h1 className="type-poster max-w-[14ch] text-[clamp(3.5rem,8vw,7rem)]">{t.notFound.title}</h1>
-      <p className="max-w-[44ch] text-[1.2rem] leading-[1.45] text-dim">
+      <h1 className="type-poster max-w-[14ch] text-display-lg">{t.notFound.title}</h1>
+      <p className="max-w-[44ch] text-prose leading-[1.45] text-dim">
         {t.notFound.line}
         {offerSignIn && " If it's a saved treatment of yours, sign in to open it."}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         {offerSignIn && <SignInButton className={primaryButton} />}
-        <Link href="/" className={offerSignIn ? `${pillButton} min-h-14 px-7 text-[17px]` : primaryButton}>
+        <Link href="/" className={offerSignIn ? `${pillButton} min-h-14 px-7 text-body` : primaryButton}>
           Back to the homepage
         </Link>
       </div>

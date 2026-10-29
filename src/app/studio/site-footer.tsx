@@ -41,18 +41,18 @@ export function SiteFooter() {
             <Mark name="itsgiving" />
             <span className="sr-only">itsgiving</span>
           </p>
-          <p className="max-w-[36ch] text-[15px] leading-6 text-dim">
+          <p className="max-w-[36ch] text-ui leading-6 text-dim">
             Treatments for music videos and short films, built from what their audience loves on Qloo.
           </p>
-          <p className="text-[15px] font-bold">{t.footer}</p>
+          <p className="text-ui font-bold">{t.footer}</p>
         </div>
 
         <nav aria-labelledby={pages} className="lg:col-span-2">
-          <h2 id={pages} className="text-[14px] font-bold">
+          <h2 id={pages} className="text-small font-bold">
             Pages
           </h2>
           {/* Two short columns on a phone, one list from the small tablet up. */}
-          <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-[15px] text-dim sm:flex sm:flex-col">
+          <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-ui text-dim sm:flex sm:flex-col">
             {PAGES.map((page) => (
               <li key={page.href}>
                 <Link href={page.href} onClick={page.id === "examples" ? toExamples : undefined} className={sweep}>
@@ -64,16 +64,16 @@ export function SiteFooter() {
         </nav>
 
         <div className="lg:col-span-5">
-          <h2 className="text-[14px] font-bold">Credits</h2>
+          <h2 className="text-small font-bold">Credits</h2>
           {/* Roles on the right of a gutter and names on its left, as end credits are set. */}
           <dl className="mt-3 grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-1.5">
-            <dt className="text-right text-[14px] text-faint">Taste data</dt>
-            <dd className="text-[15px] font-semibold">
+            <dt className="text-right text-small text-faint">Taste data</dt>
+            <dd className="text-ui font-semibold">
               <a href="https://www.qloo.com/" className={inline}>
                 Qloo
               </a>
             </dd>
-            <dt className="text-right text-[14px] text-faint">Film stills</dt>
+            <dt className="text-right text-small text-faint">Film stills</dt>
             <dd>
               {/* TMDB's own logo file, unaltered (public/tmdb.svg, from themoviedb.org/about/logos-attribution), standing
                   in for its name beside the notice its terms ask for, below. */}
@@ -82,21 +82,21 @@ export function SiteFooter() {
                 <img src="/tmdb.svg" alt="TMDB" width={92} height={12} className="h-3 w-auto" />
               </a>
             </dd>
-            <dt className="text-right text-[14px] text-faint">Maps</dt>
-            <dd className="text-[15px] font-semibold">
+            <dt className="text-right text-small text-faint">Maps</dt>
+            <dd className="text-ui font-semibold">
               <a href="https://www.openstreetmap.org/copyright" className={inline}>
                 © OpenStreetMap contributors
               </a>
             </dd>
             {/* DeepSeek writes first; Gemini and Groq stand in when it can't (src/lib/llm). */}
-            <dt className="text-right text-[14px] text-faint">Writing</dt>
-            <dd className="text-[15px] font-semibold">DeepSeek, Gemini or Groq</dd>
+            <dt className="text-right text-small text-faint">Writing</dt>
+            <dd className="text-ui font-semibold">DeepSeek, Gemini or Groq</dd>
           </dl>
-          <p className="mt-4 max-w-[46ch] text-[13px] leading-5 text-faint">{TMDB_NOTICE}</p>
+          <p className="mt-4 max-w-[46ch] text-caption leading-5 text-faint">{TMDB_NOTICE}</p>
         </div>
       </div>
 
-      <div className="mt-10 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t border-line pt-5 text-[13px] text-faint">
+      <div className="mt-10 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t border-line pt-5 text-caption text-faint">
         <p>© 2026 itsgiving</p>
         <p className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
           {process.env.NODE_ENV !== "production" && (

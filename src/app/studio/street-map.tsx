@@ -146,10 +146,10 @@ export function StreetTiles({ frame }: { frame: MapFrame }) {
 }
 
 /**
- * The corner of the map the credit takes, in screen pixels from the bottom-right: its chip (174 × 24 in the site's
- * type), its inset and a little room. Names placed on the map keep out of it.
+ * The corner of the map the credit takes, in screen pixels from the bottom-right: its chip (189 × 25 at the label
+ * size), its inset and a little room. Names placed on the map keep out of it.
  */
-export const CREDIT_CORNER = { width: 184, height: 34 };
+export const CREDIT_CORNER = { width: 200, height: 34 };
 
 /** OpenStreetMap's credit, as its licence asks: on the map's corner, or right under a map too small to spare one. */
 export function MapCredit({ under = false }: { under?: boolean }) {
@@ -158,7 +158,7 @@ export function MapCredit({ under = false }: { under?: boolean }) {
       href="https://www.openstreetmap.org/copyright"
       target="_blank"
       rel="noreferrer"
-      className={`text-[11px] leading-none text-dim hover:text-foreground ${
+      className={`text-label leading-none text-dim hover:text-foreground ${
         under ? "" : "absolute right-1.5 bottom-1.5 z-20 rounded-[4px] bg-frame/85 px-1.5 py-[6.5px]"
       }`}
     >

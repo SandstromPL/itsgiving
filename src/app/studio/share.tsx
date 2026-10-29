@@ -25,7 +25,7 @@ export function shareLinks(url: string, title: string): { whatsapp: string; emai
   };
 }
 
-const outline = "press rounded-full border border-ink px-4 py-2.5 text-[15px] font-semibold hover:bg-ink hover:text-white";
+const outline = "press rounded-full border border-ink px-4 py-2.5 text-ui font-semibold hover:bg-ink hover:text-white";
 
 /** The QR code as an SVG path in module units, with a quiet zone of four modules around it. */
 interface Qr {
@@ -67,10 +67,10 @@ export function ShareWindow({ id, title, path, ref }: { id: string; title: strin
     <PaperWindow id={id} label="share" ref={ref} onToggle={opened}>
       <div className="flex flex-col gap-5 p-5">
         <div className="flex flex-col gap-2">
-          <h2 id={`${id}-title`} className="type-head text-[2.1rem] leading-none text-ink">
+          <h2 id={`${id}-title`} className="type-head text-heading leading-none text-ink">
             {lines.title}
           </h2>
-          <p className="font-serif text-[1.3rem] leading-snug text-slip-ink italic">{title}</p>
+          <p className="font-serif text-prose leading-snug text-slip-ink italic">{title}</p>
         </div>
         <div className="flex items-center gap-4">
           {/* Dark modules on white in either theme, with the quiet zone a scanner needs. */}
@@ -81,10 +81,10 @@ export function ShareWindow({ id, title, path, ref }: { id: string; title: strin
               </svg>
             )}
           </span>
-          <p className="text-[15px] leading-6 text-dim">Scan to open on your phone.</p>
+          <p className="text-ui leading-6 text-dim">Scan to open on your phone.</p>
         </div>
         <div className="flex flex-col gap-2">
-          <label htmlFor={`${id}-link`} className="text-[14px] font-semibold text-dim">
+          <label htmlFor={`${id}-link`} className="text-small font-semibold text-dim">
             Link
           </label>
           <div className="flex gap-2">
@@ -94,7 +94,7 @@ export function ShareWindow({ id, title, path, ref }: { id: string; title: strin
               readOnly
               value={url ?? ""}
               onFocus={(event) => event.currentTarget.select()}
-              className="min-w-0 flex-1 rounded-xl border border-[#c9c1af] bg-[#fffdf6] px-3 py-2.5 font-mono text-[16px] text-slip-ink sm:text-[13px]"
+              className="min-w-0 flex-1 rounded-xl border border-[#c9c1af] bg-[#fffdf6] px-3 py-2.5 font-mono text-body text-slip-ink sm:text-caption"
             />
             <button
               type="button"
@@ -102,7 +102,7 @@ export function ShareWindow({ id, title, path, ref }: { id: string; title: strin
               onClick={async () => {
                 if (url && !(await copy(url))) field.current?.select();
               }}
-              className="shrink-0 rounded-full bg-ink px-4 py-2.5 text-[15px] font-bold text-white"
+              className="shrink-0 rounded-full bg-ink px-4 py-2.5 text-ui font-bold text-white"
             >
               {copied ? "Link copied" : "Copy link"}
             </button>

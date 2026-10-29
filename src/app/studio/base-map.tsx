@@ -407,7 +407,7 @@ function HeatMap({
 
   return (
     <div className={`${heat} ${paper.wrap} ${pin.heat}`}>
-      <p className={`mb-3 max-w-[60ch] text-[14px] leading-5 text-dim ${paper.caption} ${pin.caption}`}>
+      <p className={`mb-3 max-w-[60ch] text-small leading-5 text-dim ${paper.caption} ${pin.caption}`}>
         <span className="font-semibold text-foreground">Where the fans are.</span> {mock ? "A synthetic heatmap" : "Qloo's heatmap"} of{" "}
         {audience} across {city}, drawn as contour lines: the bolder the line, the stronger this audience is inside it.
       </p>
@@ -487,7 +487,7 @@ function HeatMap({
               <span
                 key={ring.area.ref}
                 aria-hidden
-                className={`absolute whitespace-nowrap rounded-[4px] bg-frame/85 px-1.5 py-[3px] text-[12px] leading-none ${
+                className={`absolute whitespace-nowrap rounded-[4px] bg-frame/85 px-1.5 py-[3px] text-label leading-none ${
                   ring.area.ref === base.chosen ? "font-bold text-foreground" : "text-dim"
                 }`}
                 style={{ ...at(anchor), transform: labelShift(names[i]) }}
@@ -505,8 +505,8 @@ function HeatMap({
                   title={p.name}
                   className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full font-bold ring-2 ring-frame ${
                     on
-                      ? "z-10 size-[30px] bg-accent text-[13px] text-ink shadow-[0_0_0_6px_rgb(228_255_58/0.3)]"
-                      : "size-[20px] bg-foreground text-[11px] text-frame"
+                      ? "z-10 size-[30px] bg-accent text-caption text-ink shadow-[0_0_0_6px_rgb(228_255_58/0.3)]"
+                      : "size-[20px] bg-foreground text-label text-frame"
                   }`}
                   style={at(placed[i])}
                 >
@@ -515,7 +515,7 @@ function HeatMap({
                 {on && (
                   <span
                     aria-hidden
-                    className="absolute z-10 truncate rounded-md bg-(--light-background) px-1.5 py-0.5 text-[12px] font-bold whitespace-nowrap text-ink"
+                    className="absolute z-10 truncate rounded-md bg-(--light-background) px-1.5 py-0.5 text-label font-bold whitespace-nowrap text-ink"
                     style={{
                       ...at(placed[i]),
                       ...pinNameStyle(
@@ -543,7 +543,7 @@ function HeatMap({
         </div>
         <MapCredit />
       </div>
-      <div className={`mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-dim ${paper.legend} ${pin.legend}`}>
+      <div className={`mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-label leading-4 text-dim ${paper.legend} ${pin.legend}`}>
         <span className="flex items-center gap-1.5">
           Weaker
           {/* The four lines as small loops, drawn as on the map. */}
@@ -628,17 +628,17 @@ export function ShootBaseBlock({
         {pinned && <div aria-hidden className={PINNED.bg} />}
         <div className={`flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1 ${pin.head}`}>
           <div>
-            <p className="text-[14px] font-semibold text-dim">Shoot base</p>
-            <p className="type-poster mt-1.5 text-[clamp(2rem,3.2vw,2.75rem)]">{chosen.name}</p>
+            <p className="text-small font-semibold text-dim">Shoot base</p>
+            <p className="type-poster mt-1.5 text-section">{chosen.name}</p>
           </div>
-          <p className="text-[14px] leading-6">
+          <p className="text-small leading-6">
             {share} of this audience&apos;s strongest spots in {city}
           </p>
         </div>
         {map && (
           <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} active={active} compact pinned={pinned} />
         )}
-        <p className={`text-sm leading-6 text-dim print:col-start-2 print:row-start-4 ${pin.note}`}>
+        <p className={`text-small leading-6 text-dim print:col-start-2 print:row-start-4 ${pin.note}`}>
           {base.held
             ? `${locations} is within ${km} of ${chosen.name}, so the unit can stay in one area.`
             : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${city}.`}
@@ -654,32 +654,32 @@ export function ShootBaseBlock({
       {map ? (
         <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} />
       ) : (
-        <p className="text-sm text-dim">The heatmap itself didn&apos;t come back with this treatment.</p>
+        <p className="text-small leading-5 text-dim">The heatmap itself didn&apos;t come back with this treatment.</p>
       )}
       <div>
-        <p className="text-[14px] font-semibold text-dim">Shoot base</p>
-        <p className="type-poster mt-2 text-[clamp(2.4rem,4vw,3.25rem)]">{chosen.name}</p>
-        {chosen.district && <p className="mt-2 text-[15px] text-dim">{chosen.district}</p>}
-        <p className="mt-4 text-[15px] leading-6">
+        <p className="text-small font-semibold text-dim">Shoot base</p>
+        <p className="type-poster mt-2 text-display-sm">{chosen.name}</p>
+        {chosen.district && <p className="mt-2 text-ui text-dim">{chosen.district}</p>}
+        <p className="mt-4 text-ui leading-6">
           {share} of this audience&apos;s strongest spots in {city}
         </p>
-        <p className="mt-3 text-sm leading-6 text-dim">
+        <p className="mt-3 text-small leading-6 text-dim">
           {base.held
             ? `${mock ? "The mock's" : "Qloo's"} heatmap puts this audience here. Every location below is within ${km}, so the unit can stay in one area.`
             : `Too few places matched within ${km} of ${chosen.name}, so the locations below come from across ${city}.`}
         </p>
-        {chosen.near.length > 0 && <p className="mt-3 text-xs leading-5 text-dim">Around it: {chosen.near.join(", ")}.</p>}
+        {chosen.near.length > 0 && <p className="mt-3 text-label leading-5 text-dim">Around it: {chosen.near.join(", ")}.</p>}
         {others.length > 0 && (
           <div className="mt-6">
-            <p className="text-[13px] font-medium text-dim">Other strong areas</p>
+            <p className="text-caption font-medium text-dim">Other strong areas</p>
             <ul className="mt-2 divide-y divide-line border-y border-line">
               {others.map((a) => (
-                <li key={a.ref} className="flex items-baseline justify-between gap-3 py-2 text-sm">
+                <li key={a.ref} className="flex items-baseline justify-between gap-3 py-2 text-small leading-5">
                   <span>
                     {a.name}
                     {a.district && <span className="text-dim">, {a.district}</span>}
                   </span>
-                  <span className={`type-evidence text-xs ${evidence}`}>{percent(a.share)}</span>
+                  <span className={`type-evidence text-label leading-4 ${evidence}`}>{percent(a.share)}</span>
                 </li>
               ))}
             </ul>

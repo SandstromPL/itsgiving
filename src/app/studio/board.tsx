@@ -37,11 +37,11 @@ import { printPicture, printRead, printReceipt, printRow, usePrintTitle } from "
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
 
 /** itsgiving's own writing is set in the serif; the tool, labels and Qloo's evidence stay in the interface faces. */
-const prose = "font-serif text-[1.25rem] leading-[1.38]";
+const prose = "font-serif text-prose leading-[1.38]";
 /** A card is never cut across two printed pages. */
 const card = "rounded-[26px] border border-line bg-card print:break-inside-avoid";
 /** A place's map, phone and website, at the foot of its card. */
-const placeLink = "py-2 text-sm font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground";
+const placeLink = "py-2 text-small leading-5 font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground";
 
 /** A character's sketch, after who they are, in reading order. */
 const SKETCH: [string, "wants" | "hides" | "presence" | "look" | "arc"][] = [
@@ -108,10 +108,10 @@ function Section({
     <section aria-labelledby={id} className={`flex flex-col gap-6 ${follows ? "" : "print:break-before-page"}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 print:break-after-avoid">
         {/* The section bar's jump lands on the heading, so the room it leaves for the sticky bar is the heading's. */}
-        <h2 id={id} className="type-head scroll-mt-24 text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
+        <h2 id={id} className="type-head scroll-mt-24 text-section leading-none">
           {title}
         </h2>
-        {note && <p className="max-w-[60ch] text-[15px] leading-6 text-faint">{note}</p>}
+        {note && <p className="max-w-[60ch] text-ui leading-6 text-faint">{note}</p>}
       </div>
       {children}
     </section>
@@ -124,7 +124,7 @@ function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boole
       {tags.map((tag) => (
         <li
           key={tag.id}
-          className={`rounded-full px-3 py-1.5 font-mono text-[13px] ${
+          className={`rounded-full px-3 py-1.5 font-mono text-caption ${
             shared ? "bg-accent font-semibold text-ink" : `border border-dashed border-slip-edge bg-slip ${paperEvidence(mock)}`
           }`}
         >
@@ -138,8 +138,8 @@ function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boole
 function Also({ label, items, mock }: { label: string; items: CompactEntity[]; mock: boolean }) {
   if (items.length === 0) return null;
   return (
-    <p className="text-[15px] leading-6 text-dim">
-      {label} <span className={`font-mono text-[13px] ${evidenceTone(mock)}`}>{listWithYears(items)}</span>
+    <p className="text-ui leading-6 text-dim">
+      {label} <span className={`font-mono text-caption ${evidenceTone(mock)}`}>{listWithYears(items)}</span>
     </p>
   );
 }
@@ -174,29 +174,29 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
                     className="aspect-[3/2] w-full object-[50%_22%] sm:aspect-[4/5] sm:object-center"
                   />
                   <div className="flex flex-col gap-1 p-4">
-                    <p className="text-[15px] leading-5 font-semibold">{c.face.entity.name}</p>
+                    <p className="text-ui leading-5 font-semibold">{c.face.entity.name}</p>
                     {c.face.known.length > 0 && (
-                      <p className="text-[13px] leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
+                      <p className="text-caption leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
                     )}
-                    {c.face.photo && <p className="text-[13px] leading-5 text-faint">Photo: TMDB</p>}
+                    {c.face.photo && <p className="text-caption leading-5 text-faint">Photo: TMDB</p>}
                   </div>
                 </div>
               )}
               <div className="flex flex-1 flex-col gap-4 p-5">
                 <div className="flex flex-col gap-1.5">
-                  <h3 className="type-head text-[1.7rem] leading-tight">{c.name}</h3>
+                  <h3 className="type-head text-title leading-tight">{c.name}</h3>
                   <p className={`${prose} max-w-[64ch]`}>{c.who}</p>
                 </div>
                 <dl className="grid gap-x-8 gap-y-3 xl:grid-cols-2 print:grid-cols-2">
                   {SKETCH.map(([term, key]) => (
                     <div key={key} className={`flex flex-col gap-0.5 ${key === "arc" ? "xl:col-span-2 print:col-span-2" : ""}`}>
-                      <dt className="text-[13px] font-semibold text-faint">{term}</dt>
-                      <dd className="max-w-[64ch] font-serif text-[1.15rem] leading-snug">
+                      <dt className="text-caption font-semibold text-faint">{term}</dt>
+                      <dd className="max-w-[64ch] font-serif text-lead leading-snug">
                         {c[key]}
                         {key === "arc" && c.beats.length > 0 && (
                           <>
                             {" "}
-                            <span className="ml-1 font-sans text-[13px] whitespace-nowrap text-faint">
+                            <span className="ml-1 font-sans text-caption whitespace-nowrap text-faint">
                               {c.beats.length > 1 ? "Beats" : "Beat"} {joinNames(c.beats.map(String))}
                             </span>
                           </>
@@ -207,15 +207,15 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
                 </dl>
                 {c.from && (
                   <div className="flex flex-col gap-1 border-t border-line pt-3">
-                    <p className="max-w-[64ch] text-[15px] leading-6">
+                    <p className="max-w-[64ch] text-ui leading-6">
                       <span className="font-semibold">Drawn from {c.from.character}</span> ({c.from.actor}) in{" "}
                       {withYear(c.from.title.name, c.from.title.year)}
-                      {c.from.take && <span className="font-serif text-[1.15rem] leading-snug">: {c.from.take}</span>}
+                      {c.from.take && <span className="font-serif text-lead leading-snug">: {c.from.take}</span>}
                     </p>
                     {c.from.archetypes.length > 0 && (
-                      <p className="text-[13px] leading-5 text-faint">
+                      <p className="text-caption leading-5 text-faint">
                         Qloo&apos;s archetypes for the {c.from.title.kind === "tv_show" ? "series" : "film"}:{" "}
-                        <span className={`font-mono text-[12px] ${evidenceTone(mock)}`}>{c.from.archetypes.join(" / ")}</span>
+                        <span className={`font-mono text-label ${evidenceTone(mock)}`}>{c.from.archetypes.join(" / ")}</span>
                       </p>
                     )}
                   </div>
@@ -237,7 +237,7 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
           ))}
         </ul>
       ) : (
-        <p className="text-[15px] text-dim">The writer sketched no characters for this treatment.</p>
+        <p className="text-ui text-dim">The writer sketched no characters for this treatment.</p>
       )}
       <Also
         label={faced ? "Also high for this audience:" : "Actors this audience over-indexes on:"}
@@ -266,7 +266,7 @@ function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string
   return (
     <section aria-labelledby="giving-title" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2.5">
-        <h2 id="giving-title" className="mr-2 font-serif text-[clamp(2.5rem,4.5vw,3.25rem)] leading-none font-normal italic">
+        <h2 id="giving-title" className="mr-2 font-serif text-display-sm leading-none font-normal italic">
           {lingo.giving}
         </h2>
         {tone.map((x) => (
@@ -274,8 +274,8 @@ function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string
             key={x.tag.id}
             className={
               mark && x.source === "overlap"
-                ? "rounded-full bg-accent px-4 py-2.5 text-[17px] font-bold text-ink"
-                : "rounded-full border border-line bg-card px-4 py-2.5 text-[17px]"
+                ? "rounded-full bg-accent px-4 py-2.5 text-body font-bold text-ink"
+                : "rounded-full border border-line bg-card px-4 py-2.5 text-body"
             }
           >
             {tagLabel(x.tag.name)}
@@ -284,7 +284,7 @@ function Giving({ t, mock, whose }: { t: Treatment; mock: boolean; whose: string
         ))}
         {mock && <Tape>Mock data</Tape>}
       </div>
-      <p className="text-[15px] text-faint">
+      <p className="text-ui text-faint">
         Tone tags from {mock ? "the synthetic mock, not Qloo" : "Qloo"}: what this audience over-indexes on.
         {mark ? ` Highlighted: shared with ${whose} films.` : shared > 0 ? ` All of them are shared with ${whose} films.` : ""}
       </p>
@@ -320,7 +320,7 @@ function Rework({
         className="flex flex-wrap items-center gap-2.5 rounded-[28px] border border-line bg-card p-3"
       >
         {take > 1 && (
-          <span className="shrink-0 rounded-full border-2 border-foreground px-3.5 py-2 font-mono text-[13px] font-semibold">
+          <span className="shrink-0 rounded-full border-2 border-foreground px-3.5 py-2 font-mono text-caption font-semibold">
             {lingo.take(take)}
           </span>
         )}
@@ -333,13 +333,13 @@ function Rework({
             aria-pressed={nudges.includes(nudge)}
             aria-disabled={running}
             onClick={() => onToggle(nudge)}
-            className="rounded-full border border-line bg-field px-4 py-2.5 text-[15px] hover:border-foreground aria-disabled:cursor-progress aria-disabled:opacity-50 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:font-semibold aria-pressed:text-background"
+            className="rounded-full border border-line bg-field px-4 py-2.5 text-ui hover:border-foreground aria-disabled:cursor-progress aria-disabled:opacity-50 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:font-semibold aria-pressed:text-background"
           >
             {lingo.nudges[nudge]}
             {lingo.nudges[nudge] !== NUDGE_LABELS[nudge] && (
               <>
                 <span className="sr-only">: </span>
-                <span className="ml-2 text-[13px] font-normal opacity-75">{NUDGE_LABELS[nudge].toLowerCase()}</span>
+                <span className="ml-2 text-caption font-normal opacity-75">{NUDGE_LABELS[nudge].toLowerCase()}</span>
               </>
             )}
           </button>
@@ -351,7 +351,7 @@ function Rework({
           </button>
         </div>
       </div>
-      <p className="px-3 text-[13px] text-faint">{note}</p>
+      <p className="px-3 text-caption text-faint">{note}</p>
     </div>
   );
 }
@@ -444,7 +444,7 @@ export function Board({
       className={`flex flex-col gap-14 transition-opacity duration-300 print:opacity-100 print:[zoom:0.8] ${state === "current" ? "" : "opacity-50"}`}
     >
       {state === "previous" && (
-        <p className="-mb-8 text-[15px] text-dim">
+        <p className="-mb-8 text-ui text-dim">
           This is the previous version. The latest change didn&apos;t finish, so nothing below reflects it.
         </p>
       )}
@@ -470,18 +470,18 @@ export function Board({
 
       <Section id="concept" title="Concept">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] print:grid-cols-[minmax(0,1fr)_22rem]">
-          <p className="max-w-[44ch] font-serif text-[clamp(1.5rem,2.3vw,1.9rem)] leading-[1.32] text-pretty">{t.concept}</p>
+          <p className="max-w-[44ch] font-serif text-logline leading-[1.32] text-pretty">{t.concept}</p>
           {toneOf(t).length > 0 && (
             <div className={`${card} flex flex-col gap-4 p-5`}>
-              <h3 className="text-[14px] font-semibold text-dim">How the tone reads</h3>
+              <h3 className="text-small font-semibold text-dim">How the tone reads</h3>
               <ul className="flex flex-col gap-4">
                 {toneOf(t).map((tone) => (
                   <li key={tone.tag.id} className="flex flex-col gap-1">
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+                    <p className="flex flex-wrap items-baseline gap-x-2 text-caption">
                       <span className={`font-mono font-semibold ${evidenceTone(mock)}`}>{tagLabel(tone.tag.name)}</span>
                       <span className="text-faint">{tone.source === "overlap" ? lingo.shared(whose) : "audience taste"}</span>
                     </p>
-                    <p className="font-serif text-[1.2rem] leading-snug">{tone.note}</p>
+                    <p className="font-serif text-prose leading-snug">{tone.note}</p>
                   </li>
                 ))}
               </ul>
@@ -496,7 +496,7 @@ export function Board({
         note={`${t.references.some((r) => r.entity.kind === "tv_show") ? "Films and series" : "Films"} this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the notes.`}
       >
         {t.references.length === 0 ? (
-          <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
+          <p className="text-ui text-dim">{mock ? "The mock" : "Qloo"} returned no reference films for this brief.</p>
         ) : (
           <ul className={`grid gap-5 ${referenceGrid.grid} print:flex print:flex-col print:gap-4`}>
             {t.references.map((r, i) => {
@@ -512,15 +512,15 @@ export function Board({
                   <div className="flex flex-1 flex-col gap-3.5 p-5 print:contents">
                     <div className={printRead}>
                       <div className="flex flex-col gap-1">
-                        <h3 className="type-head text-[1.7rem] leading-tight">
+                        <h3 className="type-head text-title leading-tight">
                           {r.entity.name}
-                          {year && <span className="ml-2 text-[1.1rem] font-normal tracking-normal text-faint">{year}</span>}
+                          {year && <span className="ml-2 text-lead font-normal tracking-normal text-faint">{year}</span>}
                         </h3>
                         <QlooTags tags={r.qloo.tags} />
                       </div>
-                      <p className="font-serif text-[1.15rem] leading-snug text-dim">{r.notes.why}</p>
+                      <p className="font-serif text-lead leading-snug text-dim">{r.notes.why}</p>
                       <p className={prose}>
-                        <span className="font-sans text-[13px] font-semibold text-faint">Borrow </span>
+                        <span className="font-sans text-caption font-semibold text-faint">Borrow </span>
                         {afterLabel("Borrow", r.notes.borrow)}
                       </p>
                     </div>
@@ -550,13 +550,13 @@ export function Board({
         <ol className={`grid gap-4 ${beatGrid.grid}`}>
           {t.beats.map((beat, i) => (
             <li key={i} className={`${card} flex flex-col gap-2.5 p-5 ${beatGrid.span(i)}`}>
-              <span aria-hidden className="type-poster text-[3.25rem] text-foreground/20">
+              <span aria-hidden className="type-poster text-display-sm text-foreground/20">
                 {i + 1}
               </span>
-              <h3 className="type-head text-[1.45rem] leading-tight">{beat.title}</h3>
+              <h3 className="type-head text-subhead leading-tight">{beat.title}</h3>
               <p className={prose}>{beat.description}</p>
               {(beat.reference || peopleIn(t.characters, i + 1).length > 0) && (
-                <div className="mt-auto flex flex-col pt-1 text-[13px] text-faint">
+                <div className="mt-auto flex flex-col pt-1 text-caption text-faint">
                   {peopleIn(t.characters, i + 1).length > 0 && <p>With {joinNames(peopleIn(t.characters, i + 1))}</p>}
                   {beat.reference && <p>After {beat.reference.name}</p>}
                 </div>
@@ -596,7 +596,7 @@ export function Board({
                     <div className="flex flex-1 flex-col gap-3 p-5">
                       <div className="flex flex-col gap-3">
                         <div className="flex flex-col gap-1">
-                          <h3 className="type-head text-[1.6rem] leading-tight">{c.entity.name}</h3>
+                          <h3 className="type-head text-title leading-tight">{c.entity.name}</h3>
                           <QlooTags tags={c.qloo.tags} />
                         </div>
                         <p className={`${prose} max-w-[64ch]`}>{c.notes.role}</p>
@@ -617,7 +617,7 @@ export function Board({
               </ul>
             ) : (
               (t.extras.people?.length ?? 0) === 0 && (
-                <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no actors for this audience.</p>
+                <p className="text-ui text-dim">{mock ? "The mock" : "Qloo"} returned no actors for this audience.</p>
               )
             )}
             {/* With no roles written, Qloo's actors are still evidence of the faces this audience knows. */}
@@ -640,7 +640,7 @@ export function Board({
         note={`Brands this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the looks.`}
       >
         {t.wardrobe.length === 0 ? (
-          <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
+          <p className="text-ui text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
           <ul className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
             {t.wardrobe.map((w, i) => {
@@ -652,10 +652,10 @@ export function Board({
                   className={`${card} flex flex-col gap-3.5 p-5 ${i === t.wardrobe.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
                 >
                   <div className="flex flex-col gap-1">
-                    <h3 className="type-head text-[1.7rem] leading-tight">{w.entity.name}</h3>
+                    <h3 className="type-head text-title leading-tight">{w.entity.name}</h3>
                     <QlooTags tags={w.qloo.tags} />
                     {price && (
-                      <p className="text-[14px] text-faint">
+                      <p className="text-small text-faint">
                         {price}
                         {reference && `, above ${budgetPhrase(t.brief.budget)}: rent it or match it`}
                       </p>
@@ -702,7 +702,7 @@ export function Board({
             />
           </div>
           {t.locations.length === 0 ? (
-            <p className="text-[15px] text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
+            <p className="text-ui text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
           ) : (
             <ul className={`${pinned ? "flex flex-col gap-5" : `grid gap-5 ${placeGrid.grid}`} print:flex print:flex-col print:gap-4`}>
               {t.locations.map((l, i) => {
@@ -739,14 +739,14 @@ export function Board({
                       <span className="cut-only">
                         <span
                           aria-hidden
-                          className="absolute right-3 bottom-2.5 rounded-md bg-black/45 px-1.5 font-mono text-[17px] font-semibold tracking-[0.08em] text-[#ff9a3c] [text-shadow:0_0_6px_rgb(255_140_40/0.8)]"
+                          className="absolute right-3 bottom-2.5 rounded-md bg-black/45 px-1.5 font-mono text-body font-semibold tracking-[0.08em] text-[#ff9a3c] [text-shadow:0_0_6px_rgb(255_140_40/0.8)]"
                         >
                           {stamp}
                         </span>
                       </span>
                       {t.base?.map && map && (
                         <span
-                          className={`absolute top-3 left-3 grid size-8 place-items-center rounded-full text-[14px] font-bold ${
+                          className={`absolute top-3 left-3 grid size-8 place-items-center rounded-full text-small font-bold ${
                             pinned && reading === i ? "bg-accent text-ink" : "bg-ink text-white"
                           }`}
                         >
@@ -758,10 +758,10 @@ export function Board({
                     <div className="flex flex-1 flex-col gap-3 p-5 print:contents">
                       <div className={printRead}>
                         <div>
-                          <h3 className="type-head text-[1.6rem] leading-tight">{l.entity.name}</h3>
-                          {where && <p className="mt-1 text-[14px] text-faint">{where}</p>}
-                          {hours && <p className="text-[14px] text-faint">Open {hours}</p>}
-                          {suits && <p className="text-[14px] text-faint">{suits}</p>}
+                          <h3 className="type-head text-title leading-tight">{l.entity.name}</h3>
+                          {where && <p className="mt-1 text-small text-faint">{where}</p>}
+                          {hours && <p className="text-small text-faint">Open {hours}</p>}
+                          {suits && <p className="text-small text-faint">{suits}</p>}
                         </div>
                         <QlooNote text={place?.ambience} mock={mock} />
                         <p className={prose}>{l.notes.scene}</p>
@@ -822,7 +822,7 @@ export function Board({
             ] as const
           ).map(([label, lines]) => (
             <div key={label} className={`${card} p-5`}>
-              <h3 className="text-[14px] font-semibold text-dim">{label}</h3>
+              <h3 className="text-small font-semibold text-dim">{label}</h3>
               <ul className="mt-1 flex flex-col divide-y divide-line">
                 {lines.map((line, i) => (
                   <li key={i} className={`py-3 ${prose}`}>
@@ -854,9 +854,9 @@ export function Board({
                   className={`${card} flex flex-col gap-3.5 p-5 ${i === all.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
                 >
                   <div className="flex flex-col gap-1">
-                    <h3 className="type-head text-[1.7rem] leading-tight">{m.entity.name}</h3>
+                    <h3 className="type-head text-title leading-tight">{m.entity.name}</h3>
                     <QlooTags tags={m.entity.artist?.genres ?? m.qloo.tags} />
-                    {m.notes.song && <p className="text-[14px] text-faint">Song: {m.notes.song}</p>}
+                    {m.notes.song && <p className="text-small text-faint">Song: {m.notes.song}</p>}
                   </div>
                   <p className={`${prose} max-w-[64ch]`}>{m.notes.use}</p>
                   <Why
@@ -878,7 +878,7 @@ export function Board({
             </ul>
           ) : (
             (t.extras.artists?.length ?? 0) === 0 && (
-              <p className="text-[15px] text-dim">{mock ? "The mock" : "Qloo"} returned no artists for this audience.</p>
+              <p className="text-ui text-dim">{mock ? "The mock" : "Qloo"} returned no artists for this audience.</p>
             )
           )}
           <Also
@@ -903,7 +903,7 @@ export function Board({
           <dl className="grid gap-x-10 gap-y-6 md:grid-cols-[14rem_minmax(0,1fr)] print:grid-cols-[14rem_minmax(0,1fr)]">
             {overlap.length > 0 && (
               <>
-                <dt className="text-[15px] font-semibold">Shared by {whose} films and the audience</dt>
+                <dt className="text-ui font-semibold">Shared by {whose} films and the audience</dt>
                 <dd>
                   <EvidenceChips tags={overlap} mock={mock} shared />
                 </dd>
@@ -911,13 +911,13 @@ export function Board({
             )}
             {t.directorFit && t.directorFit.length > 0 && (
               <>
-                <dt className="text-[15px] font-semibold">How the audience ranks {whose} films</dt>
+                <dt className="text-ui font-semibold">How the audience ranks {whose} films</dt>
                 <dd>
                   <ol className="flex max-w-[34rem] flex-col gap-1.5">
                     {t.directorFit.map(({ entity, qloo }) => (
-                      <li key={entity.id} className="flex items-baseline gap-3 text-[15px] leading-6">
+                      <li key={entity.id} className="flex items-baseline gap-3 text-ui leading-6">
                         <span
-                          className={`min-w-6 rounded-md px-1.5 text-center font-mono text-[12px] font-semibold tabular-nums ${
+                          className={`min-w-6 rounded-md px-1.5 text-center font-mono text-label font-semibold tabular-nums ${
                             qloo.rank === 1 ? rankMark(mock) : "text-faint"
                           }`}
                         >
@@ -928,7 +928,7 @@ export function Board({
                           {entity.kind === "tv_show" && <span className="text-faint"> (series)</span>}
                         </span>
                         {typeof qloo.affinity === "number" && (
-                          <span className={`ml-auto font-mono text-[13px] tabular-nums ${evidenceTone(mock)}`}>
+                          <span className={`ml-auto font-mono text-caption tabular-nums ${evidenceTone(mock)}`}>
                             affinity {qloo.affinity.toFixed(3)}
                           </span>
                         )}
@@ -938,18 +938,18 @@ export function Board({
                 </dd>
               </>
             )}
-            <dt className="text-[15px] font-semibold">Themes and genres the audience over-indexes on</dt>
+            <dt className="text-ui font-semibold">Themes and genres the audience over-indexes on</dt>
             <dd>
               {tasteTags.length > 0 ? (
                 <EvidenceChips tags={tasteTags} mock={mock} />
               ) : (
-                <p className="text-[15px] text-dim">No taste tags came back.</p>
+                <p className="text-ui text-dim">No taste tags came back.</p>
               )}
             </dd>
             {!t.music && (t.extras.artists?.length ?? 0) > 0 && (
               <>
-                <dt className="text-[15px] font-semibold">Music they play</dt>
-                <dd className={`font-mono text-[13px] leading-6 ${evidenceTone(mock)}`}>
+                <dt className="text-ui font-semibold">Music they play</dt>
+                <dd className={`font-mono text-caption leading-6 ${evidenceTone(mock)}`}>
                   {t.extras
                     .artists!.slice(0, 6)
                     .map((a) => a.name)
@@ -959,8 +959,8 @@ export function Board({
             )}
             {t.audience.leans.length > 0 && (
               <>
-                <dt className="text-[15px] font-semibold">Age and gender</dt>
-                <dd className={`font-mono text-[13px] leading-6 ${evidenceTone(mock)}`}>{t.audience.leans.join("; ")}</dd>
+                <dt className="text-ui font-semibold">Age and gender</dt>
+                <dd className={`font-mono text-caption leading-6 ${evidenceTone(mock)}`}>{t.audience.leans.join("; ")}</dd>
               </>
             )}
           </dl>
@@ -970,7 +970,7 @@ export function Board({
       <Section id="credits" title="Credits" follows>
         <div className="grid items-start gap-5 xl:grid-cols-2">
           <div className={`${card} p-6`}>
-            <dl className="grid gap-x-8 gap-y-3 text-[15px] leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
+            <dl className="grid gap-x-8 gap-y-3 text-ui leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
               <dt className="text-faint">Built</dt>
               {/* A fixed locale and UTC, so a board rendered on the server (a featured page) reads the same everywhere. */}
               <dd>{new Date(t.createdAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })} UTC</dd>
@@ -1000,22 +1000,22 @@ export function Board({
                 </>
               )}
               <dt className="text-faint">Creative direction</dt>
-              <dd className="font-serif text-[1.15rem] leading-snug">{t.direction}</dd>
+              <dd className="font-serif text-lead leading-snug">{t.direction}</dd>
             </dl>
             {t.notes.length > 0 && (
-              <ul className="mt-6 flex list-disc flex-col gap-1 pl-5 text-[14px] leading-6 text-dim marker:text-edge">
+              <ul className="mt-6 flex list-disc flex-col gap-1 pl-5 text-small leading-6 text-dim marker:text-edge">
                 {t.notes.map((note, i) => (
                   <li key={i}>{note}</li>
                 ))}
               </ul>
             )}
             {t.mock.qloo && (
-              <p className="mt-4 text-[14px] text-tape">
+              <p className="mt-4 text-small text-tape">
                 Mock data: the names are real, but every score, tag, photo and ranking here is synthetic, not Qloo&apos;s.
               </p>
             )}
             {templated.length > 0 && (
-              <p className="mt-2 text-[14px] text-tape">
+              <p className="mt-2 text-small text-tape">
                 Mock LLM: a deterministic template did the {templated.join(" and ")} {templated.length === 1 ? "step" : "steps"}, not a
                 language model.
               </p>

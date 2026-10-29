@@ -66,13 +66,13 @@ export function Cover({
       {/* The pills up top sit on the frame itself, so each brings its own dark: AA over a white frame. */}
       <div data-morph="top" className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim">
+          <span className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-small text-dim">
             {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
           </span>
           {who.standIns.length > 0 && (
             <span
               title={`Qloo doesn't have ${who.artists[0] ?? "the artist"}, so this audience stands in.`}
-              className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-[14px] text-dim"
+              className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-small text-dim"
             >
               Audience read through {joinNames(who.standIns)}
             </span>
@@ -98,7 +98,7 @@ export function Cover({
         <h1 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
           {t.title}
         </h1>
-        <p className="max-w-[40ch] font-serif text-[clamp(1.4rem,2.4vw,1.9rem)] leading-[1.2] text-pretty italic">{t.logline}</p>
+        <p className="max-w-[40ch] font-serif text-logline leading-[1.2] text-pretty italic">{t.logline}</p>
         <CoverPalette palette={t.palette} />
       </div>
     </header>
@@ -120,7 +120,7 @@ function CoverPalette({ palette }: { palette: Treatment["palette"] }) {
               title={c.hex}
               aria-label={`Copy ${c.name}, ${c.hex}`}
               onClick={() => copy(c.hex)}
-              className="flex cursor-pointer items-center gap-2 rounded-full bg-black/40 py-1.5 pr-3.5 pl-1.5 text-[13px] hover:bg-black/60"
+              className="flex cursor-pointer items-center gap-2 rounded-full bg-black/40 py-1.5 pr-3.5 pl-1.5 text-caption hover:bg-black/60"
             >
               <span aria-hidden className="size-[22px] rounded-full ring-1 ring-white/25" style={{ background: c.hex }} />
               <span className="relative whitespace-nowrap">
@@ -157,8 +157,8 @@ export function PaletteSwatches({ palette }: { palette: Treatment["palette"] }) 
                 className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10 print:aspect-[3/2]"
                 style={{ background: c.hex }}
               />
-              <span className="mt-2 block text-[15px] leading-tight font-semibold">{c.name}</span>
-              <span className="flex items-center gap-1 font-mono text-[13px] text-faint">
+              <span className="mt-2 block text-ui leading-tight font-semibold">{c.name}</span>
+              <span className="flex items-center gap-1 font-mono text-caption text-faint">
                 {copied === c.hex ? (
                   <>
                     {check}

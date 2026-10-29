@@ -150,6 +150,32 @@
   --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* The type scale: every size the site sets, named for what it's for. Interface text is in px, the serif's reading
+   sizes in rem, and headings that grow with the screen are clamps. Tailwind's own sizes are off, so a new size joins
+   the scale rather than one page. Line height stays with each use (leading-*). Two drawings keep sizes of their own,
+   set to fit their shapes: the run's dial digits (timeline.tsx) and the director's cut's intermission card
+   (board-cut.tsx). */
+@theme static {
+  --text-*: initial;
+  --text-label: 12px; /* the smallest: map names, tags, badges */
+  --text-caption: 13px; /* notes and credits under things */
+  --text-small: 14px; /* secondary interface text */
+  --text-ui: 15px; /* the interface: links, lists, most buttons */
+  --text-body: 17px; /* fields, primary buttons, a run's line */
+  --text-lead: 1.15rem; /* a paragraph that opens a page, and the serif's short lines */
+  --text-prose: 1.25rem; /* the treatment's writing, in the serif */
+  --text-subhead: 1.5rem;
+  --text-title: 1.7rem; /* a card's title */
+  --text-heading: 2.1rem; /* a window's title */
+  --text-logline: clamp(1.4rem, 2.4vw, 1.9rem); /* a treatment's logline and concept, in the serif */
+  --text-subsection: clamp(1.75rem, 2.6vw, 2.25rem);
+  --text-section: clamp(2rem, 3.4vw, 2.75rem); /* a section's title */
+  --text-display-sm: clamp(2.5rem, 4.5vw, 3.25rem);
+  --text-display: clamp(3rem, 6vw, 4.75rem); /* a tool page's title */
+  --text-display-lg: clamp(3.5rem, 7vw, 6rem); /* a page that's mostly its title: About, the 404 */
+  --text-hero: clamp(3.9rem, 8vw, 7.5rem); /* the homepage's line */
+}
+
 /* Bricolage at full weight with tight tracking carries the hierarchy; headlines are lowercase by choice, not by CSS. */
 /* Headings wrap in even lines: no last line of one word ("producers", "places"). Tighter than -0.04em, letters touch
    at the hero's size ("ir" in "their"). */

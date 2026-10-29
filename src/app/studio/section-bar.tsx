@@ -182,12 +182,12 @@ export function SectionBar({
             {t.title}
           </span>
           {take > 1 && (
-            <span className="hidden shrink-0 rounded-md border border-edge px-2 py-0.5 font-mono text-[12px] text-dim sm:inline">
+            <span className="hidden shrink-0 rounded-md border border-edge px-2 py-0.5 font-mono text-label text-dim sm:inline">
               {lingo.take(take)}
             </span>
           )}
           {running && (
-            <span className="flex shrink-0 items-center gap-2 text-[13px] font-semibold">
+            <span className="flex shrink-0 items-center gap-2 text-caption font-semibold">
               <span aria-hidden className="size-2 rounded-full bg-foreground motion-safe:animate-pulse" />
               <span className="hidden sm:inline">{lingo.cookingAgain}</span>
             </span>
@@ -218,7 +218,7 @@ export function SectionBar({
               aria-current={current === id ? "location" : undefined}
               // While the pill slides in, the lit label turns light as it arrives, never before.
               style={sliding && current === id ? { transitionDelay: "140ms" } : undefined}
-              className="shrink-0 rounded-full px-2.5 py-1.5 text-[14px] font-semibold whitespace-nowrap text-dim transition-colors duration-150 hover:text-foreground aria-[current=location]:text-background"
+              className="shrink-0 rounded-full px-2.5 py-1.5 text-small font-semibold whitespace-nowrap text-dim transition-colors duration-150 hover:text-foreground aria-[current=location]:text-background"
             >
               {label}
             </a>

@@ -18,7 +18,7 @@ import { suggestTitleFontFrom, titleFont, titleStyle } from "./title-fonts";
 // The homepage, the pitch: what itsgiving is, finished treatments to open, and one real run explained. No form here;
 // the tool has its own page (/studio), and every featured treatment has its own (/t/<slug>).
 
-const posterTitle = "text-[clamp(1.6rem,2.3vw,2.15rem)] leading-[0.92] font-extrabold tracking-[-0.045em] text-balance";
+const posterTitle = "text-subsection leading-[0.92] font-extrabold tracking-[-0.045em] text-balance";
 /** A poster's place in "Now showing": most of a phone's width in the sideways row, a grid cell from small screens up. */
 const poster = "w-[78%] shrink-0 snap-start sm:w-auto";
 
@@ -57,7 +57,7 @@ function HeroCover({ cover, fontId, className = "" }: { cover: FeaturedCover; fo
         <span ref={still} aria-hidden className="absolute inset-0 -z-10">
           {cover.still && <Still src={cover.still} alt="" className="absolute inset-0 size-full" />}
         </span>
-        <span className="self-start rounded-[19px] border border-edge bg-black/70 px-3 py-1 text-[12.5px] text-dim sm:px-3.5 sm:py-2 sm:text-[14px]">
+        <span className="self-start rounded-[19px] border border-edge bg-black/70 px-3 py-1 text-label text-dim sm:px-3.5 sm:py-2 sm:text-small">
           {cover.line}
         </span>
         {/* The still shows at full strength; the words bring their own dark (scrim-under). */}
@@ -65,9 +65,7 @@ function HeroCover({ cover, fontId, className = "" }: { cover: FeaturedCover; fo
           <span className="max-w-[14ch] text-balance" style={titleStyle(titleFont(fontId), "var(--hero-title)")}>
             {cover.title}
           </span>
-          <span className="hidden max-w-[38ch] font-serif text-[clamp(1.2rem,1.8vw,1.5rem)] leading-[1.25] text-pretty italic sm:block">
-            {cover.logline}
-          </span>
+          <span className="hidden max-w-[38ch] font-serif text-prose leading-[1.25] text-pretty italic sm:block">{cover.logline}</span>
           <span aria-hidden className="hidden gap-1.5 sm:flex">
             {cover.palette.map((hex) => (
               <span key={hex} className="size-5 rounded-full ring-1 ring-white/25" style={{ background: hex }} />
@@ -85,7 +83,7 @@ function HeroCover({ cover, fontId, className = "" }: { cover: FeaturedCover; fo
           />
           <p
             data-receipt={proof.mock ? "mock" : "qloo"}
-            className={`mt-3 rounded-xl border border-dashed px-3 py-2 font-mono text-[12.5px] leading-[1.6] sm:hidden ${slip(proof.mock)}`}
+            className={`mt-3 rounded-xl border border-dashed px-3 py-2 font-mono text-label leading-[1.6] sm:hidden ${slip(proof.mock)}`}
           >
             {proof.mock ? "Mock receipt, not Qloo" : "Qloo receipt"}: {proof.name}, the still, ranks{" "}
             <span className={`px-1 ${rankMark(proof.mock)}`}>
@@ -105,12 +103,12 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
       {/* On a phone the column opens up (`contents`) so the cover can sit between the headline and the paragraph: the
           first screen then holds a finished treatment and its receipt as well as the pitch. */}
       <div className="contents sm:flex sm:flex-col sm:gap-7">
-        <h1 className="order-2 type-poster text-[3.9rem] sm:text-[clamp(4.25rem,8vw,7.5rem)]">
+        <h1 className="order-2 type-poster text-hero">
           your voice,
           <br />
           their taste.
         </h1>
-        <p className="order-4 max-w-[34ch] text-[1.15rem] leading-[1.45] text-dim sm:text-[1.3rem]">
+        <p className="order-4 max-w-[34ch] text-lead leading-[1.45] text-dim sm:text-prose">
           For music-video and short-film directors: give it an artist, or the films your short is after, and a city. It reads what that
           audience actually loves on Qloo and writes a treatment you can pitch, with receipts for every pick.
         </p>
@@ -124,7 +122,7 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
             </Link>
           )}
         </div>
-        <p className="order-6 text-[15px] text-faint">No sign-up to build. A live build takes about 40 seconds.</p>
+        <p className="order-6 text-ui text-faint">No sign-up to build. A live build takes about 40 seconds.</p>
       </div>
       {cover && fontId && <HeroCover cover={cover} fontId={fontId} className="order-3" />}
     </section>
@@ -154,12 +152,12 @@ function PosterCard({ cover }: { cover: FeaturedCover }) {
         </span>
         <span className="scrim-under flex flex-col gap-3.5 [--scrim-b:1.25rem] [--scrim-fade:4rem] [--scrim-x:1.25rem]">
           {cover.tone && (
-            <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
+            <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-ui font-bold text-ink">
               {unc ? `${t.giving}: ${cover.tone}` : `${t.giving} ${cover.tone.toLowerCase()}`}
             </span>
           )}
           <span className={posterTitle}>{cover.title}</span>
-          <span className="text-[15px] text-pretty text-dim">{cover.line}</span>
+          <span className="text-ui text-pretty text-dim">{cover.line}</span>
         </span>
       </span>
       <span aria-hidden className="grid h-3 w-full" style={{ gridTemplateColumns: `repeat(${cover.palette.length}, minmax(0, 1fr))` }}>
@@ -179,10 +177,10 @@ export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; 
     return (
       <section id="now-showing" aria-labelledby="featured-heading" className="mx-auto w-full max-w-[80rem] px-4 py-12 sm:px-8">
         <div className="flex flex-col gap-3 rounded-[28px] border border-line bg-card p-8">
-          <h2 id="featured-heading" className="type-head text-[clamp(1.75rem,3vw,2.25rem)] leading-none">
+          <h2 id="featured-heading" className="type-head text-subsection leading-none">
             {t.nowShowing}
           </h2>
-          <p className="max-w-[60ch] text-[1.05rem] leading-[1.55] text-dim">
+          <p className="max-w-[60ch] text-lead leading-[1.55] text-dim">
             {live
               ? "Featured treatments are built from live Qloo data when the site is deployed, and this deploy hasn't built them yet. The studio still builds treatments."
               : "Featured treatments are built from live Qloo data when the site is deployed with its keys, and this server has none. The studio still builds treatments."}
@@ -196,10 +194,10 @@ export function NowShowing({ covers, live = false }: { covers: FeaturedCover[]; 
       <span aria-hidden className="beam print:hidden" />
       <div className="mx-auto flex w-full max-w-[80rem] flex-col gap-8 px-4 py-16 sm:px-8 sm:py-24">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-          <h2 id="featured-heading" className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
+          <h2 id="featured-heading" className="type-head text-section leading-none">
             {t.nowShowing}
           </h2>
-          <p className="text-[16px] text-dim">Built from live Qloo data. Each one opens at once.</p>
+          <p className="text-body text-dim">Built from live Qloo data. Each one opens at once.</p>
         </div>
         {/* On a phone the posters sit in a row that scrolls sideways, the next one peeking in, rather than four screens
             of posters one under another. */}
@@ -231,13 +229,13 @@ function BlankPosterBody({ label, title, titleClass = "", line }: { label: strin
   return (
     <>
       <span className="flex aspect-[4/5] w-full flex-col justify-between gap-3.5 p-5">
-        <span className="text-[13px] font-semibold text-dim">{label}</span>
+        <span className="text-caption font-semibold text-dim">{label}</span>
         <span className="flex flex-col gap-3">
-          <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-[15px] font-bold text-ink">
+          <span className="self-start rounded-xl bg-accent px-3 py-1.5 text-ui font-bold text-ink">
             {unc ? `${t.giving}: ?` : `${t.giving}… ?`}
           </span>
           <span className={`${posterTitle} ${titleClass}`}>{title}</span>
-          <span className="text-[15px] text-dim">{line}</span>
+          <span className="text-ui text-dim">{line}</span>
         </span>
       </span>
       <span aria-hidden className="h-3 w-full bg-[#2a2926]" />
@@ -288,22 +286,22 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
       text: `Qloo reads what ${run.subject}'s audience over-indexes on: moods, genres, and the age and gender it leans to. It describes a group, never one person.`,
       show: (
         <div className="flex flex-col gap-3.5 rounded-[26px] border border-line bg-card p-6">
-          <p className="text-[14px] font-semibold text-dim">{capitalize(run.audience)}</p>
+          <p className="text-small font-semibold text-dim">{capitalize(run.audience)}</p>
           <ul className="flex flex-wrap gap-2">
             {run.tones.map((tone) => (
               <li
                 key={tone.name}
                 className={
                   tone.shared
-                    ? "rounded-full bg-accent px-4 py-2 text-[16px] font-bold text-ink"
-                    : "rounded-full border border-line bg-field px-4 py-2 text-[16px]"
+                    ? "rounded-full bg-accent px-4 py-2 text-body font-bold text-ink"
+                    : "rounded-full border border-line bg-field px-4 py-2 text-body"
                 }
               >
                 {tone.name}
               </li>
             ))}
           </ul>
-          {run.leans && <p className={`type-evidence text-[13px] ${evidence}`}>{run.leans}</p>}
+          {run.leans && <p className={`type-evidence text-caption ${evidence}`}>{run.leans}</p>}
         </div>
       ),
     },
@@ -320,7 +318,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
           {run.receipts.map((r) => (
             <li
               key={r.kind}
-              className={`rounded-xl border border-dashed px-4 py-3 font-mono text-[13px] leading-[1.65] tabular-nums ${slip(run.mock)}`}
+              className={`rounded-xl border border-dashed px-4 py-3 font-mono text-caption leading-[1.65] tabular-nums ${slip(run.mock)}`}
             >
               <p className="font-semibold">
                 {r.kind}: {r.name}
@@ -346,8 +344,8 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
           <span className="text-balance" style={titleStyle(font, "clamp(2.25rem, 3.6vw, 3.5rem)")}>
             {run.title}
           </span>
-          <span className="max-w-[40ch] font-serif text-[1.3rem] leading-snug text-pretty italic text-dim">{run.logline}</span>
-          <span className="text-[15px] font-semibold underline decoration-edge underline-offset-4">Read the whole treatment</span>
+          <span className="max-w-[40ch] font-serif text-prose leading-snug text-pretty italic text-dim">{run.logline}</span>
+          <span className="text-ui font-semibold underline decoration-edge underline-offset-4">Read the whole treatment</span>
         </Link>
       ),
     },
@@ -355,10 +353,10 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
   return (
     <section aria-labelledby="how-heading" className="mx-auto flex w-full max-w-[80rem] flex-col gap-14 px-4 py-20 sm:px-8 sm:py-28">
       <div className="flex max-w-[46rem] flex-col gap-3">
-        <h2 id="how-heading" className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
+        <h2 id="how-heading" className="type-head text-section leading-none">
           {t.watchItWork}
         </h2>
-        <p className="text-[1.15rem] leading-[1.5] text-dim">
+        <p className="text-lead leading-[1.5] text-dim">
           One real run, step by step: {run.subject} in {run.city}.
         </p>
       </div>
@@ -367,11 +365,11 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
           <li key={step.title} className="grid items-start gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-14">
             {/* The words stay beside a tall map while it scrolls past: plain sticky, the scroll stays the reader's. */}
             <div className="flex flex-col gap-2.5 lg:sticky lg:top-10 lg:pt-3">
-              <span className="text-[15px] font-semibold text-faint">
+              <span className="text-ui font-semibold text-faint">
                 Step {i + 1} of {steps.length}
               </span>
-              <h3 className="type-head text-[clamp(1.75rem,2.6vw,2.25rem)] leading-tight">{step.title}</h3>
-              <p className="max-w-[38ch] text-[1.15rem] leading-[1.5] text-dim">{step.text}</p>
+              <h3 className="type-head text-subsection leading-tight">{step.title}</h3>
+              <p className="max-w-[38ch] text-lead leading-[1.5] text-dim">{step.text}</p>
             </div>
             <div className="min-w-0">{step.show}</div>
           </li>
@@ -393,15 +391,15 @@ export function HowItWorksSteps() {
   const { t } = useLingo();
   return (
     <section aria-labelledby="how-heading" className="mx-auto flex w-full max-w-[80rem] flex-col gap-6 px-4 py-16 sm:px-8">
-      <h2 id="how-heading" className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none">
+      <h2 id="how-heading" className="type-head text-section leading-none">
         {t.watchItWork}
       </h2>
       <ol className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-4">
         {STEPS.map(([title, text], i) => (
           <li key={title} className="flex flex-col gap-2.5 rounded-[22px] border border-line bg-card p-5">
-            <span className="text-[15px] font-semibold text-faint">Step {i + 1}</span>
-            <span className="type-head text-[1.4rem] leading-tight">{title}</span>
-            <span className="text-[16px] leading-6 text-dim">{text}</span>
+            <span className="text-ui font-semibold text-faint">Step {i + 1}</span>
+            <span className="type-head text-subhead leading-tight">{title}</span>
+            <span className="text-body leading-6 text-dim">{text}</span>
           </li>
         ))}
       </ol>
@@ -417,10 +415,10 @@ export function StartYourOwn() {
       className="flex flex-col items-start gap-6 rounded-[2rem] border border-line bg-card p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10 print:hidden"
     >
       <div className="flex flex-col gap-2">
-        <h2 id="start-heading" className="type-head text-[clamp(1.9rem,3vw,2.5rem)] leading-tight">
+        <h2 id="start-heading" className="type-head text-section leading-tight">
           Make one for your next video or short.
         </h2>
-        <p className="text-[1.1rem] text-dim">An artist or a film, and a city, are enough to start.</p>
+        <p className="text-lead text-dim">An artist or a film, and a city, are enough to start.</p>
       </div>
       <Link href="/studio" className={primaryButton}>
         Start a treatment

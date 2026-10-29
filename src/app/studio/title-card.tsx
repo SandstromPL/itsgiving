@@ -79,7 +79,7 @@ export function TitleCardPicker({
       <button
         type="button"
         popoverTarget={id}
-        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-bold text-background ring-1 ring-black/25 print:hidden"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full bg-foreground px-4 py-2 text-small leading-5 font-bold text-background ring-1 ring-black/25 print:hidden"
       >
         <svg
           aria-hidden
@@ -97,19 +97,19 @@ export function TitleCardPicker({
       </button>
       <PaperWindow id={id} label="title card">
         <div className="flex flex-col gap-3 px-5 pt-5">
-          <h2 id={`${id}-title`} className="type-head text-[2.1rem] leading-none text-ink">
+          <h2 id={`${id}-title`} className="type-head text-heading leading-none text-ink">
             {lines.titleWindow}
           </h2>
-          <p className="text-[15px] leading-6 text-dim">
+          <p className="text-ui leading-6 text-dim">
             The cover&apos;s era, the still behind the title and the face it&apos;s set in. All three carry into the PDF.
           </p>
         </div>
         {/* An era is a film tradition's look over the cover. Picking one also sets its face, which stays the
               director's to change below. The one the audience points to carries Qloo's receipt. */}
         <fieldset className="mt-5 flex flex-col gap-2 px-5" onKeyDown={() => (pointer.current = false)}>
-          <legend className="mb-2.5 text-[14px] font-semibold text-dim">{eraLines.legend}</legend>
+          <legend className="mb-2.5 text-small font-semibold text-dim">{eraLines.legend}</legend>
           {era.suggestion ? (
-            <div className={`mb-1 rounded-xl border border-dashed px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] ${eraReceipt}`}>
+            <div className={`mb-1 rounded-xl border border-dashed px-3 py-2.5 font-mono text-label leading-[1.6] ${eraReceipt}`}>
               <p className="font-semibold">why {eraName(era.suggestion.era, unc)} is suggested</p>
               <p>
                 {era.mock ? "The mock" : "Qloo"} ranks {era.suggestion.tag.name}{" "}
@@ -121,7 +121,7 @@ export function TitleCardPicker({
               </p>
             </div>
           ) : (
-            era.none && <p className="mb-1 text-[13px] leading-5 text-dim">{era.none}</p>
+            era.none && <p className="mb-1 text-caption leading-5 text-dim">{era.none}</p>
           )}
           <label className={eraOption} onPointerDown={() => (pointer.current = true)}>
             <input
@@ -134,8 +134,8 @@ export function TitleCardPicker({
               className="sr-only"
             />
             <span className="flex min-w-0 flex-col">
-              <span className="text-[15px] font-bold">{eraLines.none}</span>
-              <span className="text-[13px] leading-5 text-dim">{eraLines.noneEvokes}</span>
+              <span className="text-ui font-bold">{eraLines.none}</span>
+              <span className="text-caption leading-5 text-dim">{eraLines.noneEvokes}</span>
             </span>
             {era.id === null && picked}
           </label>
@@ -156,11 +156,11 @@ export function TitleCardPicker({
                 ))}
               </span>
               <span className="flex min-w-0 flex-col">
-                <span className="text-[15px] font-bold">{eraName(e, unc)}</span>
-                <span className="text-[13px] leading-5 text-dim">{e.evokes}</span>
+                <span className="text-ui font-bold">{eraName(e, unc)}</span>
+                <span className="text-caption leading-5 text-dim">{e.evokes}</span>
               </span>
               {e.id === era.suggestion?.era.id && era.id !== e.id && (
-                <span className="ml-auto shrink-0 rounded-full border-[1.5px] border-ink bg-white px-2.5 py-1 text-xs font-bold">
+                <span className="ml-auto shrink-0 rounded-full border-[1.5px] border-ink bg-white px-2.5 py-1 text-label leading-4 font-bold">
                   {eraLines.suggested}
                 </span>
               )}
@@ -172,7 +172,7 @@ export function TitleCardPicker({
               margin, not padding: a legend sits on its fieldset's top edge, above any padding. */}
         {stills.length > 1 && (
           <fieldset className="mt-5 flex flex-col px-5">
-            <legend className="mb-2.5 text-[14px] font-semibold text-dim">Still, from a reference film</legend>
+            <legend className="mb-2.5 text-small font-semibold text-dim">Still, from a reference film</legend>
             <div className="grid grid-cols-3 gap-2">
               {stills.map((s) => (
                 <label
@@ -194,17 +194,15 @@ export function TitleCardPicker({
                     loading="lazy"
                     className="aspect-video w-full rounded-lg bg-track object-cover ring-ink peer-checked:ring-[3px]"
                   />
-                  <span className="truncate text-[12.5px] leading-tight text-dim peer-checked:font-bold peer-checked:text-ink">
-                    {s.name}
-                  </span>
+                  <span className="truncate text-label leading-tight text-dim peer-checked:font-bold peer-checked:text-ink">{s.name}</span>
                 </label>
               ))}
             </div>
           </fieldset>
         )}
         <fieldset className="mt-5 flex flex-col gap-2 px-5 pb-4">
-          <legend className="mb-2.5 text-[14px] font-semibold text-dim">Typeface for the title</legend>
-          <div className={`mb-1 rounded-xl border border-dashed px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] ${slip(era.mock)}`}>
+          <legend className="mb-2.5 text-small font-semibold text-dim">Typeface for the title</legend>
+          <div className={`mb-1 rounded-xl border border-dashed px-3 py-2.5 font-mono text-label leading-[1.6] ${slip(era.mock)}`}>
             <p className="font-semibold">why {label(suggested)} is suggested</p>
             <p>{suggestion.why}</p>
           </div>
@@ -225,12 +223,14 @@ export function TitleCardPicker({
                 <span className="truncate" style={{ ...f.style, fontSize: `max(15px, calc(1.5rem * ${f.scale}))`, lineHeight: 1.15 }}>
                   {title}
                 </span>
-                <span className="text-[13px] text-dim">
+                <span className="text-caption text-dim">
                   <span className="font-bold text-ink">{label(f)}</span>, {f.evokes}
                 </span>
               </span>
               {f.id === suggestion.id && (
-                <span className="shrink-0 rounded-full border-[1.5px] border-ink bg-white px-2.5 py-1 text-xs font-bold">suggested</span>
+                <span className="shrink-0 rounded-full border-[1.5px] border-ink bg-white px-2.5 py-1 text-label leading-4 font-bold">
+                  suggested
+                </span>
               )}
             </label>
           ))}

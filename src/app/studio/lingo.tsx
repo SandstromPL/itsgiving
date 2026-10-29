@@ -149,7 +149,7 @@ export function UncSwitch() {
       onClick={() => setUnc(!unc)}
       aria-label="unc mode"
       title="unc mode: plain English for everything around the treatment"
-      className="flex min-h-11 items-center gap-2.5 rounded-full border border-foreground bg-card py-1.5 pr-4 pl-2 text-[15px] font-bold whitespace-nowrap print:hidden"
+      className="flex min-h-11 items-center gap-2.5 rounded-full border border-foreground bg-card py-1.5 pr-4 pl-2 text-ui font-bold whitespace-nowrap print:hidden"
     >
       <span
         aria-hidden

@@ -64,8 +64,8 @@ async function Saved({ params }: { params: PageProps<"/s/[id]">["params"] }) {
         <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col justify-center gap-6 px-4 py-24 sm:px-8">
           {item === "unavailable" ? (
             <>
-              <h1 className="type-poster max-w-[16ch] text-[clamp(3rem,7vw,6rem)]">saved treatments are offline</h1>
-              <p role="alert" className="max-w-[46ch] text-[1.2rem] leading-[1.45] text-dim">
+              <h1 className="type-poster max-w-[16ch] text-display-lg">saved treatments are offline</h1>
+              <p role="alert" className="max-w-[46ch] text-prose leading-[1.45] text-dim">
                 The database didn&apos;t answer. Try again in a minute; building a new treatment still works.
               </p>
             </>

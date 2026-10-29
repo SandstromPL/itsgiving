@@ -36,7 +36,7 @@ export function SavedBoard({ id, treatment, own, shared }: { id: string; treatme
         // A shared page carries words someone else chose (their brief, and the writing it steered), on this site: say
         // so before anything else, so it isn't read as itsgiving's own.
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <p className="rounded-2xl border border-line bg-card px-4 py-2.5 text-[14px] leading-5 text-dim">
+          <p className="rounded-2xl border border-line bg-card px-4 py-2.5 text-small leading-5 text-dim">
             Shared by an itsgiving user: their brief, Qloo&apos;s data and AI-written text, not checked by itsgiving.
           </p>
           <ShareButton title={treatment.title} path={`/s/${id}`} />
@@ -136,7 +136,7 @@ function OwnerBar({ id, shared: sharedAtFirst, title }: { id: string; shared: bo
             type="button"
             disabled={busy}
             onClick={remove}
-            className="rounded-full px-3 py-2.5 text-[15px] font-semibold text-safelight underline underline-offset-4"
+            className="rounded-full px-3 py-2.5 text-ui font-semibold text-safelight underline underline-offset-4"
           >
             Delete
           </button>
@@ -145,7 +145,7 @@ function OwnerBar({ id, shared: sharedAtFirst, title }: { id: string; shared: bo
       {note && (
         <p
           role={note.alert ? "alert" : "status"}
-          className={`text-[15px] ${note.alert ? "font-semibold text-safelight" : "text-dim"} break-words`}
+          className={`text-ui ${note.alert ? "font-semibold text-safelight" : "text-dim"} break-words`}
         >
           {note.text}
         </p>
@@ -162,13 +162,13 @@ export function SavedMissing() {
   const account = useAccount();
   return (
     <>
-      <h1 className="type-poster max-w-[14ch] text-[clamp(3rem,7vw,6rem)]">nothing to show here</h1>
-      <p className="max-w-[46ch] text-[1.2rem] leading-[1.45] text-dim">
+      <h1 className="type-poster max-w-[14ch] text-display-lg">nothing to show here</h1>
+      <p className="max-w-[46ch] text-prose leading-[1.45] text-dim">
         This treatment is private, deleted, or its link is wrong.{account.state === "out" && " If it's yours, sign in to open it."}
       </p>
       <div className="flex flex-wrap items-center gap-3">
         {account.state === "out" && <SignInButton className={primaryButton} />}
-        <Link href="/" className={`${pill} min-h-14 px-7 text-[17px]`}>
+        <Link href="/" className={`${pill} min-h-14 px-7 text-body`}>
           Back to the homepage
         </Link>
       </div>

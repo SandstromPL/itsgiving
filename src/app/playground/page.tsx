@@ -22,16 +22,16 @@ export default function PlaygroundPage() {
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-12 sm:px-8">
       <header className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tool playground</h1>
+          <h1 className="text-subhead leading-8 font-semibold tracking-tight text-foreground">Tool playground</h1>
           <span
-            className={`rounded px-2 py-0.5 text-xs font-medium ${
+            className={`rounded px-2 py-0.5 text-label leading-4 font-medium ${
               mode === "live" ? "border border-line text-dim" : "bg-tape-wash text-tape"
             }`}
           >
             {mode === "live" ? "Live Qloo" : "Mock data"}
           </span>
         </div>
-        <p className="max-w-2xl text-sm leading-6 text-dim">
+        <p className="max-w-2xl text-small leading-6 text-dim">
           Run each of the agent&apos;s Qloo tools by hand and see the requests behind the result. Development only.{" "}
           <Link
             href="/studio"

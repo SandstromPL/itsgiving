@@ -60,7 +60,7 @@ export function DirectorsCut() {
       <button
         type="button"
         onClick={onExit}
-        className="fixed right-4 bottom-[calc(9vh+1rem)] z-[61] rounded-full bg-ink px-4 py-2.5 text-sm font-bold text-white"
+        className="fixed right-4 bottom-[calc(9vh+1rem)] z-[61] rounded-full bg-ink px-4 py-2.5 text-small leading-5 font-bold text-white"
       >
         Exit director&apos;s cut
       </button>
@@ -78,7 +78,7 @@ export function Mark({ name }: { name: string }) {
       <span aria-hidden className="grid h-[26px] w-[34px] shrink-0 place-items-center rounded-lg bg-ink ring-1 ring-edge/60">
         <CameraMark height={17} />
       </span>
-      <span aria-hidden className="text-[27px] leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
+      <span aria-hidden className="text-title leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
         {name}
       </span>
     </>

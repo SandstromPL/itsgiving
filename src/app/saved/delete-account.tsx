@@ -40,10 +40,10 @@ export function DeleteAccount({ saved }: { saved: number }) {
       aria-labelledby="delete-account"
       className="flex max-w-[42rem] flex-col items-start gap-3 border-t border-line pt-8 print:hidden"
     >
-      <h2 id="delete-account" className="type-head text-[1.6rem] leading-tight">
+      <h2 id="delete-account" className="type-head text-title leading-tight">
         Delete your account
       </h2>
-      <p className="text-[15px] leading-6 text-dim">
+      <p className="text-ui leading-6 text-dim">
         This deletes your itsgiving account and every treatment you&apos;ve saved, and their share links stop working. Your Google or GitHub
         account isn&apos;t touched; signing in again starts a new, empty account.
       </p>
@@ -51,12 +51,12 @@ export function DeleteAccount({ saved }: { saved: number }) {
         type="button"
         disabled={busy}
         onClick={remove}
-        className="min-h-11 rounded-full border border-safelight px-4 py-2 text-[15px] font-semibold text-safelight hover:bg-safelight hover:text-background disabled:opacity-60"
+        className="min-h-11 rounded-full border border-safelight px-4 py-2 text-ui font-semibold text-safelight hover:bg-safelight hover:text-background disabled:opacity-60"
       >
         {busy ? "Deleting…" : "Delete my account"}
       </button>
       {problem && (
-        <p role="alert" className="text-[15px] font-semibold text-safelight">
+        <p role="alert" className="text-ui font-semibold text-safelight">
           {problem}
         </p>
       )}

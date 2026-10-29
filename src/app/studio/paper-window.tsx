@@ -29,7 +29,7 @@ export function PaperWindow({
           <span className="size-2.5 rounded-full border-2 border-ink" />
           <span className="size-2.5 rounded-full border-2 border-ink bg-ink" />
         </span>
-        <span className="font-mono text-[13px] text-slip-ink">{label}</span>
+        <span className="font-mono text-caption text-slip-ink">{label}</span>
         <button
           type="button"
           popoverTarget={id}

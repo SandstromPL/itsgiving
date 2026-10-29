@@ -15,7 +15,7 @@ import { outlineButton as outline } from "./ui";
 
 type Status = { kind: "idle" } | { kind: "saving" } | { kind: "saved"; id: string; shared: boolean } | { kind: "problem"; message: string };
 
-const ink = "rounded-full bg-foreground px-4 py-2.5 text-[15px] font-bold text-background hover:opacity-90 disabled:opacity-60";
+const ink = "rounded-full bg-foreground px-4 py-2.5 text-ui font-bold text-background hover:opacity-90 disabled:opacity-60";
 
 /** A saved treatment's link, for sharing: the same page its owner opens. */
 export const savedUrl = (id: string) => `${window.location.origin}/s/${id}`;
@@ -77,7 +77,7 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
   if (status.kind === "saved") {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 px-1 text-[15px] font-bold">
+        <span className="inline-flex items-center gap-1.5 px-1 text-ui font-bold">
           <CheckIcon size={16} />
           Saved
         </span>
@@ -88,7 +88,7 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
         <Link
           href={`/s/${status.id}`}
           prefetch={false}
-          className="rounded-full px-2 py-2.5 text-[15px] font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
+          className="rounded-full px-2 py-2.5 text-ui font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
         >
           Open
         </Link>
@@ -113,7 +113,7 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
         {status.kind === "saving" ? "Saving…" : "Save"}
       </button>
       {status.kind === "problem" && (
-        <span role="alert" className="text-[14px] font-semibold text-safelight">
+        <span role="alert" className="text-small font-semibold text-safelight">
           {status.message}
         </span>
       )}

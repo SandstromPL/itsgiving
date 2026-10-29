@@ -66,7 +66,7 @@ export function EraLayer({ id, title, play }: { id: EraId | null; title: string;
         {era.stickers.map((sticker, i) => (
           <li
             key={sticker.genz}
-            className={`rounded-xl px-3.5 py-2 text-[15px] leading-5 font-bold ring-1 ring-white/25 ${i === 0 ? "-rotate-3" : "rotate-2"}`}
+            className={`rounded-xl px-3.5 py-2 text-ui leading-5 font-bold ring-1 ring-white/25 ${i === 0 ? "-rotate-3" : "rotate-2"}`}
             style={{ background: era.colors.stickers[i].ground, color: era.colors.stickers[i].ink }}
           >
             {unc ? sticker.unc : sticker.genz}
@@ -74,7 +74,7 @@ export function EraLayer({ id, title, play }: { id: EraId | null; title: string;
         ))}
       </ul>
       <p
-        className="max-w-[25rem] rounded-[19px] bg-black/70 px-3.5 py-2 text-right text-[13px] leading-5"
+        className="max-w-[25rem] rounded-[19px] bg-black/70 px-3.5 py-2 text-right text-caption leading-5"
         style={{ color: era.colors.title }}
       >
         {era.credit}

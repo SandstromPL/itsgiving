@@ -18,7 +18,7 @@ const STATUS_TEXT: Record<StepStatus, string> = {
 };
 
 function Mark({ status }: { status: StepStatus }) {
-  const base = "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-bold";
+  const base = "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full text-label font-bold";
   const mark =
     status === "running" ? (
       <span className={`${base} border-2 border-foreground`}>
@@ -46,7 +46,7 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
   const cached = calls.filter((c) => c.cached).length;
   return (
     <details className="group mt-1.5">
-      <summary className="cursor-pointer py-1 font-mono text-[12px] text-tungsten marker:text-edge hover:text-foreground">
+      <summary className="cursor-pointer py-1 font-mono text-label text-tungsten marker:text-edge hover:text-foreground">
         {calls.length} Qloo {calls.length === 1 ? "call" : "calls"}
         {cached > 0 ? `, ${cached} cached` : ""}
       </summary>
@@ -55,7 +55,7 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
           // The request itself is code, so it keeps a code face.
           <li
             key={i}
-            className="overflow-x-auto rounded-lg bg-field px-2.5 py-1.5 font-mono text-[11px] leading-4 whitespace-nowrap text-dim"
+            className="overflow-x-auto rounded-lg bg-field px-2.5 py-1.5 font-mono text-label leading-4 whitespace-nowrap text-dim"
           >
             <span className="text-foreground">GET {call.path}</span> {new URLSearchParams(call.query).toString()}{" "}
             <span className="text-faint">
@@ -72,7 +72,7 @@ function QlooCalls({ calls }: { calls: Provenance[] }) {
 function LlmLine({ trace }: { trace: LlmTrace }) {
   const tried = trace.attempts.filter((a) => a.outcome !== "ok" && a.outcome !== "repaired");
   return (
-    <div className="mt-1.5 flex flex-col gap-1 text-[13px] leading-5">
+    <div className="mt-1.5 flex flex-col gap-1 text-caption leading-5">
       <p className="flex flex-wrap items-center gap-x-2 text-dim">
         {trace.producedBy.mock ? <Tape>Mock LLM</Tape> : <span className="font-semibold text-foreground">{trace.producedBy.model}</span>}
         {trace.producedBy.reasoning && <span>{thinkingName(trace.producedBy.reasoning)}</span>}
@@ -103,10 +103,10 @@ export function Timeline({ steps, size = "credits" }: { steps: StepEvent[]; size
     >
       {!stage && (
         <div>
-          <h3 id="agent-heading" className="type-head text-[1.4rem] leading-none">
+          <h3 id="agent-heading" className="type-head text-subhead leading-none">
             Run log
           </h3>
-          <p className="mt-1.5 text-[13px] leading-5 text-faint">
+          <p className="mt-1.5 text-caption leading-5 text-faint">
             Code makes every Qloo call. The model only plans and writes, citing what Qloo returned.
           </p>
         </div>
@@ -115,7 +115,7 @@ export function Timeline({ steps, size = "credits" }: { steps: StepEvent[]; size
         {current ? `${current.label}…` : ""}
       </p>
       {steps.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-[13px] leading-5 text-faint">
+        <p className="rounded-2xl border border-dashed border-line px-4 py-4 text-caption leading-5 text-faint">
           Each step and every Qloo request behind it will show here.
         </p>
       ) : (
@@ -125,14 +125,14 @@ export function Timeline({ steps, size = "credits" }: { steps: StepEvent[]; size
               <Mark status={step.status} />
               <div className="min-w-0 flex-1">
                 <p
-                  className={`flex flex-wrap items-baseline justify-between gap-x-3 text-[16px] ${step.status === "skipped" ? "text-faint" : ""}`}
+                  className={`flex flex-wrap items-baseline justify-between gap-x-3 text-body ${step.status === "skipped" ? "text-faint" : ""}`}
                 >
                   <span className={step.status === "running" ? "font-bold" : ""}>{step.label}</span>
                   {step.ms !== undefined && step.status !== "skipped" && (
-                    <span className="font-mono text-[13px] text-faint">{(step.ms / 1000).toFixed(1)} s</span>
+                    <span className="font-mono text-caption text-faint">{(step.ms / 1000).toFixed(1)} s</span>
                   )}
                 </p>
-                {step.summary && <p className="mt-0.5 text-[14px] leading-5 text-dim">{step.summary}</p>}
+                {step.summary && <p className="mt-0.5 text-small leading-5 text-dim">{step.summary}</p>}
                 {step.llm && <LlmLine trace={step.llm} />}
                 {step.qloo && step.qloo.length > 0 && <QlooCalls calls={step.qloo} />}
               </div>
@@ -295,10 +295,10 @@ function Credits({ steps, mock }: { steps: StepEvent[]; mock: boolean }) {
   return (
     <div aria-hidden className="mt-6 border-t border-line pt-5">
       {/* A role and two lines of names, at the names' size. */}
-      <div className="min-h-[calc(1.625rem_+_2.2em)] text-[1.5rem] sm:text-[clamp(1.75rem,2.6vw,2.25rem)]">
+      <div className="min-h-[calc(1.625rem_+_2.2em)] text-subhead sm:text-subsection">
         {newest && (
           <div key={newest.kind} className="transition-[opacity,translate] duration-[350ms] starting:translate-y-2.5 starting:opacity-0">
-            <p className="text-[15px] leading-5 text-dim">{role(newest, unc)}</p>
+            <p className="text-ui leading-5 text-dim">{role(newest, unc)}</p>
             <p className="type-head mt-1.5 leading-[1.1]">
               <Names credit={newest} tone={tone} />
             </p>
@@ -309,8 +309,8 @@ function Credits({ steps, mock }: { steps: StepEvent[]; mock: boolean }) {
       <dl className="mt-6 grid content-start gap-y-2.5 sm:min-h-[10.625rem] sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-x-5">
         {credits.slice(0, Math.max(0, shown - 1)).map((credit) => (
           <div key={credit.kind} className="grid transition-opacity duration-300 starting:opacity-0 sm:col-span-2 sm:grid-cols-subgrid">
-            <dt className="text-[14px] leading-5 text-faint sm:text-right">{role(credit, unc)}</dt>
-            <dd className="text-[15px] leading-5 font-semibold">
+            <dt className="text-small leading-5 text-faint sm:text-right">{role(credit, unc)}</dt>
+            <dd className="text-ui leading-5 font-semibold">
               <Names credit={credit} tone={tone} />
             </dd>
           </div>
@@ -349,19 +349,19 @@ export function RunStage({
       <div className="surface-dark grain flex flex-wrap items-center gap-x-8 gap-y-6 rounded-[2rem] bg-background p-7 sm:items-start sm:p-9">
         <Leader settled={Math.min(settled, STEP_ORDER.length)} total={STEP_ORDER.length} />
         <div className="min-w-0 flex-[1_1_16rem]">
-          <h2 className="type-poster text-[clamp(3rem,6vw,5.25rem)]">{t.cooking}</h2>
-          <p className="mt-3 text-[17px] leading-6 text-dim">
+          <h2 className="type-poster text-display">{t.cooking}</h2>
+          <p className="mt-3 text-body leading-6 text-dim">
             {THINKING[thinking].hint} Qloo first, then the writer.{" "}
             <span aria-hidden className="font-mono text-foreground">
               {elapsed} s
             </span>
           </p>
-          <p className="mt-2 text-[15px] font-semibold">
+          <p className="mt-2 text-ui font-semibold">
             Step {Math.min(STEP_ORDER.length, settled + 1)} of {STEP_ORDER.length}
             {current ? `: ${current}` : ""}
           </p>
           <Credits steps={steps} mock={mock} />
-          {elapsed >= 60 && <p className="mt-2 font-serif text-[1.6rem] leading-tight italic">{t.slowBurn}</p>}
+          {elapsed >= 60 && <p className="mt-2 font-serif text-title leading-tight italic">{t.slowBurn}</p>}
         </div>
       </div>
       {/* One cell per pipeline step, like frames on a strip: a sequence, so it reads left to right. */}

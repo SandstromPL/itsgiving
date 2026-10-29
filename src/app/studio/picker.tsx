@@ -45,18 +45,18 @@ export function Picker({
   return (
     <form onSubmit={submit} className="flex flex-col gap-7 rounded-[28px] border border-line bg-card p-6 sm:p-8">
       <div>
-        <h2 ref={heading} tabIndex={-1} className="type-poster text-[clamp(2.5rem,5vw,3.75rem)] focus:outline-none">
+        <h2 ref={heading} tabIndex={-1} className="type-poster text-display-sm focus:outline-none">
           {t.pickTitle}
         </h2>
-        <p className="mt-3 text-[16px] leading-6 text-dim">{message}</p>
+        <p className="mt-3 text-body leading-6 text-dim">{message}</p>
       </div>
       {items.map((item) => (
         <fieldset key={item.key} className="flex flex-col gap-2">
-          <legend className="mb-2 text-[15px] font-semibold">
+          <legend className="mb-2 text-ui font-semibold">
             &ldquo;{item.input}&rdquo;, from {ROLE[item.role]}
           </legend>
           {!item.exact && (
-            <p className="-mt-1 mb-1 text-[14px] leading-5 text-dim">Qloo has nothing under this exact name. These are its nearest:</p>
+            <p className="-mt-1 mb-1 text-small leading-5 text-dim">Qloo has nothing under this exact name. These are its nearest:</p>
           )}
           <div className="grid gap-2.5 sm:grid-cols-2">
             {item.candidates.map((candidate) => (
@@ -64,8 +64,8 @@ export function Picker({
                 <input type="radio" name={item.key} value={candidate.id} required className="sr-only" />
                 <Still src={candidate.image} alt="" className="aspect-video w-20 shrink-0 rounded-lg" />
                 <span className="min-w-0">
-                  <span className="block truncate text-[16px] font-bold text-foreground group-has-checked:text-ink">{candidate.name}</span>
-                  <span className="block truncate text-[13px] text-dim group-has-checked:text-(--light-dim)">
+                  <span className="block truncate text-body font-bold text-foreground group-has-checked:text-ink">{candidate.name}</span>
+                  <span className="block truncate text-caption text-dim group-has-checked:text-(--light-dim)">
                     {[candidate.disambiguation ?? candidate.year, candidate.kind?.replace("_", " ")].filter(Boolean).join(", ")}
                   </span>
                 </span>
@@ -74,12 +74,12 @@ export function Picker({
             {!item.exact && (
               <label className={optionCard}>
                 <input type="radio" name={item.key} value={NONE_PICK} required className="sr-only" />
-                <span className="grid aspect-video w-20 shrink-0 place-items-center rounded-lg bg-field text-[22px] text-dim" aria-hidden>
+                <span className="grid aspect-video w-20 shrink-0 place-items-center rounded-lg bg-field text-subhead text-dim" aria-hidden>
                   ×
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-[16px] font-bold text-foreground group-has-checked:text-ink">None of these</span>
-                  <span className="block text-[13px] text-dim group-has-checked:text-(--light-dim)">
+                  <span className="block text-body font-bold text-foreground group-has-checked:text-ink">None of these</span>
+                  <span className="block text-caption text-dim group-has-checked:text-(--light-dim)">
                     {item.role === "artist" ? "They aren't in Qloo" : "Leave it out"}
                   </span>
                 </span>
@@ -91,7 +91,7 @@ export function Picker({
       <button
         type="submit"
         aria-disabled={running}
-        className="h-14 self-start rounded-full bg-foreground px-6 text-[17px] font-bold text-background aria-disabled:opacity-60"
+        className="h-14 self-start rounded-full bg-foreground px-6 text-body font-bold text-background aria-disabled:opacity-60"
       >
         Continue with these
       </button>

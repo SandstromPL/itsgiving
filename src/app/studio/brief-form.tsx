@@ -28,14 +28,14 @@ import {
 import { useLingo } from "./lingo";
 
 const field =
-  "w-full rounded-2xl border border-edge bg-field px-4 py-3 text-[17px] text-foreground placeholder:text-faint hover:border-foreground focus:border-foreground aria-invalid:border-2 aria-invalid:border-safelight";
-const label = "text-[13px] font-medium text-dim";
-const hint = "text-[13px] leading-5 text-faint";
+  "w-full rounded-2xl border border-edge bg-field px-4 py-3 text-body text-foreground placeholder:text-faint hover:border-foreground focus:border-foreground aria-invalid:border-2 aria-invalid:border-safelight";
+const label = "text-caption font-medium text-dim";
+const hint = "text-caption leading-5 text-faint";
 /** A two-way switch: the chosen side is a solid pill inside a soft track. */
 const track = "grid grid-cols-2 gap-1 rounded-full bg-track p-1";
 const option =
-  "press cursor-pointer rounded-full px-3 py-2.5 text-center text-[15px] text-dim hover:text-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
-const chip = "flex items-center gap-0.5 rounded-full border border-line bg-card py-0.5 pr-0.5 pl-3 text-[13px]";
+  "press cursor-pointer rounded-full px-3 py-2.5 text-center text-ui text-dim hover:text-foreground has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground";
+const chip = "flex items-center gap-0.5 rounded-full border border-line bg-card py-0.5 pr-0.5 pl-3 text-caption";
 
 /** A labelled field: the label, then whatever the field holds (its control, a hint, its message). */
 function Field({ id, label: text, children }: { id: string; label: ReactNode; children: ReactNode }) {
@@ -239,7 +239,7 @@ function TasteField({
           type="button"
           onClick={add}
           aria-disabled={busy || !text.trim()}
-          className="shrink-0 rounded-2xl border border-foreground bg-card px-4 text-[15px] font-bold hover:bg-foreground hover:text-background aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:bg-card aria-disabled:hover:text-foreground"
+          className="shrink-0 rounded-2xl border border-foreground bg-card px-4 text-ui font-bold hover:bg-foreground hover:text-background aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:bg-card aria-disabled:hover:text-foreground"
         >
           {busy ? "Importing…" : looksLikeImport(text) ? "Import" : "Add"}
         </button>
@@ -250,11 +250,11 @@ function TasteField({
         {form.imported.length > 0 && `Imported from ${form.importedFrom}. `}
         {TMDB_NOTICE}
       </p>
-      <p role="status" className="text-[13px] leading-5 text-dim empty:hidden">
+      <p role="status" className="text-caption leading-5 text-dim empty:hidden">
         {status}
       </p>
       {error && (
-        <p role="alert" className="text-sm text-safelight">
+        <p role="alert" className="text-small leading-5 text-safelight">
           {error}
         </p>
       )}
@@ -300,7 +300,7 @@ export function BriefForm({
   });
   const message = (name: FieldName) =>
     problem?.field === name ? (
-      <p id={errorId} role="alert" className="text-sm font-medium text-safelight">
+      <p id={errorId} role="alert" className="text-small leading-5 font-medium text-safelight">
         {problem.message}
       </p>
     ) : null;
@@ -392,10 +392,10 @@ export function BriefForm({
       noValidate
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 id={`${ids}-title`} className="type-head text-[1.6rem] leading-none">
+        <h2 id={`${ids}-title`} className="type-head text-title leading-none">
           The brief
         </h2>
-        <p className="text-[13px] text-faint">Nothing personal goes to Qloo</p>
+        <p className="text-caption text-faint">Nothing personal goes to Qloo</p>
       </div>
 
       <fieldset>
@@ -432,8 +432,8 @@ export function BriefForm({
           className="flex min-h-15 w-full items-center justify-between gap-3 bg-field px-4 py-3 text-left hover:bg-track"
         >
           <span className="flex flex-col gap-0.5">
-            <span className="text-[16px] font-bold">{t.makeItYours}</span>
-            <span className="text-[13px] text-faint">
+            <span className="text-body font-bold">{t.makeItYours}</span>
+            <span className="text-caption text-faint">
               {isVideo
                 ? "Reference films, stand-in artists, your taste, budget, thinking"
                 : "Music its audience loves, your taste, budget, thinking"}
@@ -441,7 +441,7 @@ export function BriefForm({
           </span>
           <span className="flex items-center gap-2.5">
             {extras > 0 && (
-              <span className="rounded-full bg-foreground px-2.5 py-1 text-[12px] font-bold text-background">{extras} added</span>
+              <span className="rounded-full bg-foreground px-2.5 py-1 text-label font-bold text-background">{extras} added</span>
             )}
             <svg
               aria-hidden
@@ -503,12 +503,12 @@ export function BriefForm({
         <button
           type="submit"
           aria-disabled={running}
-          className="h-14 flex-1 rounded-full bg-foreground px-5 text-[18px] font-bold text-background hover:opacity-90 aria-disabled:cursor-progress aria-disabled:opacity-60"
+          className="h-14 flex-1 rounded-full bg-foreground px-5 text-body font-bold text-background hover:opacity-90 aria-disabled:cursor-progress aria-disabled:opacity-60"
         >
           {running ? "Building treatment…" : "Build treatment"}
         </button>
         {running && (
-          <button type="button" onClick={onStop} className="h-14 rounded-full border border-foreground px-5 text-[16px] font-semibold">
+          <button type="button" onClick={onStop} className="h-14 rounded-full border border-foreground px-5 text-body font-semibold">
             Stop
           </button>
         )}
@@ -524,7 +524,7 @@ export function BriefForm({
                   type="button"
                   onClick={() => onExample(example)}
                   title={example.detail}
-                  className="min-h-9 rounded-full border border-edge bg-card px-3.5 text-[14px] font-semibold hover:border-foreground hover:bg-field"
+                  className="min-h-9 rounded-full border border-edge bg-card px-3.5 text-small font-semibold hover:border-foreground hover:bg-field"
                 >
                   {exampleChip(example.brief)}
                 </button>

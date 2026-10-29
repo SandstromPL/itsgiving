@@ -49,8 +49,8 @@ export default async function FeaturedPage({ params }: PageProps<"/t/[slug]">) {
         ) : (
           // A server on mocks, or a build whose pre-built set doesn't match the examples any more.
           <div className="flex max-w-[42rem] flex-col items-start gap-5 rounded-[28px] border border-line bg-card p-8">
-            <h1 className="type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-tight">{example.title}</h1>
-            <p className="text-[1.15rem] leading-[1.5] text-dim">
+            <h1 className="type-head text-section leading-tight">{example.title}</h1>
+            <p className="text-lead leading-[1.5] text-dim">
               This featured treatment is built from live Qloo data when the site is deployed, and this server doesn&apos;t have it. The
               studio can build the same brief: {example.detail.charAt(0).toLowerCase() + example.detail.slice(1)}
             </p>

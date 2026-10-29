@@ -115,8 +115,8 @@ const LIMITS = [
   "Locations are a scout list. Availability and filming permission are yours to confirm with each venue.",
 ] as const;
 
-const sectionHead = "type-head text-[clamp(2rem,3.4vw,2.75rem)] leading-none";
-const lead = "max-w-[60ch] text-[1.2rem] leading-[1.55] text-dim";
+const sectionHead = "type-head text-section leading-none";
+const lead = "max-w-[60ch] text-prose leading-[1.55] text-dim";
 
 export default function About() {
   return (
@@ -125,7 +125,7 @@ export default function About() {
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-24 px-4 pt-10 pb-20 sm:px-8 sm:pt-14">
         <section aria-labelledby="who-heading" className="flex flex-col gap-10">
           <div className="flex flex-col gap-6">
-            <h1 id="who-heading" className="type-poster text-[clamp(3.5rem,7vw,6rem)]">
+            <h1 id="who-heading" className="type-poster text-display-lg">
               who it&apos;s for
             </h1>
             <p className={lead}>
@@ -136,8 +136,8 @@ export default function About() {
           <dl className="flex flex-col">
             {USERS.map((user) => (
               <div key={user.who} className="grid gap-x-12 gap-y-3 border-t border-line py-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
-                <dt className="type-head text-[1.6rem] leading-tight">{user.who}</dt>
-                <dd className="flex max-w-[62ch] flex-col gap-3 text-[1.1rem] leading-[1.55]">
+                <dt className="type-head text-title leading-tight">{user.who}</dt>
+                <dd className="flex max-w-[62ch] flex-col gap-3 text-lead leading-[1.55]">
                   <p className="text-dim">{user.situation}</p>
                   <p>{user.gets}</p>
                 </dd>
@@ -164,10 +164,10 @@ export default function About() {
             </p>
           </div>
           <div className="flex flex-col gap-3 rounded-[28px] border border-line bg-card p-6 sm:p-8">
-            <p className="text-[15px] font-semibold text-dim">Each treatment holds</p>
+            <p className="text-ui font-semibold text-dim">Each treatment holds</p>
             <ul className="flex flex-col">
               {MAKES.map((item) => (
-                <li key={item} className="border-t border-line py-3 text-[1.1rem] leading-snug first:border-t-0">
+                <li key={item} className="border-t border-line py-3 text-lead leading-snug first:border-t-0">
                   {item}
                 </li>
               ))}
@@ -188,12 +188,12 @@ export default function About() {
           </div>
           <ul className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
             {QLOO.map((point) => (
-              <li key={point.head} className="border-t border-line pt-4 text-[1.1rem] leading-[1.55]">
+              <li key={point.head} className="border-t border-line pt-4 text-lead leading-[1.55]">
                 <span className="font-bold">{point.head}</span> <span className="text-dim">{point.text}</span>
               </li>
             ))}
           </ul>
-          <p className="text-[15px] text-dim">
+          <p className="text-ui text-dim">
             More at{" "}
             <a href="https://www.qloo.com/" className="font-semibold text-foreground underline underline-offset-4">
               qloo.com
@@ -216,13 +216,13 @@ export default function About() {
             {STEPS.map((step, i) => (
               <li key={step.title} className="grid gap-x-12 gap-y-4 border-t border-line py-7 lg:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="flex max-w-[62ch] flex-col gap-2">
-                  <span className="text-[14px] font-semibold text-faint">Step {i + 1}</span>
-                  <h3 className="type-head text-[1.5rem] leading-tight">{step.title}</h3>
-                  <p className="text-[1.05rem] leading-[1.55] text-dim">{step.text}</p>
+                  <span className="text-small font-semibold text-faint">Step {i + 1}</span>
+                  <h3 className="type-head text-subhead leading-tight">{step.title}</h3>
+                  <p className="text-lead leading-[1.55] text-dim">{step.text}</p>
                 </div>
                 {step.qloo ? (
                   <div
-                    className={`self-start rounded-xl border border-dashed px-4 py-3 font-mono text-[13px] leading-[1.7] ${slip(false)}`}
+                    className={`self-start rounded-xl border border-dashed px-4 py-3 font-mono text-caption leading-[1.7] ${slip(false)}`}
                   >
                     <p className="font-semibold">Qloo calls</p>
                     {step.qloo.map((call) => (
@@ -230,7 +230,7 @@ export default function About() {
                     ))}
                   </div>
                 ) : (
-                  <p className="self-start font-serif text-[1.3rem] leading-snug italic">{step.model}</p>
+                  <p className="self-start font-serif text-prose leading-snug italic">{step.model}</p>
                 )}
               </li>
             ))}
@@ -243,7 +243,7 @@ export default function About() {
           </h2>
           <ul className="grid gap-x-10 gap-y-5 sm:grid-cols-2">
             {LIMITS.map((limit) => (
-              <li key={limit} className="max-w-[56ch] border-t border-line pt-4 text-[1.05rem] leading-[1.55] text-dim">
+              <li key={limit} className="max-w-[56ch] border-t border-line pt-4 text-lead leading-[1.55] text-dim">
                 {limit}
               </li>
             ))}

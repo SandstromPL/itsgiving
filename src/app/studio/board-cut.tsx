@@ -11,7 +11,7 @@ export function FilmEdge({ count }: { count: number }) {
   return (
     <div aria-hidden className="flex flex-col gap-2 rounded-2xl bg-[#1b1a17] py-2.5 print:hidden">
       <span className={holes} />
-      <span className="truncate px-4 font-mono text-[14px] tracking-[0.14em] text-[#f2b33d]">
+      <span className="truncate px-4 font-mono text-small tracking-[0.14em] text-[#f2b33d]">
         ITSGIVING 400 {Array.from({ length: count }, (_, i) => `▸ ${i + 1}`).join(" ")}
       </span>
       <span className={holes} />
@@ -33,7 +33,7 @@ export function Interval() {
       >
         {lingo.interval.title}
       </p>
-      <p className="text-[16px] text-[#fff3d6]">{lingo.interval.line}</p>
+      <p className="text-body text-[#fff3d6]">{lingo.interval.line}</p>
     </aside>
   );
 }

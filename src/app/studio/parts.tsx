@@ -14,7 +14,7 @@ export function Tape({ children, title }: { children: ReactNode; title?: string 
   return (
     <span
       title={title}
-      className="inline-flex items-center rounded-full bg-tape-wash px-2.5 py-1 text-xs font-semibold text-tape ring-1 ring-tape/40"
+      className="inline-flex items-center rounded-full bg-tape-wash px-2.5 py-1 text-label leading-4 font-semibold text-tape ring-1 ring-tape/40"
     >
       {children}
     </span>
@@ -39,7 +39,7 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
   const writer = treatment?.writtenBy;
   const mockedSteps = treatment?.llm.filter((t) => t.producedBy.mock && t.step !== "write").map((t) => t.step) ?? [];
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-caption">
       {qloo === "mock" ? (
         <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>
       ) : (
@@ -74,7 +74,7 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
 
 /** Shown in place of the badges until the server has said which data sources are live. */
 export function ModesPending() {
-  return <span className="hidden text-[13px] text-faint lg:inline">Checking data sources…</span>;
+  return <span className="hidden text-caption text-faint lg:inline">Checking data sources…</span>;
 }
 
 /** Qloo's image server answers a picture it no longer has with a blank square, 30 px wide. */
@@ -97,7 +97,7 @@ export function Still({
   if (!src || broken) {
     return (
       <div aria-hidden className={`flex items-end bg-field p-4 ${className}`}>
-        <span className="type-head line-clamp-2 text-2xl leading-tight text-foreground/20">{alt}</span>
+        <span className="type-head line-clamp-2 text-subhead leading-tight text-foreground/20">{alt}</span>
       </div>
     );
   }
@@ -153,7 +153,7 @@ export function Receipt({
   return (
     <div
       data-receipt={mock ? "mock" : "qloo"}
-      className={`rounded-xl border border-dashed px-3.5 py-3 font-mono text-[12.5px] leading-[1.65] tabular-nums ${slip(mock)} ${className}`}
+      className={`rounded-xl border border-dashed px-3.5 py-3 font-mono text-label leading-[1.65] tabular-nums ${slip(mock)} ${className}`}
     >
       <p className="font-semibold">{mock ? "Mock receipt, not Qloo" : "Qloo receipt"}</p>
       {label && <p>{label}</p>}
@@ -174,8 +174,8 @@ export function Receipt({
 export function QlooNote({ text, mock, max = 180 }: { text?: string; mock: boolean; max?: number }) {
   if (!text) return null;
   return (
-    <p className="text-[14px] leading-5 text-dim">
-      <span className={`font-mono text-[12px] font-semibold ${evidenceTone(mock)}`}>{mock ? "Mock note" : "Qloo"} </span>
+    <p className="text-small leading-5 text-dim">
+      <span className={`font-mono text-label font-semibold ${evidenceTone(mock)}`}>{mock ? "Mock note" : "Qloo"} </span>
       {/* The whole note is in the item's Why window. */}
       {excerpt(text, max)}
     </p>
@@ -185,7 +185,7 @@ export function QlooNote({ text, mock, max = 180 }: { text?: string; mock: boole
 /** A few of the item's Qloo tags (style notes for films, aesthetics for brands, kind and mood for places). */
 export function QlooTags({ tags, max = 3 }: { tags: string[]; max?: number }) {
   if (tags.length === 0) return null;
-  return <p className="font-mono text-[12px] leading-5 text-faint">{tags.slice(0, max).map(tagLabel).join(" / ")}</p>;
+  return <p className="font-mono text-label leading-5 text-faint">{tags.slice(0, max).map(tagLabel).join(" / ")}</p>;
 }
 
 /** What each tool's list holds, in words: the tool names themselves are code. */
@@ -244,10 +244,12 @@ export function Why({
       </Receipt>
       <div id={id} popover="auto" className="why" role="dialog" aria-label={`Why ${name}`}>
         <div className="p-6">
-          <p className="type-head text-[1.75rem] leading-tight">{name}</p>
+          <p className="type-head text-title leading-tight">{name}</p>
           <section className="mt-4">
-            <h3 className={`font-mono text-xs font-semibold ${evidence}`}>{mock ? "Mock data (synthetic, not Qloo)" : "From Qloo"}</h3>
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-xs leading-5 tabular-nums text-slip-ink">
+            <h3 className={`font-mono text-label leading-4 font-semibold ${evidence}`}>
+              {mock ? "Mock data (synthetic, not Qloo)" : "From Qloo"}
+            </h3>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-mono text-label leading-5 tabular-nums text-slip-ink">
               <dt className="text-faint">Rank</dt>
               <dd>
                 {qloo.rank} of {qloo.of} {of ?? LIST_OF[qloo.tool] ?? "picks"} for this audience
@@ -286,21 +288,21 @@ export function Why({
                   ),
               )}
             </dl>
-            <p className="mt-2 text-xs leading-5 text-faint">
+            <p className="mt-2 text-label leading-5 text-faint">
               Aggregate audience affinity: what fans of the input over-index on, not a fact about any one person.
             </p>
           </section>
           <section className="mt-5 border-t border-line pt-4">
-            <h3 className="text-xs font-semibold">itsgiving&apos;s read</h3>
+            <h3 className="text-label leading-4 font-semibold">itsgiving&apos;s read</h3>
             <dl className="mt-2 flex flex-col gap-2">
               {read.map((r) => (
                 <div key={r.term}>
-                  <dt className="text-xs text-faint">{r.term}</dt>
-                  <dd className="font-serif text-lg leading-snug">{r.text}</dd>
+                  <dt className="text-label leading-4 text-faint">{r.term}</dt>
+                  <dd className="font-serif text-lead leading-snug">{r.text}</dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-2 text-xs text-faint">Interpretation by {modelName(writtenBy)}.</p>
+            <p className="mt-2 text-label leading-4 text-faint">Interpretation by {modelName(writtenBy)}.</p>
           </section>
           {/* autoFocus moves focus into the popover when it opens; closing returns it to the invoker. */}
           <button
@@ -308,7 +310,7 @@ export function Why({
             popoverTarget={id}
             popoverTargetAction="hide"
             autoFocus
-            className="mt-5 rounded-full bg-ink px-5 py-2.5 text-sm font-bold text-white"
+            className="mt-5 rounded-full bg-ink px-5 py-2.5 text-small leading-5 font-bold text-white"
           >
             Close
           </button>

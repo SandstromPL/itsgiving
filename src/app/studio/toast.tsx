@@ -68,8 +68,8 @@ export function Toast({ toast }: { toast: ToastNote | null }) {
             </svg>
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-[19px] leading-tight font-extrabold tracking-[-0.03em]">{toast.title}</span>
-            <span className="truncate text-[14px] text-[#d9d5cc]">{toast.line}</span>
+            <span className="text-lead leading-tight font-extrabold tracking-[-0.03em]">{toast.title}</span>
+            <span className="truncate text-small text-[#d9d5cc]">{toast.line}</span>
           </span>
         </>
       )}

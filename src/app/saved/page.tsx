@@ -23,10 +23,10 @@ export default function SavedListPage({ searchParams }: PageProps<"/saved">) {
     <>
       <SiteHeader />
       <main className={shell}>
-        <h1 className="type-poster text-[clamp(3rem,6vw,4.75rem)]">your treatments</h1>
+        <h1 className="type-poster text-display">your treatments</h1>
         <Suspense
           fallback={
-            <p role="status" className="text-[15px] text-dim">
+            <p role="status" className="text-ui text-dim">
               Opening your treatments…
             </p>
           }
@@ -40,22 +40,22 @@ export default function SavedListPage({ searchParams }: PageProps<"/saved">) {
 
 async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["searchParams"] }) {
   const { signin, account } = await searchParams;
-  if (!accountsOn) return <p className="max-w-[46ch] text-[1.15rem] leading-[1.5] text-dim">Accounts aren&apos;t set up on this server.</p>;
+  if (!accountsOn) return <p className="max-w-[46ch] text-lead leading-[1.5] text-dim">Accounts aren&apos;t set up on this server.</p>;
   const viewer = await viewerId();
   if (!viewer) {
     return (
       <div className="flex max-w-[42rem] flex-col items-start gap-5 rounded-[28px] border border-line bg-card p-8">
         {account === "deleted" && (
-          <p role="status" className="text-[1.05rem] font-semibold text-foreground">
+          <p role="status" className="text-lead font-semibold text-foreground">
             Your account is deleted, with every treatment it saved.
           </p>
         )}
         {signin === "failed" && (
-          <p role="alert" className="text-[1.05rem] font-semibold text-safelight">
+          <p role="alert" className="text-lead font-semibold text-safelight">
             Sign-in didn&apos;t finish. Try again, or pick the other account.
           </p>
         )}
-        <p className="text-[1.15rem] leading-[1.5] text-dim">
+        <p className="text-lead leading-[1.5] text-dim">
           {account === "deleted"
             ? "Signing in again with Google or GitHub starts a new, empty account. Building a treatment needs none."
             : "Sign in with Google or GitHub to see the treatments you've saved. Building one needs no account."}
@@ -71,7 +71,7 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
     if (!(err instanceof SavedStoreError)) throw err;
     console.error(JSON.stringify({ evt: "saved", action: "list", outcome: "unavailable", error: err.message }));
     return (
-      <p role="alert" className="max-w-[46ch] text-[1.15rem] leading-[1.5] text-dim">
+      <p role="alert" className="max-w-[46ch] text-lead leading-[1.5] text-dim">
         Your saved treatments didn&apos;t load: the database didn&apos;t answer. Try again in a minute.
       </p>
     );
@@ -80,7 +80,7 @@ async function SavedList({ searchParams }: { searchParams: PageProps<"/saved">["
     <>
       {items.length === 0 ? (
         <div className="flex max-w-[42rem] flex-col items-start gap-5">
-          <p className="text-[1.15rem] leading-[1.5] text-dim">Nothing saved yet. Build a treatment, then press Save on its board.</p>
+          <p className="text-lead leading-[1.5] text-dim">Nothing saved yet. Build a treatment, then press Save on its board.</p>
           <Link href="/studio" className={primaryButton}>
             Open the studio
           </Link>
@@ -110,13 +110,13 @@ function SavedGrid({ items }: { items: SavedSummary[] }) {
                 <img src={tmdbSize(item.cover, "w780")} alt="" loading="lazy" className="size-full object-cover opacity-80" />
               )}
               {item.shared && (
-                <span className="absolute top-3 left-3 rounded-full bg-ink px-2.5 py-1 text-[13px] font-bold text-white">Shared</span>
+                <span className="absolute top-3 left-3 rounded-full bg-ink px-2.5 py-1 text-caption font-bold text-white">Shared</span>
               )}
             </span>
             <span className="flex flex-1 flex-col gap-1.5 p-5">
-              <span className="type-head text-[1.45rem] leading-tight">{item.title}</span>
-              <span className="text-[14px] leading-5 text-dim">{item.summary}</span>
-              <span className="mt-auto pt-2 text-[13px] text-faint">
+              <span className="type-head text-subhead leading-tight">{item.title}</span>
+              <span className="text-small leading-5 text-dim">{item.summary}</span>
+              <span className="mt-auto pt-2 text-caption text-faint">
                 Saved {new Date(item.savedAt).toLocaleDateString("en-GB", { dateStyle: "medium", timeZone: "UTC" })}
               </span>
             </span>

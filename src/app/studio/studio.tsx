@@ -39,13 +39,13 @@ function FailCard({ problem, onRetry }: { problem: string; onRetry?: () => void 
   const rateLimited = /too many|rate limit/i.test(problem);
   return (
     <div role="alert" className="flex flex-col gap-3 rounded-[24px] border-2 border-safelight bg-safelight-wash p-6">
-      <p className="type-head text-[clamp(1.75rem,3vw,2.25rem)] leading-none text-safelight">{rateLimited ? t.rateTitle : t.failTitle}</p>
-      <p className="text-[16px] leading-6">{problem}</p>
+      <p className="type-head text-subsection leading-none text-safelight">{rateLimited ? t.rateTitle : t.failTitle}</p>
+      <p className="text-body leading-6">{problem}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
-          className="self-start rounded-full bg-foreground px-5 py-3 text-[15px] font-bold text-background"
+          className="self-start rounded-full bg-foreground px-5 py-3 text-ui font-bold text-background"
         >
           Try again
         </button>
@@ -342,7 +342,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-foreground bg-card py-2 pr-2 pl-5 sm:rounded-full print:hidden">
                 <span aria-hidden className="size-2.5 rounded-full bg-foreground motion-safe:animate-pulse" />
                 <span className="font-bold">{lingo.cookingAgain}</span>
-                {current && <span className="text-[15px] text-dim">{current}</span>}
+                {current && <span className="text-ui text-dim">{current}</span>}
                 <button type="button" onClick={stream.stop} className={stopButton}>
                   Stop
                 </button>
@@ -374,7 +374,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[28px] border border-line bg-card py-2 pr-2 pl-5 sm:rounded-full">
               <span className="font-bold">{briefLine(pending.form)}</span>
-              <span className="text-[15px] text-dim">{THINKING[pending.form.thinking].label} thinking</span>
+              <span className="text-ui text-dim">{THINKING[pending.form.thinking].label} thinking</span>
               <button type="button" onClick={stream.stop} className={stopButton}>
                 Stop
               </button>
@@ -390,7 +390,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 id="reopen-board"
                 type="button"
                 onClick={reopenBoard}
-                className="flex min-h-11 max-w-full items-center self-start rounded-full bg-foreground px-5 py-2 text-[15px] font-bold text-background hover:opacity-90"
+                className="flex min-h-11 max-w-full items-center self-start rounded-full bg-foreground px-5 py-2 text-ui font-bold text-background hover:opacity-90"
               >
                 <span className="truncate">Back to {treatment.title}</span>
               </button>
@@ -409,8 +409,8 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
             <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,36rem)_minmax(0,19rem)] lg:justify-center lg:gap-16">
               <div className="flex min-w-0 flex-col gap-7">
                 <div className="flex flex-col gap-3">
-                  <h1 className="type-poster text-[clamp(3rem,6vw,4.75rem)]">new treatment</h1>
-                  <p className="max-w-[40ch] text-[1.15rem] leading-[1.5] text-dim">
+                  <h1 className="type-poster text-display">new treatment</h1>
+                  <p className="max-w-[40ch] text-lead leading-[1.5] text-dim">
                     {form.format === "music_video" ? "An artist and a city" : "A film it's after and a city"} are enough to start.
                     Everything else is optional.
                   </p>
