@@ -44,12 +44,14 @@ export type { PipelineDeps, PipelineOutcome } from "./pipeline-run";
 // through Run (pipeline-run.ts).
 
 /**
- * Time limits per thinking depth, sized from live DeepSeek runs (2026-10-25): deep plans took 4-6 s and
- * deep writes 22-35 s; quick plans about 3 s and quick writes 12-18 s. Each limit leaves room for one
- * fallback to a free model, and the run limit sits under the route's maxDuration.
+ * Time limits per thinking depth, sized from live DeepSeek runs. Deep plans take 4-7 s, and 13-14 s in DeepSeek's busy
+ * hours (01:00-04:00 and 06:00-10:00 UTC on weekdays). Since the characters (2026-10-29), deep writes take 35-53 s, and
+ * up to 59 s in the busy hours. Quick plans took about 3 s and quick writes 12-18 s (2026-10-25). Each limit leaves room
+ * for one fallback to a free model, and the run limit sits under the route's maxDuration: the deep run's 135 s still
+ * leaves its plan the first 45 s, as before the write's limit rose from 60 s.
  */
 export const TIMING: Record<Thinking, { planMs: number; writeMs: number; runMs: number }> = {
-  deep: { planMs: 20_000, writeMs: 60_000, runMs: 120_000 },
+  deep: { planMs: 20_000, writeMs: 75_000, runMs: 135_000 },
   quick: { planMs: 15_000, writeMs: 45_000, runMs: 90_000 },
 };
 const REASONING: Record<Thinking, Reasoning> = { deep: "high", quick: "low" };

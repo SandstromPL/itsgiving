@@ -208,12 +208,13 @@ finished treatments and each one's page shows it at once, whatever the live rate
   took over 100 s per call. DeepSeek V4 Pro lost to Flash on quality, speed and cost.
 - **Thinking depth.** Each brief chooses how long DeepSeek thinks: **Deep** (the default, high reasoning effort) or
   **Quick** (low). Two blind judges scored deep treatments 8.5 out of 10, quick ones 8.1 and thinking-off ones 5.8,
-  judged side by side on live Qloo. A deep treatment takes about 35-45 s, a quick one about 25-35 s, and either costs
+  judged side by side on live Qloo. A deep treatment takes about 45-65 s, a quick one about 25-35 s, and either costs
   under a cent. The free fallbacks ignore the setting: more thinking made them slower, not better. A quick brief is
   answered from a cached deep treatment of the same brief when there is one.
-- **Where the time goes.** Profiled live, a deep treatment spends about 31 of its 36-42 s in DeepSeek (plan 4-5 s,
-  write 26-31 s) and about 6 s in Qloo. The time limits are itsgiving's own (`TIMING` in `src/lib/agent/pipeline.ts`):
-  deep allows 20 s to plan, 60 s to write and 120 s in all, quick 15, 45 and 90 s, each leaving room for one fallback.
+- **Where the time goes.** Most of a deep treatment's time is DeepSeek's: a plan takes 4-7 s and a write 35-53 s, both
+  longer in DeepSeek's busy hours (13-14 s and up to 59 s, measured 2026-10-29). The time limits are itsgiving's own
+  (`TIMING` in `src/lib/agent/pipeline.ts`): deep allows 20 s to plan, 75 s to write and 135 s in all, quick 15, 45 and
+  90 s, each leaving room for one fallback.
   While a model thinks, the timeline counts the seconds, which also keeps the stream alive.
 - Array limits ("4-6 colours") are stated to the model but applied in code, so one extra item never costs a repair.
 - A provider that times out, is overloaded or is rate limited rests for one to two minutes (longer if it sends a retry
@@ -313,7 +314,7 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
 
 - `POST /api/treatment`: takes a brief, streams progress as server-sent events (`start`, `step`, `needs_input`,
   `treatment`, `error`, `done`). Guarded by a per-IP rate limit (6 fresh treatments a minute), a daily LLM-call cap, a
-  run budget (120 s deep, 90 s quick, under a 150 s `maxDuration`) and a 24-hour cache keyed by the normalized brief.
+  run budget (135 s deep, 90 s quick, under a 165 s `maxDuration`) and a 24-hour cache keyed by the normalized brief.
 - `POST /api/taste`: takes `{ "source": "<TMDB list link or IMDb links>" }` and returns the films Qloo knows, by IMDb
   ID, plus the ones it left out. At most 30 TMDB calls (5 list pages, then 25 lookups) and one Qloo call; 8 imports a
   minute per IP.

@@ -4,9 +4,9 @@ import { clientIp } from "@/lib/agent/guards";
 import { cachedTreatment, getTreatmentService, sseFrame, streamTreatment } from "@/lib/agent/service";
 import { readJson, tooMany } from "@/lib/http";
 
-// Plan + write LLM calls and ~15 Qloo requests. A deep-thinking run gives up at 120 s (TIMING in
+// Plan + write LLM calls and ~25 Qloo requests. A deep-thinking run gives up at 135 s (TIMING in
 // pipeline.ts), so this leaves room to close the stream; Vercel allows up to 300 s with Fluid compute.
-export const maxDuration = 150;
+export const maxDuration = 165;
 
 const MAX_BODY_BYTES = 8 * 1024;
 
