@@ -77,6 +77,9 @@ export function ModesPending() {
   return <span className="hidden text-[13px] text-faint lg:inline">Checking data sources…</span>;
 }
 
+/** Qloo's image server answers a picture it no longer has with a blank square, 30 px wide. */
+const qlooPlaceholder = (img: HTMLImageElement) => img.naturalWidth > 0 && img.naturalWidth <= 30 && img.naturalHeight <= 30;
+
 /** An image from Qloo (or a mock placeholder); plain <img> because hosts vary per entity. */
 export function Still({
   src,
@@ -106,6 +109,12 @@ export function Still({
       loading={loading}
       referrerPolicy="no-referrer"
       onError={() => setBroken(true)}
+      // Qloo's blank stands for a missing picture too, so the name shows instead; the ref catches one that loaded before
+      // the page came to life, when no handler was listening yet.
+      onLoad={(event) => qlooPlaceholder(event.currentTarget) && setBroken(true)}
+      ref={(img) => {
+        if (img && qlooPlaceholder(img)) setBroken(true);
+      }}
       className={`bg-field object-cover ${className}`}
     />
   );

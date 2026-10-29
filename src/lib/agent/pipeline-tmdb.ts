@@ -1,15 +1,22 @@
 import { defaultSleep, type CompactEntity } from "../qloo";
 import type { KnownRole, TmdbCharacter, TmdbClient } from "../tmdb";
 
-// What TMDB adds to a run, which Qloo doesn't have: each reference's still and top-billed characters, and the parts its
-// actors are known for. A title's lookup starts as soon as Qloo's list lands and runs beside the rest of the run; it is
-// kept for the run, so a re-plan never asks twice. A failure costs a still, a character or a role, never the run: TMDB
-// isn't Qloo's evidence, so `complete` doesn't count it, and the warning says why it failed, not only how often.
+// What TMDB adds to a run, which Qloo doesn't have: each reference's still and top-billed characters, and its actors'
+// photos and the parts they're known for. A title's lookup starts as soon as Qloo's list lands and runs beside the rest
+// of the run; it is kept for the run, so a re-plan never asks twice. A failure costs a still, a character, a photo or a
+// role, never the run: TMDB isn't Qloo's evidence, so `complete` doesn't count it, and the warning says why it failed,
+// not only how often.
 
 /** What TMDB knows of a reference. */
 export interface TitleLookup {
   still?: string;
   characters: TmdbCharacter[];
+}
+
+/** What TMDB knows of an actor: their photo, if it has one, and the parts they're best known for. */
+export interface ActorProfile {
+  photo?: string;
+  known: KnownRole[];
 }
 
 /** An error's message and, where the network gave one, its code (ETIMEDOUT, ECONNRESET): what a log needs to say why. */
@@ -105,24 +112,36 @@ export class TmdbLookups {
     this.titleFailures.log(this.titles.size);
   }
 
-  /** The parts each actor is best known for, by entity ID, for those TMDB knows by the IMDb ID on Qloo's record. */
-  async roles(people: CompactEntity[]): Promise<Map<string, KnownRole[]>> {
-    const roles = new Map<string, KnownRole[]>();
+  /**
+   * What TMDB knows of each actor, by entity ID, for those it knows by the IMDb ID on Qloo's record. The photo is kept
+   * when the parts fail: it came first.
+   */
+  async profiles(people: CompactEntity[]): Promise<Map<string, ActorProfile>> {
+    const profiles = new Map<string, ActorProfile>();
     const tmdb = this.usable;
-    if (!tmdb) return roles;
-    const failures = new Failures("tmdb_roles");
+    if (!tmdb) return profiles;
+    const failures = new Failures("tmdb_actors");
     await Promise.all(
       people.map(async (person) => {
         if (!person.external?.imdb) return;
+        let found;
         try {
-          const known = await tmdb.roles(person.external.imdb, this.signal);
-          if (known.length > 0) roles.set(person.id, known);
+          found = await tmdb.findPerson(person.external.imdb, this.signal);
+        } catch (err) {
+          if (!this.signal.aborted) failures.add(err);
+          return;
+        }
+        if (!found) return;
+        let known: KnownRole[] = [];
+        try {
+          known = await tmdb.roles(found, this.signal);
         } catch (err) {
           if (!this.signal.aborted) failures.add(err);
         }
+        if (found.photo || known.length > 0) profiles.set(person.id, { ...(found.photo ? { photo: found.photo } : {}), known });
       }),
     );
     failures.log(people.length);
-    return roles;
+    return profiles;
   }
 }

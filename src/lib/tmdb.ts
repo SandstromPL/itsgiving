@@ -5,14 +5,15 @@ import { defaultSleep, type FetchLike } from "./qloo";
 // exactly (/entities with external.imdb.ids), so an imported film never needs the ambiguity picker. It gives a
 // reference film's still: Qloo's image of a film is its poster, whose own lettering fights a treatment's title. And it
 // names people, which Qloo doesn't: a reference's characters, for a treatment's characters to be drawn from, and the
-// parts an actor is known for.
+// parts an actor is known for, with their photo for the faces Qloo has no picture of.
 // Server-side only: the key never reaches the browser. Checked against developer.themoviedb.org on 2026-10-25: list
 // details are GET /3/list/{id} (paged), IMDb IDs come from GET /3/{movie|tv}/{id}/external_ids, the limit is about 40
 // requests a second, and a read access token goes in a Bearer header while a v3 API key goes in the api_key query
 // parameter. GET /3/find/{imdb_id}?external_source=imdb_id gives a film's backdrop_path (live, 2026-10-26: film frames
 // without lettering, e.g. Darlings, Riceboy Sleeps), served from image.tmdb.org/t/p/{size}{path}. Live, 2026-10-29: a
 // film's characters come from /3/movie/{id}/credits, a series' from /3/tv/{id}/aggregate_credits (each actor's parts
-// across its seasons), and an actor's parts from /3/person/{id}/combined_credits.
+// across its seasons), and an actor's parts from /3/person/{id}/combined_credits; /find gives a person's profile_path,
+// in the sizes w45, w185, h632 and original (/3/configuration).
 
 export const TMDB_BASE_URL = "https://api.themoviedb.org";
 export const TMDB_IMAGE_URL = "https://image.tmdb.org/t/p";
@@ -157,6 +158,13 @@ export interface KnownRole {
   year?: number;
 }
 
+/** A person on TMDB, found by their IMDb ID. */
+export interface TmdbPerson {
+  tmdbId: number;
+  /** Their photo, 632 px tall, when TMDB has one. */
+  photo?: string;
+}
+
 /** At most this many requests in flight per client: six stays well under TMDB's 40 requests a second. */
 const IN_FLIGHT = 6;
 
@@ -172,8 +180,9 @@ function partName(raw: unknown): string | undefined {
   return name && !NOT_A_PART.test(name) ? name.slice(0, 60).trim() : undefined;
 }
 
-function stillUrl(path: unknown): string | undefined {
-  return typeof path === "string" && /^\/[\w-]+\.(jpg|png|webp)$/.test(path) ? `${TMDB_IMAGE_URL}/w1280${path}` : undefined;
+/** An image path TMDB gave, as a URL at `size`: a still 1280 px wide, or a person's photo 632 px tall. */
+function imageUrl(path: unknown, size: "w1280" | "h632"): string | undefined {
+  return typeof path === "string" && /^\/[\w-]+\.(jpg|png|webp)$/.test(path) ? `${TMDB_IMAGE_URL}/${size}${path}` : undefined;
 }
 
 function problemFor(status: number): string {
@@ -286,7 +295,7 @@ export class TmdbClient {
     const movie = data.movie_results?.[0];
     const hit = movie ?? data.tv_results?.[0];
     if (typeof hit?.id !== "number") return undefined;
-    const still = stillUrl(hit.backdrop_path);
+    const still = imageUrl(hit.backdrop_path, "w1280");
     return { kind: movie ? "movie" : "tv", tmdbId: hit.id, ...(still ? { still } : {}) };
   }
 
@@ -311,16 +320,23 @@ export class TmdbClient {
     return characters;
   }
 
+  /** A person by their IMDb ID (nm…), with their photo, if TMDB has them. */
+  async findPerson(imdbId: string, signal?: AbortSignal): Promise<TmdbPerson | undefined> {
+    if (!/^nm\d{7,10}$/.test(imdbId)) return undefined;
+    type Found = { id?: number; profile_path?: string | null };
+    const data = await this.get<{ person_results?: Found[] }>(`/3/find/${imdbId}`, { external_source: "imdb_id" }, signal);
+    const hit = data.person_results?.[0];
+    if (typeof hit?.id !== "number") return undefined;
+    const photo = imageUrl(hit.profile_path, "h632");
+    return { tmdbId: hit.id, ...(photo ? { photo } : {}) };
+  }
+
   /**
-   * The two parts a person is best known for, by their IMDb ID (nm…): leads or close to them in films (billed in the
-   * first four) and regular parts in series (three episodes or more), the titles with the most TMDB votes first.
-   * Playing oneself, voices, uncredited parts and talk, news or reality shows don't count.
+   * The two parts a person is best known for: leads or close to them in films (billed in the first four) and regular
+   * parts in series (three episodes or more), the titles with the most TMDB votes first. Playing oneself, voices,
+   * uncredited parts and talk, news or reality shows don't count.
    */
-  async roles(imdbId: string, signal?: AbortSignal): Promise<KnownRole[]> {
-    if (!/^nm\d{7,10}$/.test(imdbId)) return [];
-    const found = await this.get<{ person_results?: { id?: number }[] }>(`/3/find/${imdbId}`, { external_source: "imdb_id" }, signal);
-    const id = found.person_results?.[0]?.id;
-    if (typeof id !== "number") return [];
+  async roles(person: TmdbPerson, signal?: AbortSignal): Promise<KnownRole[]> {
     type Credit = {
       media_type?: string;
       title?: string;
@@ -333,7 +349,7 @@ export class TmdbClient {
       first_air_date?: string;
       genre_ids?: number[];
     };
-    const data = await this.get<{ cast?: Credit[] }>(`/3/person/${id}/combined_credits`, {}, signal);
+    const data = await this.get<{ cast?: Credit[] }>(`/3/person/${person.tmdbId}/combined_credits`, {}, signal);
     const parts = (data.cast ?? [])
       .filter((c) => !c.genre_ids?.some((g) => NOT_A_SHOW.has(g)))
       .filter((c) => (c.media_type === "tv" ? (c.episode_count ?? 0) >= 3 : (c.order ?? 0) <= 3))

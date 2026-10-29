@@ -1,14 +1,15 @@
-import type { KnownRole } from "../tmdb";
+import { missingPictures } from "../qloo";
 import { BUDGETS, STEP_LABELS } from "./options";
 import { ladder, relax, report, type Relaxed } from "./pipeline-relax";
 import type { Cast } from "./pipeline-resolve";
 import { names, type Run } from "./pipeline-run";
+import type { ActorProfile } from "./pipeline-tmdb";
 
 // The faces this audience knows and the music it plays: the actors Qloo says it over-indexes on, as faces for the
-// story's characters, with the parts TMDB says each is known for, and its artists, as a short film's music (or, for a
-// music video, what its fans also play). Both need only the subjects, so they start as soon as the names are resolved
-// and run beside the audience read and the plan; the writer is the first to wait for them, and a re-plan doesn't ask
-// again.
+// story's characters, with TMDB's photo of each and the parts it says they're known for, and its artists, as a short
+// film's music (or, for a music video, what its fans also play). Both need only the subjects, so they start as soon as
+// the names are resolved and run beside the audience read and the plan; the writer is the first to wait for them, and a
+// re-plan doesn't ask again.
 
 /** Fewer actors than this within the budget's reach, and the ceiling is lifted. */
 const MIN_FACES = 4;
@@ -18,14 +19,14 @@ export const WRITER_FACES = 8;
 
 export interface People {
   casting: Relaxed;
-  /** The parts each actor is best known for, by entity ID (TMDB): only those TMDB knows. */
-  roles: Map<string, KnownRole[]>;
+  /** What TMDB knows of each actor, by entity ID: their photo and best-known parts, for those TMDB knows. */
+  profiles: Map<string, ActorProfile>;
   music: Relaxed;
 }
 
 export async function findPeople(run: Run, cast: Cast): Promise<People> {
-  const [{ casting, roles }, music] = await Promise.all([findCasting(run, cast), findMusic(run, cast)]);
-  return { casting, roles, music };
+  const [{ casting, profiles }, music] = await Promise.all([findCasting(run, cast), findMusic(run, cast)]);
+  return { casting, profiles, music };
 }
 
 async function findMusic(run: Run, cast: Cast): Promise<Relaxed> {
@@ -41,7 +42,7 @@ async function findMusic(run: Run, cast: Cast): Promise<Relaxed> {
   return music;
 }
 
-async function findCasting(run: Run, cast: Cast): Promise<Pick<People, "casting" | "roles">> {
+async function findCasting(run: Run, cast: Cast): Promise<Pick<People, "casting" | "profiles">> {
   const ceiling = BUDGETS[run.brief.budget].castCeiling;
   run.emit({ type: "step", id: "casting", status: "running", label: STEP_LABELS.casting });
   const casting = await relax(
@@ -60,7 +61,13 @@ async function findCasting(run: Run, cast: Cast): Promise<Pick<People, "casting"
     MIN_FACES,
   );
   report(run, "casting", "cast", STEP_LABELS.casting, "Casting references", casting, (items) => names(items).slice(0, 4).join(", "));
-  // After the step: its time is Qloo's.
-  const roles = await run.tmdb.roles(casting.items.slice(0, WRITER_FACES));
-  return { casting, roles };
+  // After the step: its time is Qloo's. A face whose picture Qloo's image server no longer has is a face Qloo has no
+  // picture of, so TMDB's photo stands in for it.
+  const faces = casting.items.slice(0, WRITER_FACES);
+  const [profiles, gone] = await Promise.all([
+    run.tmdb.profiles(faces),
+    run.deps.qloo.mode === "mock" ? new Set<string>() : missingPictures(faces, { signal: run.signal }),
+  ]);
+  const items = casting.items.map((entity) => (gone.has(entity.id) ? { ...entity, image: undefined } : entity));
+  return { casting: { ...casting, items }, profiles };
 }

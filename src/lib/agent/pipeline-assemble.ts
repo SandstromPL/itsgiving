@@ -105,6 +105,7 @@ export function assemble(input: AssembleInput): Treatment {
       const actor = ctx.casting.find((r) => r.ref === c.face)?.item;
       const face = actor && !faces.has(actor.id) ? actor : undefined;
       if (face) faces.add(face.id);
+      const profile = face && people.profiles.get(face.id);
       return {
         name: prose(c.name, 60),
         who: prose(c.who, 300),
@@ -130,7 +131,9 @@ export function assemble(input: AssembleInput): Treatment {
               face: {
                 entity: face,
                 qloo: evidence(people.casting.items, "casting_references", face),
-                known: people.roles.get(face.id) ?? [],
+                known: profile?.known ?? [],
+                // TMDB's photo only stands in where Qloo has no picture of the face.
+                ...(profile?.photo && !face.image ? { photo: profile.photo } : {}),
               },
             }
           : {}),

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { Cooldowns, DailyBudget, LlmError, strictModeViolations, toJsonSchema, type LlmDeps, type LlmProvider } from "../llm";
 import { QlooClient, createQlooClient, type FetchLike } from "../qloo";
 import { MemoryCache } from "../qloo/cache";
@@ -180,16 +180,23 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
 
   it("draws the story's people from TMDB's characters, and names the parts their actors are known for", async () => {
     const mock = createMockFetch();
-    // The mock's actors have no IMDb IDs: give each one, under imdb_id as live Qloo does.
+    // The mock's actors have no IMDb IDs: give each one, under imdb_id as live Qloo does. Qloo has no picture of the
+    // second, and its image server no longer has the third's.
     const fetchImpl: FetchLike = async (url, init) => {
       const response = await mock(url, init);
       if (!decodeURIComponent(url).includes("filter.type=urn:entity:person")) return response;
       const body = await response.json();
-      (body.results?.entities ?? []).forEach(
-        (e: { external?: unknown }, i: number) => (e.external = { imdb_id: [{ id: `nm${1_000_000 + i}` }] }),
-      );
+      (body.results?.entities ?? []).forEach((e: { external?: unknown; properties?: { image?: unknown } }, i: number) => {
+        e.external = { imdb_id: [{ id: `nm${1_000_000 + i}` }] };
+        if (i === 1) delete e.properties?.image;
+        if (i === 2) e.properties = { ...e.properties, image: { url: "https://images.qloo.com/i/gone.jpg" } };
+      });
       return Response.json(body, { status: response.status });
     };
+    vi.stubGlobal("fetch", async (url: string) =>
+      url.endsWith("gone.jpg") ? new Response(null, { status: 307, headers: { location: "/s/oops.png" } }) : new Response("jpeg"),
+    );
+    onTestFinished(() => void vi.unstubAllGlobals());
     const live = new QlooClient({
       mode: "live",
       apiKey: "test",
@@ -210,8 +217,11 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
           { name: "Shoya", actor: "Miyu Irino" },
         ];
       },
-      async roles(imdb: string) {
-        return imdb === "nm1000000" ? [{ character: "Calum", title: "Aftersun", year: 2022 }] : [];
+      async findPerson(imdb: string) {
+        return { tmdbId: Number(imdb.slice(2)), photo: `https://image.tmdb.org/t/p/h632/${imdb}.jpg` };
+      },
+      async roles(person: { tmdbId: number }) {
+        return person.tmdbId === 1_000_000 ? [{ character: "Calum", title: "Aftersun", year: 2022 }] : [];
       },
     } as unknown as TmdbClient;
     const short = brief({ touchstones: ["Past Lives", "Aftersun"], city: "Mumbai", format: "short_film" });
@@ -227,6 +237,12 @@ describe("runPipeline (mock Qloo, mock LLM)", () => {
     expect(lead.from).toMatchObject({ character: "Shoko", actor: "Saori Hayami", take: expect.any(String) });
     expect(["A Silent Voice", "Donnie Darko"]).toContain(lead.from?.title.name);
     expect((t.characters ?? []).flatMap((c) => c.face?.known ?? [])).toContainEqual({ character: "Calum", title: "Aftersun", year: 2022 });
+    // TMDB's photo stands in only for the faces Qloo has no picture of, the one whose picture is gone included.
+    const faces = (t.characters ?? []).flatMap((c) => (c.face ? [c.face] : []));
+    expect(faces.filter((f) => f.photo).map((f) => [f.entity.image, f.photo])).toEqual([
+      [undefined, "https://image.tmdb.org/t/p/h632/nm1000001.jpg"],
+      [undefined, "https://image.tmdb.org/t/p/h632/nm1000002.jpg"],
+    ]);
     // The stills come from the same lookups, and TMDB never makes a treatment partial.
     expect(
       t.references

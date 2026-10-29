@@ -55,12 +55,13 @@ const SKETCH: [string, "wants" | "hides" | "presence" | "look" | "arc"][] = [
 /** "Calum in Aftersun (2022) and Lucius in Gladiator II (2024)". */
 const knownAs = (roles: KnownRole[]) => joinNames(roles.map((role) => `${role.character} in ${withYear(role.title, role.year)}`));
 
-/** What TMDB gave this board, for its credits: stills, the characters its people draw on, and actors' roles. */
+/** What TMDB gave this board, for its credits: stills, the characters its people draw on, and actors' roles and photos. */
 const tmdbGave = (t: Treatment) =>
   [
     t.references.some((r) => r.still) && "film stills",
     t.characters?.some((c) => c.from) && "characters",
     t.characters?.some((c) => c.face?.known.length) && "actors' roles",
+    t.characters?.some((c) => c.face?.photo) && "actors' photos",
   ].filter((part): part is string => Boolean(part));
 
 const capitalized = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -168,7 +169,7 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
               {c.face && (
                 <div className="flex shrink-0 flex-col border-line sm:w-48 sm:border-r">
                   <Still
-                    src={c.face.entity.image}
+                    src={c.face.entity.image ?? c.face.photo}
                     alt={`Photo of ${c.face.entity.name}`}
                     className="aspect-[3/2] w-full object-[50%_22%] sm:aspect-[4/5] sm:object-center"
                   />
@@ -177,6 +178,7 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
                     {c.face.known.length > 0 && (
                       <p className="text-[13px] leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
                     )}
+                    {c.face.photo && <p className="text-[13px] leading-5 text-faint">Photo: TMDB</p>}
                   </div>
                 </div>
               )}

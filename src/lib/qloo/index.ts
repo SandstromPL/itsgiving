@@ -6,6 +6,7 @@ import { Pacer } from "./pacer";
 export * from "./client";
 export * from "./errors";
 export * from "./normalize";
+export * from "./pictures";
 export * from "./urns";
 export type * from "./types";
 

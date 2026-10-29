@@ -110,7 +110,7 @@ const STEPS: { title: string; text: string; qloo?: string[]; model?: string }[] 
 const LIMITS = [
   "Qloo describes groups. A treatment says what an audience tends to love, never what one person will do.",
   "Qloo scores feature films, series and artists, not short films or songs. A short's audience comes from the feature films it's after, and a video's from the artist, not the track. A song named in a treatment comes from Qloo's list of the artist's notable songs: clear it before you use it.",
-  "Characters are invented for the story. The characters they're drawn from and the parts an actor is known for come from TMDB, and the actors are faces this audience knows, for the presence a part needs: whether anyone is free or interested is for you to ask.",
+  "Characters are invented for the story. The characters they're drawn from, the parts an actor is known for and the photo of a face Qloo has no picture of come from TMDB, and the actors are faces this audience knows, for the presence a part needs: whether anyone is free or interested is for you to ask.",
   "Not every artist is in Qloo. When one is missing, stand-in artists carry the audience, and the treatment says so.",
   "Locations are a scout list. Availability and filming permission are yours to confirm with each venue.",
 ] as const;

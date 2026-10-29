@@ -50,8 +50,8 @@ fast and cheap, and within the free fallback models' limits.
    (`score_for_audience`, which asks Qloo to rank exactly that list). The calls run at once. Beside them, from the
    moment the names are resolved, run two searches that need nothing else: the **actors** this audience knows
    (`casting_references`: actors only, leaving out people Qloo also tags as influencers, YouTubers, reality-TV names,
-   athletes or musicians, within the budget's reach), each with the two parts TMDB says they're best known for, and
-   the **artists** it plays (`music_references`, each with a few of its notable songs). The writer is the first to wait
+   athletes or musicians, within the budget's reach), each with the two parts TMDB says they're best known for (and
+   TMDB's photo, for a face Qloo has no picture of), and the **artists** it plays (`music_references`, each with a few of its notable songs). The writer is the first to wait
    for them, and a re-plan doesn't ask again. The heatmap scores
    every tile of the city for the audience; itsgiving groups the hottest tenth into the three strongest areas, 2 km in
    radius, and names each after the neighbourhoods Qloo lists around its centre. Tags that name who people are
@@ -90,8 +90,8 @@ fast and cheap, and within the free fallback models' limits.
    wrote it. A ref that slips into the prose is swapped for its name, and lighting or shot notes sent as objects are
    flattened, so neither costs a repair call. TMDB gives each reference its still (its backdrop, by IMDb ID) and its
    top-billed characters, looked up as soon as Qloo's films land: the cover and the reference cards show film frames,
-   not posters, whose own lettering would fight the treatment's title. A TMDB failure costs a still, a character or a
-   role, never the treatment.
+   not posters, whose own lettering would fight the treatment's title. A TMDB failure costs a still, a character, a
+   role or a photo, never the treatment.
 
 Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and write; Qloo lookups come from cache.
 
@@ -305,7 +305,7 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
 | `LLM_DAILY_CAP` | Real LLM calls per UTC day per instance before the mock takes over (default 300) |
 | `TMDB_BASE_URL` | Optional: another address for TMDB's API; defaults to `https://api.themoviedb.org` |
 | `ITSGIVING_TOOL_PLAYGROUND` | `1` enables `/playground` and `/api/tools/*` in production builds (set at build time) |
-| `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list, the reference films' stills and characters, and actors' roles. IMDb links work without it; without stills, covers show the palette alone, and characters aren't drawn from any |
+| `TMDB_API_KEY` | Optional: TMDB's "API Read Access Token" (or v3 API key), for importing a director's TMDB list, the reference films' stills and characters, and actors' roles and photos. IMDb links work without it; without stills, covers show the palette alone, and characters aren't drawn from any |
 | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional: the Supabase project's URL and publishable key, which turn accounts on (read at build time) |
 | `SUPABASE_SECRET_KEY` | With the two above: the project's secret key, used only on the server, to read and write saved treatments and to seal each treatment it builds so only those can be saved |
 
@@ -388,8 +388,8 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
 ## Credits
 
 - Taste data: [Qloo](https://www.qloo.com/)'s Insights API.
-- Imported film lists, film stills, characters and actors' roles: [TMDB](https://www.themoviedb.org/). This product
-  uses the TMDB API but is not endorsed or certified by TMDB.
+- Imported film lists, film stills, characters, and actors' roles and photos: [TMDB](https://www.themoviedb.org/).
+  This product uses the TMDB API but is not endorsed or certified by TMDB.
 - Street maps under the heatmap: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, from
   OpenStreetMap's standard tiles under its [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 

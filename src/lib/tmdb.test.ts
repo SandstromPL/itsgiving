@@ -150,7 +150,7 @@ describe("TmdbClient.backdrop", () => {
   });
 });
 
-describe("TmdbClient characters and roles", () => {
+describe("TmdbClient characters, actors and roles", () => {
   it("names a film's top-billed characters, one per actor, skipping credits that aren't parts", async () => {
     const { client } = fakeTmdb({
       "/3/find/tt13968674": { movie_results: [{ id: 913862, backdrop_path: "/a.jpg" }], tv_results: [] },
@@ -193,9 +193,10 @@ describe("TmdbClient characters and roles", () => {
     ]);
   });
 
-  it("names the two parts an actor is best known for, and none for someone TMDB lacks", async () => {
+  it("finds an actor with their photo, and names the two parts they're best known for", async () => {
     const { client, requests } = fakeTmdb({
-      "/3/find/nm8958770": { person_results: [{ id: 1 }] },
+      "/3/find/nm8958770": { person_results: [{ id: 1, profile_path: "/mescal.jpg" }] },
+      "/3/find/nm0000002": { person_results: [{ id: 2, profile_path: null }] },
       "/3/find/nm0000001": { person_results: [] },
       "/3/person/1/combined_credits": {
         cast: [
@@ -215,15 +216,19 @@ describe("TmdbClient characters and roles", () => {
         ],
       },
     });
-    await expect(client.roles("nm8958770")).resolves.toEqual([
+    const found = await client.findPerson("nm8958770");
+    expect(found).toEqual({ tmdbId: 1, photo: "https://image.tmdb.org/t/p/h632/mescal.jpg" });
+    await expect(client.roles(found!)).resolves.toEqual([
       { character: "Lucius", title: "Gladiator II", year: 2024 },
       { character: "Calum", title: "Aftersun", year: 2022 },
     ]);
-    await expect(client.roles("nm0000001")).resolves.toEqual([]);
-    await expect(client.roles("tt0118694")).resolves.toEqual([]);
+    await expect(client.findPerson("nm0000002")).resolves.toEqual({ tmdbId: 2 });
+    await expect(client.findPerson("nm0000001")).resolves.toBeUndefined();
+    await expect(client.findPerson("tt0118694")).resolves.toBeUndefined();
     expect(requests.map((r) => new URL(r.url).pathname)).toEqual([
       "/3/find/nm8958770",
       "/3/person/1/combined_credits",
+      "/3/find/nm0000002",
       "/3/find/nm0000001",
     ]);
   });

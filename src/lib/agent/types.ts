@@ -156,9 +156,10 @@ export interface Character {
   };
   /**
    * An actor this audience over-indexes on (casting_references), as a reference for the presence the part needs, never
-   * an offer; `known` is the parts TMDB says they're best known for.
+   * an offer; `known` is the parts TMDB says they're best known for, and `photo` TMDB's photo of them, only when Qloo has
+   * no picture.
    */
-  face?: { entity: CompactEntity; qloo: QlooEvidence; known: KnownRole[] };
+  face?: { entity: CompactEntity; qloo: QlooEvidence; known: KnownRole[]; photo?: string };
 }
 
 /** An area from Qloo's heatmap, with the ref (A1, A2...) the planner chose it by. */
