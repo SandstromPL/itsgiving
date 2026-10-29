@@ -421,16 +421,39 @@ body {
   animation: letterbox-open 900ms var(--ease-out) both;
 }
 
-/* The run's film leader (timeline.tsx): its sweep is an angle the browser can ease, so each finished step glides it on
-   rather than jumping. */
-@property --sweep {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
+/* The run's film leader (timeline.tsx): its sweep is two half discs, one for each side of the dial, each turned into
+   place, so a finished step glides it on by rotation alone and the browser never repaints the dial as it moves. */
 .leader {
-  background: conic-gradient(var(--foreground) 0 var(--sweep), #3a3936 var(--sweep) 360deg);
-  transition: --sweep 600ms var(--ease-out);
+  background: #3a3936;
+}
+.leader-half {
+  position: absolute;
+  inset-block: 0;
+  width: 50%;
+  overflow: hidden;
+}
+.leader-half > span {
+  position: absolute;
+  inset-block: 0;
+  width: 200%;
+  border-radius: 50%;
+  transition: transform 600ms var(--ease-out);
+}
+/* The right half shows 0-180 degrees: its disc's left half is the fill, turned in clockwise. */
+.leader-right {
+  right: 0;
+}
+.leader-right > span {
+  right: 0;
+  background: linear-gradient(to right, var(--foreground) 50%, transparent 0);
+}
+/* The left half shows 180-360 degrees: its disc's right half is the fill. */
+.leader-left {
+  left: 0;
+}
+.leader-left > span {
+  left: 0;
+  background: linear-gradient(to left, var(--foreground) 50%, transparent 0);
 }
 
 /*
