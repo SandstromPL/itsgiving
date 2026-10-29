@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Treatment } from "../agent/types";
 import { SAVED_LIMIT, coverOf, summaryOf, takeKey } from "./shape";
-import { SavedStoreError, deleteAccount, deleteSaved, saveTreatment, savedForViewer, savedList, setShared } from "./store";
+import { SavedStoreError, deleteAccount, deleteSaved, saveTreatment, savedForViewer, savedList, savedVisible, setShared } from "./store";
 
 // A stand-in for supabase-js: each query records its builder calls in order (from, select, eq, insert...) and, when
 // awaited, answers with the next scripted reply. The store's own logic is what's under test, not PostgREST.
@@ -126,6 +126,7 @@ describe("saved treatments' store", () => {
     expect(await setShared("1 or 1=1", OWNER, true)).toBe(false);
     expect(await deleteSaved("../everything", OWNER)).toBe(false);
     expect(await savedForViewer("not-a-uuid", OWNER)).toBeNull();
+    expect(await savedVisible("not-a-uuid", OWNER)).toBe(false);
     expect(fake.queries).toHaveLength(0);
   });
 
@@ -143,6 +144,18 @@ describe("saved treatments' store", () => {
     fake.replies.push({ data: row({ shared: true }), error: null }, { data: null, error: null });
     expect(await savedForViewer(SAVED_ID, null)).toMatchObject({ id: SAVED_ID, shared: true });
     expect(await savedForViewer(SAVED_ID, OWNER)).toBeNull(); // gone
+  });
+
+  it("answers whether a viewer may open a saved treatment without reading the treatment", async () => {
+    const visibility = (shared: boolean) => ({ data: { owner_id: OWNER, shared }, error: null });
+    fake.replies.push(visibility(false), visibility(false), visibility(true), { data: null, error: null });
+    expect(await savedVisible(SAVED_ID, OWNER)).toBe(true);
+    expect(await savedVisible(SAVED_ID, null)).toBe(false);
+    expect(await savedVisible(SAVED_ID, null)).toBe(true);
+    expect(await savedVisible(SAVED_ID, OWNER)).toBe(false); // gone
+    expect(calls(0)).toEqual([["select", "owner_id, shared"], ["eq", "id", SAVED_ID], ["maybeSingle"]]);
+    fake.replies.push({ data: null, error: { code: "PGRST002", message: "Could not query the database for the schema cache" } });
+    await expect(savedVisible(SAVED_ID, OWNER)).rejects.toThrow(SavedStoreError);
   });
 
   it(`stops at ${SAVED_LIMIT} saved treatments without writing`, async () => {

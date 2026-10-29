@@ -98,8 +98,10 @@ function SavedGrid({ items }: { items: SavedSummary[] }) {
     <ul className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
         <li key={item.id}>
+          {/* No prefetch: the proxy counts each request for a saved treatment as an open (src/proxy.ts). */}
           <Link
             href={`/s/${item.id}`}
+            prefetch={false}
             className="flex h-full flex-col overflow-hidden rounded-[26px] border border-line bg-card hover:border-foreground"
           >
             <span className="surface-dark relative block aspect-video bg-background">

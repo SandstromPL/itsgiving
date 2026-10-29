@@ -84,8 +84,10 @@ export function SaveControl({ treatment, seal, autoSave = false }: { treatment: 
         <button ref={shareButton} type="button" onClick={() => share(status)} className={outline}>
           {status.shared ? "Share" : "Share link"}
         </button>
+        {/* No prefetch: the proxy counts each request for a saved treatment as an open (src/proxy.ts). */}
         <Link
           href={`/s/${status.id}`}
+          prefetch={false}
           className="rounded-full px-2 py-2.5 text-[15px] font-semibold underline decoration-edge underline-offset-4 hover:decoration-foreground"
         >
           Open

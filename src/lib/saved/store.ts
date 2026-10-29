@@ -100,7 +100,10 @@ export async function saveTreatment(ownerId: string, treatment: Treatment): Prom
   return { kind: "saved", id: data.id as string, created: true };
 }
 
-/** A saved treatment, if this viewer may see it: its owner always, anyone else only while it's shared. */
+/** Who may see a saved treatment: its owner always, anyone else only while it's shared. */
+const visibleTo = (row: Pick<Row, "owner_id" | "shared">, viewerId: string | null) => row.shared || row.owner_id === viewerId;
+
+/** A saved treatment, if this viewer may see it. */
 export async function savedForViewer(id: string, viewerId: string | null): Promise<SavedTreatment | null> {
   if (!isSavedId(id)) return null;
   const { data, error } = await db()
@@ -109,8 +112,19 @@ export async function savedForViewer(id: string, viewerId: string | null): Promi
     .eq("id", id)
     .maybeSingle<Row>();
   if (error) fail("reading a saved treatment", error);
-  if (!data || !(data.shared || data.owner_id === viewerId)) return null;
+  if (!data || !visibleTo(data, viewerId)) return null;
   return { ...summaryFrom(data), ownerId: data.owner_id, treatment: data.treatment };
+}
+
+/**
+ * Whether this viewer may open a saved treatment, asked without reading the treatment: the proxy's check, so a link
+ * that leads nowhere answers 404 before its page starts.
+ */
+export async function savedVisible(id: string, viewerId: string | null): Promise<boolean> {
+  if (!isSavedId(id)) return false;
+  const { data, error } = await db().from(TABLE).select("owner_id, shared").eq("id", id).maybeSingle<Pick<Row, "owner_id" | "shared">>();
+  if (error) fail("checking a saved treatment", error);
+  return Boolean(data && visibleTo(data, viewerId));
 }
 
 /** A person's saved treatments, newest first, without the treatments themselves. */
