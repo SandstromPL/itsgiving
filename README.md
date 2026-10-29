@@ -208,7 +208,7 @@ finished treatments and each one's page shows it at once, whatever the live rate
   took over 100 s per call. DeepSeek V4 Pro lost to Flash on quality, speed and cost.
 - **Thinking depth.** Each brief chooses how long DeepSeek thinks: **Deep** (the default, high reasoning effort) or
   **Quick** (low). Two blind judges scored deep treatments 8.5 out of 10, quick ones 8.1 and thinking-off ones 5.8,
-  judged side by side on live Qloo. A deep treatment takes about 45-65 s, a quick one about 25-35 s, and either costs
+  judged side by side on live Qloo. A deep treatment takes about 45-65 s, a quick one about 40 s, and either costs
   under a cent. The free fallbacks ignore the setting: more thinking made them slower, not better. A quick brief is
   answered from a cached deep treatment of the same brief when there is one.
 - **Where the time goes.** Most of a deep treatment's time is DeepSeek's: a plan takes 4-7 s and a write 35-53 s, both

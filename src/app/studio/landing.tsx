@@ -122,7 +122,7 @@ export function Hero({ cover, fontId }: { cover?: FeaturedCover; fontId?: string
             </Link>
           )}
         </div>
-        <p className="order-6 text-ui text-faint">No sign-up to build. A live build takes about 40 seconds.</p>
+        <p className="order-6 text-ui text-faint">No sign-up to build. A live build takes about a minute.</p>
       </div>
       {cover && fontId && <HeroCover cover={cover} fontId={fontId} className="order-3" />}
     </section>

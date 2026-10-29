@@ -152,8 +152,8 @@ export default function About() {
               What it is
             </h2>
             <p className={lead}>
-              A treatment agent. Give it an artist, or the films a short is after, and a shoot city. In about 40 seconds it writes a
-              treatment you can pitch, built on what that audience loves.
+              A treatment agent. Give it an artist, or the films a short is after, and a shoot city. In about a minute it writes a treatment
+              you can pitch, built on what that audience loves.
             </p>
             <p className={lead}>
               Add the films you love and it finds where your taste meets theirs: your voice, their taste. Every treatment prints to PDF and
