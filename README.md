@@ -17,11 +17,14 @@ The name is Gen Z slang: "it's giving…" means "this has the vibe of…", which
 
 | | |
 |---|---|
-| ![The homepage's headline](docs/media/02-headline.jpg) | ![Now showing: the featured treatments on a film strip](docs/media/04-now-showing.jpg) |
-| ![Watch it work: the shoot base on Qloo's heatmap](docs/media/05-watch-it-work-map.jpg) | ![A treatment's cover](docs/media/08-board-cover.jpg) |
+| ![The title card: the itsgiving lettermark](docs/media/01-title-card.jpg) | ![The homepage's headline](docs/media/02-headline.jpg) |
+| ![What it does, in one screen](docs/media/03-pitch.jpg) | ![Now showing: the featured treatments on a film strip](docs/media/04-now-showing.jpg) |
+| ![Watch it work: the shoot base on Qloo's heatmap](docs/media/05-watch-it-work-map.jpg) | ![Watch it work: the treatment it wrote](docs/media/06-watch-it-work-treatment.jpg) |
+| ![The examples page](docs/media/07-examples.jpg) | ![A treatment's cover](docs/media/08-board-cover.jpg) |
 | ![The concept beside its tone tags](docs/media/09-concept-tone.jpg) | ![Reference films with Qloo receipts](docs/media/10-references.jpg) |
 | ![Characters drawn from titles the audience loves](docs/media/11-characters.jpg) | ![Wardrobe from brands the audience over-indexes on](docs/media/12-wardrobe.jpg) |
 | ![Locations beside the held shoot-base map](docs/media/13-locations-map.jpg) | ![Palette and the audience read](docs/media/14-palette-audience.jpg) |
+| ![The studio's brief](docs/media/15-studio.jpg) |  |
 
 More in [`docs/media/`](docs/media/). Film stills come from TMDB and the maps' streets from OpenStreetMap on the live
 site; in these captures the maps show only Qloo's contours.
