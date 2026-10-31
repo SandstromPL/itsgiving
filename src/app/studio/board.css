@@ -70,7 +70,8 @@
 
 /* ---------- The slide-in card: a character's face or a brand, from the right (side-card.tsx) ----------
  * A popover in the top layer. It slides in on the drawer's curve and leaves a little faster; reduced motion only fades.
- * On a phone it takes the screen's width, at the foot of the screen. */
+ * On a phone it takes the screen's width, at the foot of the screen, and rises from the bottom edge like the phone's
+ * other sheets (the share and title-card windows). */
 [popover].side-card {
   position: fixed;
   inset: auto;
@@ -120,14 +121,24 @@
     left: 8px;
     width: auto;
     max-height: calc(100dvh - 24px);
-    translate: calc(100% + 16px) 0;
+    translate: 0 calc(100% + 16px);
+    transition:
+      translate 200ms var(--ease-out),
+      opacity 200ms ease,
+      overlay 200ms allow-discrete,
+      display 200ms allow-discrete;
   }
   [popover].side-card:popover-open {
     translate: 0 0;
+    transition:
+      translate 300ms var(--ease-drawer),
+      opacity 180ms ease,
+      overlay 300ms allow-discrete,
+      display 300ms allow-discrete;
   }
   @starting-style {
     [popover].side-card:popover-open {
-      translate: calc(100% + 16px) 0;
+      translate: 0 calc(100% + 16px);
     }
   }
 }
