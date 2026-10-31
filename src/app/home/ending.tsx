@@ -49,7 +49,7 @@ export function Ending({ examples }: { examples: boolean }) {
             </Link>
           )}
         </div>
-        <p className="text-small text-faint">No sign-up to build. A live build takes about a minute.</p>
+        <p className="text-small text-faint">No sign-up to build. A live build takes about a minute, sometimes two.</p>
       </div>
     </section>
   );

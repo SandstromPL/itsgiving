@@ -104,10 +104,10 @@ export type Format = keyof typeof FORMATS;
 /**
  * How long DeepSeek thinks. Deep is the default: blind judges rated its treatments clearly higher.
  * Quick thinks less and is faster: since the characters, a deep build takes 45-65 s and a quick one about 43 s
- * (live, 2026-10-29).
+ * (live, 2026-10-29); in DeepSeek's busy hours a deep one can take about 90 s.
  */
 export const THINKING = {
-  deep: { label: "Deep", hint: "The strongest treatment, in about a minute." },
+  deep: { label: "Deep", hint: "The strongest treatment, in about a minute, sometimes two." },
   quick: { label: "Quick", hint: "A little less considered, in about 40 s." },
 } as const;
 export type Thinking = keyof typeof THINKING;
