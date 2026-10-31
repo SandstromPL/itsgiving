@@ -8,7 +8,7 @@ The name is Gen Z slang: "it's giving…" means "this has the vibe of…", which
 
 > **Status:** built for the [Qloo Agentic Hackathon](https://qloo.devpost.com/) and live at
 > https://itsgiving-two.vercel.app. The treatment builder runs end to end on live Qloo: the Qloo tools, a lean LLM agent
-> (DeepSeek first, free models as fallbacks), the board UI, four pre-built featured treatments, a director's taste
+> (DeepSeek first, free models as fallbacks), the board UI, five pre-built featured treatments, a director's taste
 > imported from a TMDB list or IMDb links, and accounts for saving and sharing.
 
 ![itsgiving: your voice, their taste.](docs/media/thumbnail.jpg)

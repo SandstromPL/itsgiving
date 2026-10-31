@@ -36,6 +36,13 @@ export const EXAMPLES: Example[] = [
     featured: true,
   },
   {
+    slug: "anuv-jain-delhi",
+    title: "Anuv Jain",
+    detail: "Music video in Delhi on an indie budget.",
+    brief: { artist: "Anuv Jain", city: "Delhi" },
+    featured: true,
+  },
+  {
     slug: "after-past-lives-aftersun",
     title: "After Past Lives and Aftersun",
     detail: "A short film in Mumbai on a shoestring.",
