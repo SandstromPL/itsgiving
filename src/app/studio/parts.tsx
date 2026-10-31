@@ -14,6 +14,7 @@ export function Tape({ children, title }: { children: ReactNode; title?: string 
   return (
     <span
       title={title}
+      data-tape
       className="inline-flex items-center rounded-full bg-tape-wash px-2.5 py-1 text-label leading-4 font-semibold text-tape ring-1 ring-tape/40"
     >
       {children}

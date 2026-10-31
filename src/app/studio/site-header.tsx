@@ -100,7 +100,13 @@ export function SiteHeader({
             );
           })}
         </nav>
-        {badges && <div className="order-7 flex flex-wrap items-center gap-2 sm:order-3 sm:ml-auto">{badges}</div>}
+        {/* Phones show only the mock warnings (ModeBadges), so without one the box goes: empty, it would still take a gap
+            after the GitHub button and pull it in from the edge on the pages that have badges. */}
+        {badges && (
+          <div className="order-7 flex flex-wrap items-center gap-2 max-sm:[&:not(:has([data-tape]))]:hidden sm:order-3 sm:ml-auto">
+            {badges}
+          </div>
+        )}
       </div>
     </header>
   );
