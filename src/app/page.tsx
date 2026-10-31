@@ -22,7 +22,7 @@ export default function Home() {
         <Opening />
         <Pitch />
         {frames.length > 0 ? <Flatbed frames={frames} /> : <FlatbedEmpty live={live} />}
-        {run ? <HowItWorks run={run} /> : <HowItWorksSteps />}
+        {run ? <HowItWorks run={run} still={frames.find((frame) => frame.slug === run.slug)?.still} /> : <HowItWorksSteps />}
         <Ending examples={frames.length > 0} />
       </main>
     </>

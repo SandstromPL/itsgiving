@@ -2,9 +2,10 @@
 
 import { useRef, type CSSProperties, type ReactNode } from "react";
 import type { FeaturedRun } from "@/lib/agent/featured";
-import { STEP_LABELS } from "@/lib/agent/options";
+import { STEP_LABELS, tmdbSize } from "@/lib/agent/options";
 import { useScrollFrame } from "../smooth";
 import { ShootBaseBlock } from "../studio/base-map";
+import { Still } from "../studio/parts";
 import { useLingo } from "../studio/lingo";
 import { titleFont, titleStyle, suggestTitleFontFrom } from "../studio/title-fonts";
 import { evidenceTone, rankMark, slip } from "../studio/ui";
@@ -82,7 +83,13 @@ function StepWords({ i, of, title, text }: { i: number; of: number; title: strin
 }
 
 /** "Watch it work": one real featured run, a step to a screen, each step and then what it made. */
-export function HowItWorks({ run }: { run: FeaturedRun }) {
+export function HowItWorks({
+  run,
+  still,
+}: {
+  run: FeaturedRun;
+  /** The treatment's cover still, for step 4's small title card. */ still?: string;
+}) {
   const { t } = useLingo();
   const list = useSteps();
   const head = useArrivals<HTMLDivElement>();
@@ -175,13 +182,28 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
       show: (
         <CutLink
           href={`/t/${run.slug}`}
-          className="surface-dark flex w-full flex-col gap-4 rounded-[28px] bg-frame p-6 text-foreground sm:p-12"
+          className="surface-dark grid w-full items-center gap-8 rounded-[28px] bg-frame p-6 text-foreground sm:p-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-12"
         >
-          <span className="text-balance" style={titleStyle(font, "var(--text-display)")}>
-            {run.title}
+          <span className="flex min-w-0 flex-col gap-4">
+            <span className="text-balance" style={titleStyle(font, "var(--text-display)")}>
+              {run.title}
+            </span>
+            <span className="max-w-[44ch] font-serif text-prose leading-[1.32] text-pretty text-dim italic">{run.logline}</span>
+            <span className="text-ui font-bold underline decoration-edge underline-offset-4">Read the whole treatment</span>
           </span>
-          <span className="max-w-[44ch] font-serif text-prose leading-[1.32] text-pretty text-dim italic">{run.logline}</span>
-          <span className="text-ui font-bold underline decoration-edge underline-offset-4">Read the whole treatment</span>
+          {/* The treatment's own title card in small, beside its title: the still it opens on, the title in its face. */}
+          {still && (
+            <div aria-hidden className="relative aspect-[2.11/1] w-full overflow-hidden rounded-[18px] bg-background ring-1 ring-line">
+              <Still src={tmdbSize(still, "w780")} alt="" className="size-full object-cover" />
+              <span className="absolute inset-0 bg-linear-to-t from-black/80 via-black/25 to-transparent" />
+              <span
+                className="absolute inset-x-4 bottom-3 line-clamp-2 leading-[0.95] text-balance"
+                style={titleStyle(font, "var(--text-subhead)")}
+              >
+                {run.title}
+              </span>
+            </div>
+          )}
         </CutLink>
       ),
     },
