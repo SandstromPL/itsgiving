@@ -104,7 +104,7 @@ export function Cover({
             </Fragment>
           ))}
         </h1>
-        <p className="max-w-[40ch] font-serif text-logline leading-[1.2] text-pretty italic">{t.logline}</p>
+        <p className="max-w-[40ch] font-serif text-logline leading-[1.3] text-pretty italic">{t.logline}</p>
         <CoverPalette palette={t.palette} />
       </div>
     </header>
