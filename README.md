@@ -108,9 +108,14 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   the Qloo heatmap's shoot base in Mumbai, or a tone tag elsewhere.
 - **unc mode.** The words around the work are Gen Z slang by default. A switch in the header turns them into plain
   English for producers, label people and judges. The treatment, the receipts and the run log read the same in both.
-- **Section bar and pinned map.** Under the cover, one bar lists the sections, lights up the one being read and fills
-  a thin line as you go; once the cover scrolls away, the title and the way back join it. In Locations, the
-  shoot-base map stays put beside the places and lights up the pin of the one in view.
+- **A board to read slowly.** The title comes into focus word by word the first time a board opens, and each part
+  rises into place as you reach it (everything shows at once on paper, under reduced motion it only fades, and a jump
+  lands on a part already in place). "How the tone reads" is a card of its own under the concept. A character's name
+  or a brand's opens a card from the right with the face (Qloo's picture or TMDB's, "Known as", the receipt) or the
+  brand (its picture, traits, price and style). The palette's big swatches lift under the pointer.
+- **Section bar and held map.** Under the cover, one bar lists the sections, lights up the one being read and fills
+  a thin line as you go; once the cover scrolls away, the title and the way back join it. In Locations, the places
+  come one to a screen while the shoot-base map is held beside them, lighting the pin of the one being read.
 - **A map you can read.** The heatmap is drawn as contour lines on the city's streets (OpenStreetMap, darkened): the
   bolder the line, the stronger the audience inside it, around the three strongest areas and the numbered locations.
   The homepage draws a featured run's map with the same component, and the PDF prints it light.
@@ -121,18 +126,24 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
 
 ### The pages
 
-- **The homepage** explains and proves, and holds no form: the headline, a finished cover, "Start a treatment" and
-  "See a finished one"; "Now showing", the other featured treatments as posters in a dark strip under a still
-  projector beam (a sideways row on a phone), ending on a poster for the reader's own, the way into the studio; and
-  "How it works", one real featured run step by step beside what each step produced. Nothing on it moves or changes
-  as you scroll; the one motion is the cover opening like a letterbox when the page loads.
+- **The homepage** explains and proves, and holds no form, one block to a screen. The title card (the lettermark,
+  coming into focus) dollies through the second g's reel window into black, then "your voice, their taste." comes into
+  focus word by word; the pitch lights up word by word as you scroll; "Now showing" runs the featured treatments past
+  a film gate as you scroll, ending on a frame for the reader's own; "Watch it work" takes one real featured run a step
+  to a screen, each step and then what it made (the shoot base beside its map); and only then "Start a treatment" and
+  "See a finished one". The intro plays once a visit, with Skip intro; under reduced motion everything fades instead.
+- **Examples** (`/examples`) lists the featured treatments as cards (still, title in its face, logline, tones and
+  palette), filterable by format. Opening one, from here or the homepage, goes through the camera cut: the frame goes
+  dark, the camera's reels run up to speed and the shot pushes through a reel window into the board.
 - **The studio** (`/studio`) is the tool. A music video starts from its artist and a city; a short film from the films
   it's after and a city. The rest waits under "Make it yours": a video's reference films and stand-in artists, a
   short's "music its audience loves" (an artist whose fans it's for, which shapes the audience, not the story), your
-  own films, the budget and the thinking depth. "Your poster" fills in beside it. While a treatment builds, the brief
-  folds into one line and the run takes the page: a countdown, the step it's on, every Qloo call, what Qloo found
-  rolling in as opening credits, and the tab's title counting the seconds. Back from a board returns to the brief, and
-  "Back to" the treatment's title opens it again, even after a visit to the homepage.
+  own films, the budget and the thinking depth. "Your treatment" above the form says what the brief adds up to so far.
+  While a treatment builds, the brief folds into one line and the run takes the page: a countdown, the step it's on,
+  what Qloo found rolling in as opening credits, a strip with a cell for each step, and the tab's title counting the
+  seconds (the run log stays off this screen; the board's credits keep it). When it's ready, a slate claps, is pulled
+  up out of frame as on set, and the camera cuts through its window to the board. Back from a board returns to the
+  brief, and "Back to" the treatment's title opens it again, even after a visit to the homepage.
 - **Featured treatments** (`/t/<slug>`) are pages of their own, built with the site, so Back, reload and links work as
   anywhere. A rework chip there hands the treatment to the studio, which opens it at once and re-runs it with the
   change. On every board, the section bar jumps within the page and puts the section in the address without adding
@@ -145,12 +156,15 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   treatments a minute), like an example, and its rework
   chips take it to the studio as their own take. **Your treatments** (`/saved`) lists them, and at its foot deletes
   the account along with everything saved in it.
-- **One header on every page:** Examples, Studio and About, with the current section lit (a featured treatment counts
-  as Examples), then the unc-mode switch, the account button (Sign in, or your initial with your treatments and Sign
-  out) and the theme, since those choices carry across pages. Pages add only status badges, live or mock. On phones
-  it takes two rows, and only the mock warnings among the badges show there.
-- **Light or dark,** switched in the header and remembered per browser. Light is the default, and nothing on a page
-  changes it.
+- **One header on every page:** the camera and the lettermark, Examples, Studio and About, with the current section
+  lit (a featured treatment counts as Examples), then the unc-mode switch and the profile menu (the room, plus Sign in,
+  or your initial with your treatments and Sign out), since those choices carry across pages. Pages add only status
+  badges, live or mock. The homepage keeps it away until "Watch it work", and a board until you scroll; on the other
+  pages it stays at the top. On phones it takes two rows, and only the mock warnings among the badges show there.
+- **Four rooms,** picked in the profile menu and remembered per browser: Grade (the default, a colourist's neutral
+  grey), Tungsten (warm, lamp-lit), Tri-X (black and white; only the films keep colour) and Light (the paper room).
+  Nothing on a page changes the room. Smooth scrolling (Lenis) runs on every page but the studio, and not at all with
+  reduced motion.
 
 ### Featured treatments
 
@@ -393,6 +407,8 @@ All server-side only, except the two `NEXT_PUBLIC_` ones, which are meant for th
   This product uses the TMDB API but is not endorsed or certified by TMDB.
 - Street maps under the heatmap: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, from
   OpenStreetMap's standard tiles under its [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
+- Smooth scrolling: [Lenis](https://github.com/darkroomengineering/lenis) (MIT). The lettermark is drawn from
+  [Bricolage Grotesque](https://fonts.google.com/specimen/Bricolage+Grotesque) (SIL Open Font License 1.1).
 
 ## License
 

@@ -1,31 +1,29 @@
-import { EXAMPLES } from "@/lib/agent/examples";
-import { featuredCovers, featuredItem, featuredOffered, featuredRun, loadFeatured } from "@/lib/agent/featured";
-import { Hero, HowItWorks, HowItWorksSteps, NowShowing, StartYourOwn } from "./studio/landing";
+import { SmoothScroll } from "./smooth";
+import { showData } from "./home/data";
+import { Ending } from "./home/ending";
+import { Flatbed, FlatbedEmpty } from "./home/flatbed";
+import { HowItWorks, HowItWorksSteps } from "./home/how";
+import { Opening } from "./home/opening";
+import { Pitch } from "./home/pitch";
 import { SiteHeader } from "./studio/site-header";
-import { suggestTitleFont } from "./studio/title-fonts";
 
 /**
- * The pitch: what itsgiving is, the featured treatments, one real run explained, and the way into the studio. It
- * holds no form and reads nothing per request, so the whole page is built once, featured treatments included. Only
- * featured treatments whose own page will open are offered (featuredItem).
+ * The pitch, one block to a screen: the title card dollied through to the line, the pitch, the featured treatments on a
+ * flatbed, one real run step by step, and the way in. It holds no form and reads nothing per request, so the whole page
+ * is built once, featured treatments included. The header waits until "Watch it work".
  */
 export default function Home() {
-  const live = featuredOffered();
-  const all = live ? loadFeatured() : [];
-  const items = EXAMPLES.filter((example) => example.featured).flatMap((example) => featuredItem(example.slug, all) ?? []);
-  const covers = featuredCovers(items);
-  const run = featuredRun(items);
-  const first = items[0];
+  const { live, frames, run } = showData();
   return (
     <>
-      <SiteHeader home />
+      <SiteHeader home reveal={{ after: "how" }} />
+      <SmoothScroll />
       <main className="flex flex-1 flex-col">
-        <Hero cover={covers[0]} fontId={first && suggestTitleFont(first.treatment).id} />
-        <NowShowing covers={covers.length > 1 ? covers.slice(1) : covers} live={live} />
+        <Opening />
+        <Pitch />
+        {frames.length > 0 ? <Flatbed frames={frames} /> : <FlatbedEmpty live={live} />}
         {run ? <HowItWorks run={run} /> : <HowItWorksSteps />}
-        <div className="mx-auto w-full max-w-[80rem] px-4 pb-20 sm:px-8">
-          <StartYourOwn />
-        </div>
+        <Ending examples={frames.length > 0} />
       </main>
     </>
   );
