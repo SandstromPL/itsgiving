@@ -1,14 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_FORM, addFilm, briefLine, exampleChip, formFromBrief, looksLikeImport, removeFilm, toBrief, validateForm } from "./form";
+import {
+  EMPTY_FORM,
+  addFilm,
+  briefLine,
+  exampleChip,
+  formFromBrief,
+  looksLikeImport,
+  problemsLine,
+  removeFilm,
+  toBrief,
+  validateForm,
+} from "./form";
 
 describe("the brief by format", () => {
   const inMumbai = { ...EMPTY_FORM, city: "Mumbai" };
 
   it("starts a music video from its artist and a short film from the films it's after", () => {
-    expect(validateForm({ ...inMumbai, artist: "Prateek Kuhad" })).toBeNull();
-    expect(validateForm({ ...inMumbai, format: "short_film", artist: "Prateek Kuhad" })).toMatchObject({ field: "touchstones" });
-    expect(validateForm({ ...inMumbai, format: "short_film", touchstones: "Past Lives" })).toBeNull();
-    expect(validateForm({ ...inMumbai, artist: "Chaar Diwaari", standIns: "A\nB\nC\nD" })).toMatchObject({ field: "standIns" });
+    expect(validateForm({ ...inMumbai, artist: "Prateek Kuhad" })).toEqual([]);
+    expect(validateForm({ ...inMumbai, format: "short_film", artist: "Prateek Kuhad" })).toMatchObject([{ field: "touchstones" }]);
+    expect(validateForm({ ...inMumbai, format: "short_film", touchstones: "Past Lives" })).toEqual([]);
+    expect(validateForm({ ...inMumbai, artist: "Chaar Diwaari", standIns: "A\nB\nC\nD" })).toMatchObject([{ field: "standIns" }]);
+  });
+
+  it("names every problem at once, one per field, in the form's order", () => {
+    const problems = validateForm({ ...EMPTY_FORM });
+    expect(problems.map((p) => p.field)).toEqual(["artist", "city"]);
+    // The missing artist can be fixed in the drawer too, by reference films.
+    expect(problems[0]).toMatchObject({ either: "touchstones" });
+    expect(problemsLine(problems)).toBe("2 things to fix. Add the artist, or some reference films. Add the shoot city.");
+    expect(problemsLine([problems[1]])).toBe("Add the shoot city.");
+    const long = "x".repeat(200);
+    expect(validateForm({ ...inMumbai, artist: long, directorFilms: long }).map((p) => p.field)).toEqual(["artist", "directorFilms"]);
   });
 
   it("names a short film's films the way a sentence lists them", () => {

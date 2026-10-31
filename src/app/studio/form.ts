@@ -88,41 +88,51 @@ export type FieldName = "artist" | "touchstones" | "standIns" | "city" | "direct
 export interface FormProblem {
   field: FieldName;
   message: string;
+  /** Another field that would fix it too: a music video's missing artist, which reference films can stand in for. */
+  either?: FieldName;
 }
 
-/** Client-side check of a brief, in the order a director reads the form. */
-export function validateForm(form: FormState): FormProblem | null {
+/** Client-side check of a brief: each field's first problem, all at once, in the order a director reads the form. */
+export function validateForm(form: FormState): FormProblem[] {
   const isVideo = form.format === "music_video";
   const touchstones = splitTitles(form.touchstones);
   const standIns = splitTitles(form.standIns);
   const films = splitTitles(form.directorFilms);
   const tooLong = (titles: string[]) => titles.find((t) => t.length > LIMITS.name);
+  const problems: FormProblem[] = [];
+  const add = (problem: FormProblem) => {
+    if (!problems.some((p) => p.field === problem.field)) problems.push(problem);
+  };
   // A music video starts from its artist; a short film from the films it's after.
-  if (isVideo && form.artist.trim().length > LIMITS.name) {
-    return { field: "artist", message: `Keep the artist name under ${LIMITS.name} characters.` };
-  }
+  if (isVideo && form.artist.trim().length > LIMITS.name)
+    add({ field: "artist", message: `Keep the artist name under ${LIMITS.name} characters.` });
   if (isVideo && !form.artist.trim() && touchstones.length === 0) {
-    return { field: "artist", message: "Add the artist, or some reference films." };
+    add({ field: "artist", message: "Add the artist, or some reference films.", either: "touchstones" });
   }
-  if (!isVideo && touchstones.length === 0) return { field: "touchstones", message: "Add at least one film your short is after." };
+  if (!isVideo && touchstones.length === 0) add({ field: "touchstones", message: "Add at least one film your short is after." });
   if (touchstones.length > LIMITS.touchstones) {
-    return { field: "touchstones", message: `Use up to ${LIMITS.touchstones} films; you have ${touchstones.length}.` };
+    add({ field: "touchstones", message: `Use up to ${LIMITS.touchstones} films; you have ${touchstones.length}.` });
   }
-  if (tooLong(touchstones)) return { field: "touchstones", message: `Each title must be under ${LIMITS.name} characters.` };
-  if (!form.city.trim()) return { field: "city", message: "Add the shoot city." };
-  if (form.city.trim().length > LIMITS.name) return { field: "city", message: `Keep the city under ${LIMITS.name} characters.` };
-  if (!isVideo && form.artist.trim().length > LIMITS.name) {
-    return { field: "artist", message: `Keep the artist name under ${LIMITS.name} characters.` };
-  }
+  if (tooLong(touchstones)) add({ field: "touchstones", message: `Each title must be under ${LIMITS.name} characters.` });
+  if (!form.city.trim()) add({ field: "city", message: "Add the shoot city." });
+  if (form.city.trim().length > LIMITS.name) add({ field: "city", message: `Keep the city under ${LIMITS.name} characters.` });
+  if (!isVideo && form.artist.trim().length > LIMITS.name)
+    add({ field: "artist", message: `Keep the artist name under ${LIMITS.name} characters.` });
   if (isVideo && standIns.length > LIMITS.standIns) {
-    return { field: "standIns", message: `Use up to ${LIMITS.standIns} stand-in artists; you have ${standIns.length}.` };
+    add({ field: "standIns", message: `Use up to ${LIMITS.standIns} stand-in artists; you have ${standIns.length}.` });
   }
-  if (isVideo && tooLong(standIns)) return { field: "standIns", message: `Each name must be under ${LIMITS.name} characters.` };
+  if (isVideo && tooLong(standIns)) add({ field: "standIns", message: `Each name must be under ${LIMITS.name} characters.` });
   if (films.length > LIMITS.directorFilms) {
-    return { field: "directorFilms", message: `Use up to ${LIMITS.directorFilms} of your films; you have ${films.length}.` };
+    add({ field: "directorFilms", message: `Use up to ${LIMITS.directorFilms} of your films; you have ${films.length}.` });
   }
-  if (tooLong(films)) return { field: "directorFilms", message: `Each title must be under ${LIMITS.name} characters.` };
-  return null;
+  if (tooLong(films)) add({ field: "directorFilms", message: `Each title must be under ${LIMITS.name} characters.` });
+  return problems;
+}
+
+/** What the studio's status line says for a brief's problems: one, or how many and each. */
+export function problemsLine(problems: FormProblem[]): string {
+  if (problems.length <= 1) return problems[0]?.message ?? "";
+  return `${problems.length} things to fix. ${problems.map((p) => p.message).join(" ")}`;
 }
 
 export function toBrief(form: FormState, picks: Record<string, string> = {}, nudges: Nudge[] = []): BriefInput {

@@ -13,7 +13,7 @@ import { Board } from "./board";
 import { useBoardHistory } from "./board-history";
 import { BriefForm } from "./brief-form";
 import { useReceipts } from "./eggs";
-import { briefLine, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
+import { briefLine, formFromBrief, problemsLine, toBrief, validateForm, type FormProblem, type FormState } from "./form";
 import { HandoffReader, type Handoff } from "./handoff";
 import { onScreen } from "./jump";
 import { useLingo } from "./lingo";
@@ -81,7 +81,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const [pending, setPending] = useState<RunInput | null>(saved.board?.shown ?? null);
   const [shown, setShown] = useState<RunInput | null>(saved.board?.shown ?? null);
   const [question, setQuestion] = useState<{ message: string; items: Ambiguity[] } | null>(null);
-  const [formProblem, setFormProblem] = useState<FormProblem | null>(null);
+  const [formProblems, setFormProblems] = useState<FormProblem[]>([]);
   const [runProblem, setRunProblem] = useState<string | null>(null);
   const [modes, setModes] = useState<{ qloo: QlooMode; llm: LlmMode } | null>(null);
   const [status, setStatus] = useState("");
@@ -135,7 +135,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     const began = Date.now();
 
     setPending(input);
-    setFormProblem(null);
+    setFormProblems([]);
     setRunProblem(null);
     setQuestion(null);
     setSteps([]);
@@ -155,7 +155,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
     /** A run the brief can fix (Qloo lacks the artist): the message goes on the field that fixes it, not on a failure card. */
     const askOnField = (problem: FormProblem) => {
       pendingNudge.current = null;
-      setFormProblem(problem);
+      setFormProblems([problem]);
       setPhase("idle");
       setSteps(stopRunningSteps("Stopped before it finished."));
       setStatus(problem.message);
@@ -248,10 +248,10 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
 
   /** A new brief starts clean, but only once it is valid: a typo must not wipe the board. */
   const startOver = (nextForm: FormState) => {
-    const invalid = validateForm(nextForm);
-    if (invalid) {
-      setFormProblem(invalid);
-      setStatus(invalid.message);
+    const problems = validateForm(nextForm);
+    if (problems.length) {
+      setFormProblems(problems);
+      setStatus(problemsLine(problems));
       return;
     }
     setTreatment(null);
@@ -310,7 +310,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   /** A "Try one" chip fills the brief without running it, so the director sees what it holds first. */
   const fillExample = (example: (typeof TRY)[number]) => {
     setForm(formFromBrief(example.brief));
-    setFormProblem(null);
+    setFormProblems([]);
     setStatus(`Filled the brief with ${example.title}. ${example.detail}`);
   };
 
@@ -448,7 +448,7 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 onSubmit={() => startOver(form)}
                 onStop={stream.stop}
                 running={running}
-                problem={formProblem}
+                problems={formProblems}
                 examples={TRY}
                 onExample={fillExample}
               />

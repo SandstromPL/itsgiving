@@ -269,7 +269,7 @@ export function BriefForm({
   onSubmit,
   onStop,
   running,
-  problem,
+  problems,
   examples = [],
   onExample,
 }: {
@@ -278,7 +278,8 @@ export function BriefForm({
   onSubmit: () => void;
   onStop: () => void;
   running: boolean;
-  problem: FormProblem | null;
+  /** Every field's problem at once (validateForm), or the one a run came back with. */
+  problems: FormProblem[];
   /** Briefs to fill the form with, as chips at the top. */
   examples?: Example[];
   onExample?: (example: Example) => void;
@@ -293,17 +294,13 @@ export function BriefForm({
   };
   const isVideo = form.format === "music_video";
   const errorId = `${ids}-problem`;
-  /** The failing field gets aria-invalid and points at the message; the others keep their hints. */
+  const problemOf = (name: FieldName) => problems.find((p) => p.field === name);
+  /** Each failing field gets aria-invalid and points at its own message; the others keep their hints. The studio's
+   *  status line reads them all out together, so the messages themselves aren't alerts. */
   const describe: Describe = (name, hint) => ({
-    "aria-invalid": problem?.field === name ? true : undefined,
-    "aria-describedby": [problem?.field === name ? errorId : undefined, hint].filter(Boolean).join(" ") || undefined,
+    "aria-invalid": problemOf(name) ? true : undefined,
+    "aria-describedby": [problemOf(name) ? `${errorId}-${name}` : undefined, hint].filter(Boolean).join(" ") || undefined,
   });
-  const message = (name: FieldName) =>
-    problem?.field === name ? (
-      <p id={errorId} role="alert" className="text-small leading-5 font-medium text-safelight">
-        {problem.message}
-      </p>
-    ) : null;
 
   // The optional extras sit in a drawer. A music video starts from its artist, a short film from the films it's after;
   // the other one is an extra.
@@ -313,15 +310,42 @@ export function BriefForm({
     form.imported.length;
   const [drawerOpen, setDrawerOpen] = useState(extras > 0);
   // A problem inside the drawer keeps it open, so the message is never hidden.
-  const drawerHasProblem =
-    problem?.field === "directorFilms" ||
-    (isVideo ? problem?.field === "touchstones" || problem?.field === "standIns" : problem?.field === "artist");
+  const drawerHasProblem = problems.some(
+    (p) => p.field === "directorFilms" || (isVideo ? p.field === "touchstones" || p.field === "standIns" : p.field === "artist"),
+  );
   const open = drawerOpen || drawerHasProblem;
 
-  // A problem takes focus to its field, which may be in the drawer it just opened (a run can fail on the stand-ins).
+  /** A message under its field. When another field in the closed drawer can fix it, a button opens the drawer there. */
+  const message = (name: FieldName) => {
+    const problem = problemOf(name);
+    if (!problem) return null;
+    const other = problem.either;
+    return (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <p id={`${errorId}-${name}`} className="text-small leading-5 font-medium text-safelight">
+          {problem.message}
+        </p>
+        {other && !open && (
+          <button
+            type="button"
+            onClick={() => {
+              setDrawerOpen(true);
+              requestAnimationFrame(() => document.getElementById(`${ids}-${other.toLowerCase()}`)?.focus());
+            }}
+            className="press min-h-9 rounded-full border border-edge px-3 text-small font-semibold hover:border-foreground"
+          >
+            Add reference films
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // Problems take focus to the first failing field, which may be in the drawer they just opened (a run can fail on the
+  // stand-ins).
   useEffect(() => {
-    if (problem) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
-  }, [problem]);
+    if (problems.length) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [problems]);
 
   const artist = (
     <Field id={`${ids}-artist`} label={isVideo ? "Artist" : "Music its audience loves (optional)"}>
