@@ -85,13 +85,12 @@ function useSteps() {
   return list;
 }
 
-function StepWords({ i, of, title, text }: { i: number; of: number; title: string; text: string }) {
+function StepWords({ i, title, text }: { i: number; title: string; text: string }) {
   return (
     <div className="how-words home-sa flex max-w-[44rem] flex-col gap-2.5">
-      <span className="text-ui font-semibold text-faint tabular-nums">
-        Step {i + 1} of {of}
-      </span>
-      <h3 className="type-head text-section leading-[0.95] lg:text-display-sm">{title}</h3>
+      <h3 className="type-head text-section leading-[0.95] lg:text-display-sm">
+        <span className="tabular-nums">{i + 1}.</span> {title}
+      </h3>
       <p className="max-w-[46ch] text-lead leading-normal text-dim lg:text-prose">{text}</p>
     </div>
   );
@@ -141,9 +140,9 @@ export function HowItWorks({
       split: chosen && {
         base: (
           <div className="surface-dark flex flex-col gap-2.5 rounded-[28px] bg-frame p-5 text-foreground sm:p-8">
-            <p className="text-ui font-bold text-dim">Shoot base</p>
             <p className="type-poster text-display-sm">{chosen.name}</p>
             <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-lead leading-normal text-dim">
+              <span>Shoot base:</span>
               <b className={`rounded-md px-2 py-0.5 text-subhead font-extrabold ${rankMark(run.mock)}`}>{percent(chosen.share)}</b>
               of this audience&apos;s strongest spots in {run.city}
             </p>
@@ -240,13 +239,13 @@ export function HowItWorks({
           <li key={step.title} className="how-step">
             {step.split ? (
               <div className="how-pin how-pin--split mx-auto w-full max-w-[80rem] px-4 sm:px-8">
-                <StepWords i={i} of={steps.length} title={step.title} text={step.text} />
+                <StepWords i={i} title={step.title} text={step.text} />
                 <div className="how-base home-sb">{step.split.base}</div>
                 {step.split.map}
               </div>
             ) : (
               <div className="how-pin mx-auto w-full max-w-[80rem] px-4 sm:px-8">
-                <StepWords i={i} of={steps.length} title={step.title} text={step.text} />
+                <StepWords i={i} title={step.title} text={step.text} />
                 <div className="home-sb w-full">{step.show}</div>
               </div>
             )}
@@ -275,8 +274,9 @@ export function HowItWorksSteps() {
       <ol className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-4">
         {STEPS.map(([title, text], i) => (
           <li key={title} className="flex flex-col gap-2.5 rounded-[22px] border border-line bg-card p-5">
-            <span className="text-ui font-semibold text-faint">Step {i + 1}</span>
-            <span className="type-head text-subhead leading-tight">{title}</span>
+            <span className="type-head text-subhead leading-tight">
+              <span className="tabular-nums">{i + 1}.</span> {title}
+            </span>
             <span className="text-body leading-6 text-dim">{text}</span>
           </li>
         ))}

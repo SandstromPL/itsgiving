@@ -199,11 +199,11 @@ export function Flatbed({ frames }: { frames: ShowFrame[] }) {
         <div className="ns-cap mx-auto w-full max-w-[80rem] px-4 sm:px-8" aria-live="polite">
           {now && font ? (
             <>
-              <p className="text-small text-dim tabular-nums">
-                {now.meta}. {shown + 1} of {frames.length}
-              </p>
               <p className="leading-none text-balance" style={titleStyle(font, "var(--text-subsection)")}>
                 {now.title}
+              </p>
+              <p className="mt-1.5 text-small text-dim tabular-nums">
+                {now.meta}. {shown + 1} of {frames.length}
               </p>
               <p className="cap-log max-w-[56ch] font-serif text-lead leading-[1.32] text-pretty">{now.logline}</p>
               <CutLink
@@ -215,8 +215,8 @@ export function Flatbed({ frames }: { frames: ShowFrame[] }) {
             </>
           ) : (
             <>
-              <p className="text-small text-dim">{t.nextUp.label}</p>
               <p className="type-poster text-subsection leading-none">{t.nextUp.title}</p>
+              <p className="mt-1.5 text-small text-dim">{t.nextUp.label}</p>
               <p className="cap-log max-w-[56ch] font-serif text-lead leading-[1.32]">
                 Give it an artist, or the films your short is after, and a city.
               </p>

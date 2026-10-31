@@ -786,12 +786,9 @@ export function ShootBaseBlock({
         {pinned && <div aria-hidden className={PINNED.bg} />}
         {!mapOnly && (
           <div className={`flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1 ${pin.head}`}>
-            <div>
-              <p className="text-small font-semibold text-dim">Shoot base</p>
-              <p className={`type-poster mt-1.5 ${held ? "text-subsection" : "text-section"}`}>{chosen.name}</p>
-            </div>
+            <p className={`type-poster ${held ? "text-subsection" : "text-section"}`}>{chosen.name}</p>
             <p className="text-small leading-6">
-              {share} of this audience&apos;s strongest spots in {city}
+              Shoot base: {share} of this audience&apos;s strongest spots in {city}
             </p>
           </div>
         )}
@@ -831,11 +828,10 @@ export function ShootBaseBlock({
         <p className="text-small leading-5 text-dim">The heatmap itself didn&apos;t come back with this treatment.</p>
       )}
       <div>
-        <p className="text-small font-semibold text-dim">Shoot base</p>
-        <p className="type-poster mt-2 text-display-sm">{chosen.name}</p>
+        <p className="type-poster text-display-sm">{chosen.name}</p>
         {chosen.district && <p className="mt-2 text-ui text-dim">{chosen.district}</p>}
         <p className="mt-4 text-ui leading-6">
-          {share} of this audience&apos;s strongest spots in {city}
+          Shoot base: {share} of this audience&apos;s strongest spots in {city}
         </p>
         <p className="mt-3 text-small leading-6 text-dim">
           {base.held

@@ -57,20 +57,9 @@ export function Cover({
       <div aria-hidden className="absolute inset-0 -z-10">
         {still && <Still src={still.src} alt="" loading="eager" className="absolute inset-0 size-full" />}
       </div>
-      {/* The pills up top sit on the frame itself, so each brings its own dark: AA over a white frame. */}
+      {/* The tape up top sits on the frame itself, so it brings its own dark: AA over a white frame. */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-small text-dim">
-            {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
-          </span>
-          {who.standIns.length > 0 && (
-            <span
-              title={`Qloo doesn't have ${who.artists[0] ?? "the artist"}, so this audience stands in.`}
-              className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-small text-dim"
-            >
-              Audience read through {joinNames(who.standIns)}
-            </span>
-          )}
           {t.mock.qloo && <Tape title="Synthetic fixtures with real names; every score is invented. Not Qloo data.">Mock data</Tape>}
         </div>
         <TitleCardPicker
@@ -104,7 +93,18 @@ export function Cover({
             </Fragment>
           ))}
         </h1>
-        <p className="max-w-[40ch] font-serif text-logline leading-[1.3] text-pretty italic">{t.logline}</p>
+        <div className="flex flex-col gap-3">
+          <p className="max-w-[40ch] font-serif text-logline leading-[1.3] text-pretty italic">{t.logline}</p>
+          {/* The brief, under the logline: on the scrim, so AA over a white frame too. */}
+          <p className="text-small text-dim">
+            {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
+            {who.standIns.length > 0 && (
+              <span title={`Qloo doesn't have ${who.artists[0] ?? "the artist"}, so this audience stands in.`}>
+                . Audience read through {joinNames(who.standIns)}
+              </span>
+            )}
+          </p>
+        </div>
         <CoverPalette palette={t.palette} />
       </div>
     </header>
