@@ -286,6 +286,38 @@ function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: 
 /** The treatment's tone tags, without any that name who people are (isIdentityTag): older builds can carry them. */
 const toneOf = (t: Treatment) => withoutIdentity(t.tone, (tone) => tone.tag.name);
 
+/** A tag's tilt and lift, from its name: scattered like cards dropped on a desk, the same on every visit. */
+function scatter(name: string, i: number) {
+  let h = 2166136261;
+  for (const ch of name) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const unit = ((h >>> 0) % 1000) / 1000;
+  return { tilt: (i % 2 === 0 ? -1 : 1) * (2.5 + unit * 6), lift: ((h >>> 12) % 25) - 12 };
+}
+
+/** The tone tags beside the concept, each a small card at its own angle: the tag, and whose taste it is. */
+function ToneTags({ tone, mock, shared }: { tone: ReturnType<typeof toneOf>; mock: boolean; shared: string }) {
+  return (
+    <ul
+      aria-label={`Tone tags from ${mock ? "the synthetic mock, not Qloo" : "Qloo"}`}
+      className="flex flex-wrap items-center justify-center gap-x-6 gap-y-8 py-2 lg:py-8 print:justify-start print:gap-3 print:py-0"
+    >
+      {tone.map((x, i) => {
+        const { tilt, lift } = scatter(x.tag.name, i);
+        return (
+          <li
+            key={x.tag.id}
+            className="tone-tag rv rv-soft flex flex-col items-start gap-1 rounded-2xl border border-line bg-card px-4 py-3 shadow-[0_12px_28px_rgb(0_0_0/0.22)] print:shadow-none"
+            style={{ "--tilt": `${tilt.toFixed(1)}deg`, "--lift": `${lift}px`, "--d": `${i * 90}ms` } as CSSProperties}
+          >
+            <span className={`font-mono text-caption font-semibold ${evidenceTone(mock)}`}>{tagLabel(x.tag.name)}</span>
+            <span className="text-caption text-faint">{x.source === "overlap" ? shared : "audience taste"}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /**
  * "it's giving": the tone tags Qloo found, with the ones the director's own films share highlighted. `whose` says
  * whose films: "your" in the studio, "the director's" on an example someone else briefed.
@@ -427,6 +459,50 @@ function useGlide(article: RefObject<HTMLElement | null>, take: string) {
   }, [article, take]);
 }
 
+/**
+ * Beside the wardrobe on wide screens: the brand being read, as Qloo shows it (its picture, traits, prices and style),
+ * held while the looks scroll past on the left. Phones and paper have the same facts in the slide-in card and the row.
+ */
+function HeldBrand({ w, t, mock }: { w: Treatment["wardrobe"][number]; t: Treatment; mock: boolean }) {
+  const brand = w.entity.brand;
+  const price = priceLine(brand?.price);
+  const reference = aboveBudget(w.entity, t.brief.budget);
+  return (
+    <aside
+      aria-label={`The brand being read, as ${mock ? "the mock" : "Qloo"} shows it`}
+      className="hidden self-stretch lg:block print:hidden"
+    >
+      <div className="sticky top-[calc(var(--head,0px)+5rem)]">
+        <div key={w.entity.id} className="held-brand flex flex-col gap-3 rounded-[28px] border border-line bg-card p-4">
+          {w.entity.image && (
+            <div className="grid aspect-[4/3] max-h-[38dvh] w-full place-items-center overflow-hidden rounded-[18px] bg-white">
+              <Still
+                src={w.entity.image}
+                alt={`${w.entity.name}, as ${mock ? "the mock" : "Qloo"} shows it`}
+                className="size-full object-contain!"
+              />
+            </div>
+          )}
+          <div className="flex flex-col gap-2.5 px-1.5 pb-1">
+            <p className="type-head text-subhead leading-tight">{w.entity.name}</p>
+            {brand?.traits && brand.traits.length > 0 && (
+              <p className={`font-mono text-label leading-5 ${evidenceTone(mock)}`}>{brand.traits.join(" / ")}</p>
+            )}
+            {price && (
+              <p className="text-small leading-5 text-dim">
+                {price}
+                {reference && `, above ${budgetPhrase(t.brief.budget)}: rent it or match it`}
+              </p>
+            )}
+            <QlooNote text={brand?.style} mock={mock} max={260} />
+            <Receipt qloo={w.qloo} mock={mock} className="mt-1 max-w-xs" />
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export function Board({
   treatment: t,
   state,
@@ -491,23 +567,32 @@ export function Board({
   const tasteTags = withoutIdentity(t.audience.taste_tags);
   const tone = toneOf(t);
   const [reading, setReading] = useState(0);
+  const [wearing, setWearing] = useState(0);
   const placeCards = useRef<(HTMLLIElement | null)[]>([]);
-  // The place being read is the one nearest the middle of the screen, here and on the map.
+  const brandRows = useRef<(HTMLLIElement | null)[]>([]);
+  // The place being read is the one nearest the middle of the screen, here and on the map; the brand being read is
+  // found the same way, for the panel held beside the wardrobe.
   useScrollFrame(
     useCallback(() => {
       const mid = window.innerHeight * 0.55;
-      let best = -1;
-      let bestDistance = Infinity;
-      placeCards.current.forEach((el, i) => {
-        const box = el?.getBoundingClientRect();
-        if (!box || box.height === 0) return;
-        const distance = Math.abs(box.top + box.height / 2 - mid);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          best = i;
-        }
-      });
-      if (best >= 0) setReading((was) => (was === best ? was : best));
+      const nearest = (list: (HTMLElement | null)[]) => {
+        let best = -1;
+        let bestDistance = Infinity;
+        list.forEach((el, i) => {
+          const box = el?.getBoundingClientRect();
+          if (!box || box.height === 0) return;
+          const distance = Math.abs(box.top + box.height / 2 - mid);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = i;
+          }
+        });
+        return best;
+      };
+      const place = nearest(placeCards.current);
+      if (place >= 0) setReading((was) => (was === place ? was : place));
+      const brand = nearest(brandRows.current);
+      if (brand >= 0) setWearing((was) => (was === brand ? was : brand));
     }, []),
   );
   return (
@@ -545,29 +630,10 @@ export function Board({
       <SectionBar t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} back={back} />
 
       <Section id="concept" title="Concept">
-        <p className="rv max-w-[52ch] font-serif text-logline leading-[1.4] text-pretty">{t.concept}</p>
-        {tone.length > 0 && (
-          <div className={`${card} rv mt-4 p-6 sm:p-8 lg:mt-8`}>
-            <h3 className="type-head text-subhead leading-tight">How the tone reads</h3>
-            <p className="mt-1.5 text-small text-faint">
-              Each tone tag from {mock ? "the synthetic mock, not Qloo" : "Qloo"}, and what the treatment does with it.
-            </p>
-            <ul className="mt-3 flex flex-col">
-              {tone.map((x) => (
-                <li
-                  key={x.tag.id}
-                  className="rv rv-soft grid gap-x-9 gap-y-2 border-t border-line py-5 first:border-t-0 last:pb-0 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] print:grid-cols-[14rem_minmax(0,1fr)] print:break-inside-avoid"
-                >
-                  <p className="flex flex-col items-start gap-1.5">
-                    <span className={`font-mono text-caption font-semibold ${evidenceTone(mock)}`}>{tagLabel(x.tag.name)}</span>
-                    <span className="text-caption text-faint">{x.source === "overlap" ? lingo.shared(whose) : "audience taste"}</span>
-                  </p>
-                  <p className="max-w-[54ch] font-serif text-prose leading-snug">{x.note}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <div className="grid items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,52ch)_minmax(0,1fr)]">
+          <p className="rv max-w-[52ch] font-serif text-logline leading-[1.4] text-pretty">{t.concept}</p>
+          {tone.length > 0 && <ToneTags tone={tone} mock={mock} shared={lingo.shared(whose)} />}
+        </div>
       </Section>
 
       <Section
@@ -722,42 +788,49 @@ export function Board({
         {t.wardrobe.length === 0 ? (
           <p className="text-ui text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
-          <ul className="flex flex-col">
-            {t.wardrobe.map((w, i) => {
-              const brandCard = `${cards}brand${i}`;
-              const price = priceLine(w.entity.brand?.price);
-              const reference = aboveBudget(w.entity, t.brief.budget);
-              return (
-                <li
-                  key={w.entity.id}
-                  className="rv rv-soft flex flex-col gap-2 border-b border-line py-6 first:pt-0 last:border-b-0 last:pb-0 print:break-inside-avoid print:py-4"
-                >
-                  <h3 className="type-head text-subhead leading-tight">
-                    <NameButton card={brandCard} icon="look">
-                      {w.entity.name}
-                    </NameButton>
-                  </h3>
-                  <p className={`${prose} max-w-[62ch]`}>{w.notes.look}</p>
-                  <p className={`font-mono text-label leading-5 tabular-nums ${evidenceTone(mock)} print:hidden`}>
-                    {mock ? "mock " : ""}rank {w.qloo.rank} of {w.qloo.of} for this audience
-                  </p>
-                  {/* On paper there's no card to open: what Qloo says about the brand prints in the row. */}
-                  <div className="hidden flex-col gap-2 print:flex">
-                    <QlooTags tags={w.qloo.tags} />
-                    {price && (
-                      <p className="text-small text-faint">
-                        {price}
-                        {reference && `, above ${budgetPhrase(t.brief.budget)}: rent it or match it`}
-                      </p>
-                    )}
-                    <QlooNote text={w.entity.brand?.style} mock={mock} />
-                    <Receipt qloo={w.qloo} mock={mock} className="max-w-xs" />
-                  </div>
-                  <BrandCard id={brandCard} w={w} t={t} mock={mock} />
-                </li>
-              );
-            })}
-          </ul>
+          <div className="grid items-start gap-x-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] xl:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]">
+            <ul className="flex flex-col">
+              {t.wardrobe.map((w, i) => {
+                const brandCard = `${cards}brand${i}`;
+                const price = priceLine(w.entity.brand?.price);
+                const reference = aboveBudget(w.entity, t.brief.budget);
+                return (
+                  <li
+                    key={w.entity.id}
+                    ref={(el) => {
+                      brandRows.current[i] = el;
+                    }}
+                    data-on={i === wearing ? "" : undefined}
+                    className="wear-row rv rv-soft flex flex-col gap-2 border-b border-line py-6 first:pt-0 last:border-b-0 last:pb-0 print:break-inside-avoid print:py-4"
+                  >
+                    <h3 className="type-head text-subhead leading-tight">
+                      <NameButton card={brandCard} icon="look">
+                        {w.entity.name}
+                      </NameButton>
+                    </h3>
+                    <p className={`${prose} max-w-[62ch]`}>{w.notes.look}</p>
+                    <p className={`font-mono text-label leading-5 tabular-nums ${evidenceTone(mock)} print:hidden`}>
+                      {mock ? "mock " : ""}rank {w.qloo.rank} of {w.qloo.of} for this audience
+                    </p>
+                    {/* On paper there's no card to open: what Qloo says about the brand prints in the row. */}
+                    <div className="hidden flex-col gap-2 print:flex">
+                      <QlooTags tags={w.qloo.tags} />
+                      {price && (
+                        <p className="text-small text-faint">
+                          {price}
+                          {reference && `, above ${budgetPhrase(t.brief.budget)}: rent it or match it`}
+                        </p>
+                      )}
+                      <QlooNote text={w.entity.brand?.style} mock={mock} />
+                      <Receipt qloo={w.qloo} mock={mock} className="max-w-xs" />
+                    </div>
+                    <BrandCard id={brandCard} w={w} t={t} mock={mock} />
+                  </li>
+                );
+              })}
+            </ul>
+            <HeldBrand w={t.wardrobe[Math.min(wearing, t.wardrobe.length - 1)]} t={t} mock={mock} />
+          </div>
         )}
         <Also label="Also high for this audience:" items={t.extras.brands} mock={mock} />
       </Section>

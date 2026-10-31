@@ -295,3 +295,51 @@
     display: none;
   }
 }
+
+/* ---------- The tone tags beside the concept: cards at their own angles (board.tsx, ToneTags) ----------
+ * Each card's tilt and lift come from its tag's name, so the scatter is the same on every visit. A gentler tilt on
+ * narrow screens; paper lays them straight. `top` lifts a card, since the reading glide owns `translate`. */
+@media screen {
+  .tone-tag {
+    position: relative;
+    top: var(--lift, 0px);
+    rotate: var(--tilt, 0deg);
+  }
+}
+@media screen and (max-width: 63.99rem) {
+  .tone-tag {
+    top: calc(var(--lift, 0px) / 2);
+    rotate: calc(var(--tilt, 0deg) * 0.6);
+  }
+}
+
+/* ---------- The wardrobe beside the brand being read (board.tsx, HeldBrand) ----------
+ * On wide screens the look being read stays bright and the others dim, as the places do beside their map; the panel
+ * fades the next brand in. A part still waiting for the reading glide keeps its own hiding. */
+@media screen and (min-width: 64rem) {
+  .wear-row[data-rv="now"],
+  .wear-row:not([data-rv]) {
+    transition: opacity 300ms ease;
+  }
+  .wear-row[data-rv="in"]:not([data-on]),
+  .wear-row[data-rv="now"]:not([data-on]),
+  .wear-row:not([data-rv]):not([data-on]) {
+    opacity: 0.5;
+  }
+}
+@keyframes held-in {
+  from {
+    opacity: 0;
+    translate: 0 10px;
+  }
+}
+.held-brand {
+  animation: held-in 340ms var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1)) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  @keyframes held-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
