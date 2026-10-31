@@ -132,8 +132,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   focus word by word; the pitch lights up word by word as you scroll; "Now showing" runs the featured treatments past
   a film gate as you scroll, ending on a frame for the reader's own; "Watch it work" takes one real featured run a step
   to a screen, each step and then what it made (the shoot base beside its map, the treatment beside its small title
-  card); and only then "Start a treatment" and "See a finished one". The zoom is part of the scroll both ways:
-  scrolling back up pulls out of the window to the title card. Under reduced motion everything fades instead.
+  card); and only then "Start a treatment" and "See a finished one". The zoom and the headline's focus are part of the
+  scroll both ways, so a fast scroll can't pass the words by: scrolling back up blurs them out and pulls out of the
+  window to the title card. Under reduced motion everything fades instead.
 - **Examples** (`/examples`) lists the featured treatments as cards (still, title in its face, logline, tones and
   palette), filterable by format. Opening one, from here or the homepage, goes through the camera cut: the frame goes
   dark, the camera's reels run up to speed and the shot pushes through a reel window into the board.

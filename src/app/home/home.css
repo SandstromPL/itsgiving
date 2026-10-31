@@ -7,7 +7,7 @@
 /* ---------- 1: the title card, dollied through, then the words ---------- */
 .intro {
   position: relative;
-  height: calc(100svh * 3.55);
+  height: calc(100svh * 3.7);
 }
 .intro-stage {
   position: sticky;
@@ -54,9 +54,8 @@
 }
 .hero-w {
   display: inline-block;
-  transition: opacity 280ms ease;
 }
-/* Dark until the push is through, and again when the reader backs up into the window (opening.tsx). */
+/* Dark until the script takes them over and racks them in with the scroll (opening.tsx); without it they show (below). */
 .intro[data-dark] .hero-w {
   opacity: 0;
 }

@@ -8,9 +8,10 @@ import "./home.css";
 
 // The homepage's first screen: the title card, the 2B lettermark on black, loaded in 1B rack focus, its reels rolling.
 // Scrolling parks a window of the second g at the top and dollies through it until the window is the screen; after a
-// beat of black, "your voice, their taste." racks into focus word by word and holds the screen. It's all part of the
-// scroll, both ways: scrolling back up darkens the words and pulls back out of the window to the card, and coming
-// through again racks the words in again. Under reduced motion the card fades out instead and the words fade in.
+// beat of black, "your voice, their taste." racks into focus word by word and holds the screen. It's all the scroll's,
+// both ways and at any speed: the words sharpen as far as the reader has scrolled, so a fast scroll can't leave them
+// behind, and scrolling back up blurs them out and pulls back out of the window to the card. Under reduced motion the
+// card fades out instead and the words fade in.
 
 const [BX, BY, BW, BH] = LETTERMARK_BOX;
 /** Where the mark sits: as wide as 72% of the screen or 155% of its height, whichever is less, its baseline 46% down. */
@@ -36,6 +37,14 @@ const markStyle = {
   left: "calc((100cqw - var(--ww)) / 2)",
   top: `calc(${BASELINE * 100}cqh + var(--ww) * ${(264 + BY) / BW})`,
 } as CSSProperties;
+
+/**
+ * Where each word racks into focus, as a share of the scroll that follows the push: a beat of black, then the four
+ * words one after another, sharp a little past halfway, so the rest of it holds them. Under reduced motion, where
+ * nothing follows the push, a share of the push's own scroll once the card has faded.
+ */
+const WORDS = { start: 0.05, step: 0.09, span: 0.26 };
+const FADES = { start: 0.52, step: 0.03, span: 0.2 };
 
 /** The hole through the black is a little wider than the window, so its edge always sits under the g's body. */
 const HOLE = P0.r * 1.15;
@@ -66,22 +75,29 @@ export function Opening() {
     top: 0,
     dist: 0,
     hold: 0,
+    /** How far through the push (0 to 1), and through the scroll that holds the words after it. */
     p: 0,
+    q: 0,
     angle: 0,
     speed: 0,
     rolling: false,
     ready: false,
     parking: false,
-    revealed: false,
+    /** Each word's focus as last drawn, so a frame that changes nothing writes nothing. */
+    focus: [] as number[],
     raf: 0,
     last: 0,
   }).current;
 
-  // Fill the width with the two lines, as the words alone (the size is fitted, like a title card's).
+  // Fill the width with the two lines, as the words alone (the size is fitted, like a title card's), measured at their
+  // own size: a word still racking in is drawn a little large.
   const fit = () => {
     const h = heading.current;
     const box = h?.parentElement;
     if (!h || !box) return;
+    const words = Array.from(h.querySelectorAll<HTMLElement>(".hero-w"));
+    const scaled = words.map((word) => word.style.transform);
+    words.forEach((word) => (word.style.transform = ""));
     h.style.fontSize = "100px";
     const widest = Math.max(
       ...Array.from(h.querySelectorAll(".hero-line"), (line) => {
@@ -90,6 +106,7 @@ export function Opening() {
         return range.getBoundingClientRect().width;
       }),
     );
+    words.forEach((word, i) => (word.style.transform = scaled[i]));
     const cs = getComputedStyle(box);
     const room = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     if (widest > 0) h.style.fontSize = `${Math.floor(Math.min((room / widest) * 100 * 0.99, 300))}px`;
@@ -101,19 +118,21 @@ export function Opening() {
     });
   };
 
-  const reveal = (delay: number) => {
-    if (s.revealed) return;
-    s.revealed = true;
-    const words = Array.from(heading.current?.querySelectorAll(".hero-w") ?? []);
-    rackFocus(words, { delay, stagger: 150, duration: 1150, scale: 1.06, blur: 18 });
-    delete section.current?.dataset.dark;
+  /** 1B rack focus, as far as the scroll has come: each word from dark, blurred and a little large, to sharp. */
+  const focusWords = () => {
+    heading.current?.querySelectorAll<HTMLElement>(".hero-w").forEach((word, i) => {
+      const at = s.reduce ? FADES : WORDS;
+      const e = outCubic(clamp(((s.reduce ? s.p : s.q) - at.start - i * at.step) / at.span));
+      if (s.focus[i] === e) return;
+      s.focus[i] = e;
+      word.style.opacity = e.toFixed(3);
+      word.style.filter = s.reduce || e === 1 ? "" : `blur(${(18 * (1 - e)).toFixed(2)}px)`;
+      word.style.transform = s.reduce || e === 1 ? "" : `scale(${(1.06 - 0.06 * e).toFixed(4)})`;
+    });
   };
-  /** Back up into the window: the words go dark again, so coming through brings them into focus again. */
-  const conceal = () => {
-    if (!s.revealed) return;
-    s.revealed = false;
-    heading.current?.querySelectorAll<HTMLElement>(".hero-w").forEach((word) => word.getAnimations().forEach((a) => a.cancel()));
-    if (section.current) section.current.dataset.dark = "";
+  const place = (y: number) => {
+    s.p = s.dist ? clamp((y - s.top) / s.dist) : 1;
+    s.q = s.hold ? clamp((y - s.top - s.dist) / s.hold) : 0;
   };
 
   const draw = () => {
@@ -146,9 +165,7 @@ export function Opening() {
       ui.current.style.opacity = String(1 - clamp(s.p / 0.06));
       ui.current.style.visibility = s.p > 0.06 ? "hidden" : "";
     }
-    // A little way back before the words go dark, so a reader resting at the edge doesn't flicker them.
-    if (done) reveal(s.reduce ? 0 : 750);
-    else if (s.reduce ? s.p < 0.42 : zp < 0.97) conceal();
+    focusWords();
   };
 
   const measure = () => {
@@ -160,11 +177,12 @@ export function Opening() {
     s.vh = innerHeight;
     s.W = st.clientWidth;
     s.H = st.clientHeight;
-    // After the push and the words, the words keep the screen a while before the page moves on.
-    s.hold = s.reduce ? 0 : Math.round(innerHeight * 0.95);
+    // After the push, the scroll that racks the words in and then keeps them on the screen before the page moves on.
+    s.hold = s.reduce ? 0 : Math.round(innerHeight * 1.1);
     s.dist = Math.round(innerHeight * 1.6);
     sec.style.height = `${s.H + s.dist + s.hold}px`;
     s.top = sec.getBoundingClientRect().top + scrollY;
+    place(scrollY);
     fit();
     draw();
   };
@@ -245,7 +263,7 @@ export function Opening() {
   useScrollFrame((y) => {
     // A phone's address bar coming and going changes the height a little: only a real resize lays the scene out again.
     if (innerWidth !== s.vw || Math.abs(innerHeight - s.vh) > 150) measure();
-    s.p = s.dist ? clamp((y - s.top) / s.dist) : 1;
+    place(y);
     if (s.p < 0.012) {
       if (s.ready) startRolling();
     } else if (s.rolling && !s.parking) park();
