@@ -15,7 +15,7 @@ export function PaperWindow({
   children,
 }: {
   id: string;
-  /** The bar's name for the window, in the receipts' mono ("share", "title card"). */
+  /** The bar's name for the window ("share", "title card"). */
   label: string;
   ref?: Ref<HTMLDivElement>;
   onToggle?: ToggleEventHandler<HTMLDivElement>;
@@ -29,7 +29,7 @@ export function PaperWindow({
           <span className="size-2.5 rounded-full border-2 border-ink" />
           <span className="size-2.5 rounded-full border-2 border-ink bg-ink" />
         </span>
-        <span className="font-mono text-caption text-slip-ink">{label}</span>
+        <span className="text-caption font-bold text-slip-ink">{label}</span>
         <button
           type="button"
           popoverTarget={id}
