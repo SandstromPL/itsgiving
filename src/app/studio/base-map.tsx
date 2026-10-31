@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { flushSync } from "react-dom";
-import type { ShootBase, Treatment } from "@/lib/agent/types";
+import type { BaseArea, ShootBase, Treatment } from "@/lib/agent/types";
+import { FRAME_MARGIN_M, distanceM, frameAround } from "@/lib/geo";
 import type { HeatGrid } from "@/lib/tools/heatmap";
 import { heatContours } from "./contours";
 import { CREDIT_CORNER, MapCredit, StreetTiles, fixed, mapFrame, widen, type Bounds } from "./street-map";
@@ -17,6 +18,8 @@ const W = 600;
 const SHARP = 560;
 /** Pins closer than this (in SVG units) are nudged apart, each with a leader line to its true spot. */
 const PIN_GAP = 26;
+/** How far in from the frame's edge a location beyond it is drawn, in screen pixels: clear of the edge with its halo. */
+const EDGE_INSET = 18;
 
 export interface Pin {
   n: number;
@@ -48,22 +51,107 @@ const LINES = [
 const LEVELS = LINES.map((l) => l.level);
 const TOP_FILL = 0.14;
 
-/** What the map frames: the grid's bounds, grown to keep every pin inside. */
-function frameBounds(map: HeatGrid, pins: Pin[]): Bounds {
+/**
+ * How far from the shoot base the map reaches for the other strong areas and the locations. A city's areas lie well
+ * within it (Mumbai's farthest two, 17 km apart); a state's often don't (Kerala's, 88 km), nor do locations scouted
+ * across a whole state when too few matched near the base. Those stay off the map, pointed at from its edge, so the map
+ * keeps the street-level zoom the base needs.
+ */
+const REACH_M = 25_000;
+
+/** The area the shoot is based in: the planner's pick, else the strongest. */
+const chosenArea = (base: ShootBase) => base.areas.find((a) => a.ref === base.chosen) ?? base.areas[0];
+
+/** Within REACH_M of the shoot base, so on the map. */
+const nearBase = (base: ShootBase) => {
+  const chosen = chosenArea(base);
+  return (spot: { lat: number; lon: number }) => !chosen || distanceM(chosen, spot) <= REACH_M;
+};
+
+/**
+ * What the map frames: the grid's bounds, grown to keep every pin near the base inside. When some strong areas lie
+ * beyond REACH_M, the frame is drawn around the ones near the base instead, as the grid frames all of them.
+ */
+export function frameBounds(map: HeatGrid, pins: Pin[], base: ShootBase): Bounds {
+  const near = nearBase(base);
+  const areas = base.areas.filter(near);
   // Grids saved before bounds were recorded are framed on their own squares.
-  let { south, west, north, east } = map.bounds ?? {
-    south: Math.min(...map.tiles.map((t) => t.lat)) - map.cell.lat,
-    north: Math.max(...map.tiles.map((t) => t.lat)) + map.cell.lat,
-    west: Math.min(...map.tiles.map((t) => t.lon)) - map.cell.lon,
-    east: Math.max(...map.tiles.map((t) => t.lon)) + map.cell.lon,
-  };
-  for (const p of pins) {
+  let { south, west, north, east } =
+    areas.length > 0 && areas.length < base.areas.length
+      ? frameAround(areas.map((a) => ({ ...a, reach: a.radius_m + FRAME_MARGIN_M })))
+      : (map.bounds ?? {
+          south: Math.min(...map.tiles.map((t) => t.lat)) - map.cell.lat,
+          north: Math.max(...map.tiles.map((t) => t.lat)) + map.cell.lat,
+          west: Math.min(...map.tiles.map((t) => t.lon)) - map.cell.lon,
+          east: Math.max(...map.tiles.map((t) => t.lon)) + map.cell.lon,
+        });
+  for (const p of pins.filter(near)) {
     south = Math.min(south, p.lat - map.cell.lat);
     north = Math.max(north, p.lat + map.cell.lat);
     west = Math.min(west, p.lon - map.cell.lon);
     east = Math.max(east, p.lon + map.cell.lon);
   }
   return { south, west, north, east };
+}
+
+/** A pin's distance from the shoot base, in whole kilometres. */
+const kmFromBase = (base: ShootBase, spot: { lat: number; lon: number }) => {
+  const chosen = chosenArea(base);
+  return chosen ? Math.round(distanceM(chosen, spot) / 1000) : 0;
+};
+
+/**
+ * Where a pin beyond the frame is drawn: on the line from the base toward it, where that line meets the frame's edge,
+ * `inset` units in, and above the OpenStreetMap credit when it would land on it.
+ */
+export function edgePoint(
+  from: Point,
+  to: Point,
+  width: number,
+  height: number,
+  inset: number,
+  credit: { width: number; height: number },
+): Point {
+  const [dx, dy] = [to.x - from.x, to.y - from.y];
+  const tx = dx > 0 ? (width - inset - from.x) / dx : dx < 0 ? (inset - from.x) / dx : Infinity;
+  const ty = dy > 0 ? (height - inset - from.y) / dy : dy < 0 ? (inset - from.y) / dy : Infinity;
+  const t = Math.max(0, Math.min(tx, ty, 1));
+  const at = { x: from.x + dx * t, y: from.y + dy * t };
+  if (at.x > width - credit.width && at.y > height - credit.height - inset) at.y = height - credit.height - inset;
+  return { x: fixed(at.x), y: fixed(at.y) };
+}
+
+/** The direction from one point to another, in degrees clockwise from east: an arrow pointing at a location off the map. */
+const bearing = (from: Point, to: Point) => fixed((Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI, 1);
+
+/** The frame edge a pin drawn at the edge is nearest to. */
+function edgeOf(p: Point, width: number, height: number) {
+  const gaps = { left: p.x, right: width - p.x, top: p.y, bottom: height - p.y };
+  return (Object.keys(gaps) as (keyof typeof gaps)[]).reduce((a, b) => (gaps[b] < gaps[a] ? b : a));
+}
+
+/** From a pin at the edge to its distance tag, in screen pixels: clear of the pin (20px) and its ring. */
+const AWAY_OFFSET = 16;
+
+/** Beside a pin drawn at the frame's edge, on the side away from that edge, so its distance reads inside the map. */
+function awayShift(p: Point, width: number, height: number): string {
+  const off = `${AWAY_OFFSET}px`;
+  return {
+    left: `translate(${off}, -50%)`,
+    right: `translate(calc(-100% - ${off}), -50%)`,
+    top: `translate(-50%, ${off})`,
+    bottom: `translate(-50%, calc(-100% - ${off}))`,
+  }[edgeOf(p, width, height)];
+}
+
+/** The box a distance tag ("→ 35 km", 12px in its pill, with the arrow) covers, matching awayShift, so names keep off it. */
+export function awayBox(p: Point, text: string, width: number, height: number, scale = 1): Box {
+  const px = (n: number) => n / scale;
+  const [w, h, off] = [px(text.length * 6.6 + 26), px(20), px(AWAY_OFFSET)];
+  const edge = edgeOf(p, width, height);
+  const left = edge === "left" ? p.x + off : edge === "right" ? p.x - off - w : p.x - w / 2;
+  const top = edge === "top" ? p.y + off : edge === "bottom" ? p.y - off - h : p.y - h / 2;
+  return { left, top, right: left + w, bottom: top + h };
 }
 
 interface Point {
@@ -169,8 +257,8 @@ function hiddenArea(b: Box, taken: Box[], width: number, height: number): number
  * Each area's name beside its ring, in the first place that stays in the frame and clear of the pins, the
  * OpenStreetMap credit and the names placed before it; where no place is clear, in the one that hides least of it.
  */
-export function placeLabels(rings: Ring[], pins: Point[], width: number, height: number, scale = 1): Placement[] {
-  const taken = fixtures(pins, width, height, scale);
+export function placeLabels(rings: Ring[], pins: Point[], width: number, height: number, scale = 1, tags: Box[] = []): Placement[] {
+  const taken = [...fixtures(pins, width, height, scale), ...tags];
   const hidden = (b: Box) => hiddenArea(b, taken, width, height);
   return rings.map((ring) => {
     const box = (p: Placement) => nameBox(ring, p, scale);
@@ -215,13 +303,14 @@ export function placePinName(
   width: number,
   height: number,
   scale = 1,
+  tags: Box[] = [],
 ): PinName {
   const px = (n: number) => n / scale;
   // The pill as drawn: 12px bold on the page's line height, with its padding.
   const w = px(name.length * 6.6 + 12);
   const h = px(22);
   const off = px(PIN_NAME_OFFSET);
-  const taken = [...fixtures(others, width, height, scale), ...rings.map((ring, i) => nameBox(ring, names[i], scale))];
+  const taken = [...fixtures(others, width, height, scale), ...rings.map((ring, i) => nameBox(ring, names[i], scale)), ...tags];
   const sides: Side[] = pin.x > width / 2 ? ["left", "right", "above", "below"] : ["right", "left", "above", "below"];
   const place = (side: Side): PinName & { box: Box } => {
     if (side === "right" || side === "left") {
@@ -372,7 +461,7 @@ function HeatMap({
 }) {
   // The frame and its lines are kept while the bounds and the box stay the same: the board draws the map again as each
   // location is read, and tracing the lines takes a few milliseconds.
-  const { south, west, north, east } = frameBounds(map, pins);
+  const { south, west, north, east } = frameBounds(map, pins, base);
   const box = useRef<HTMLDivElement>(null);
   const fill = useFill(box, pinned || held);
   const own = useMemo(() => mapFrame({ south, west, north, east }, W, SHARP), [south, west, north, east]);
@@ -402,18 +491,38 @@ function HeatMap({
   const width = fill ? Math.min(fill.width, (fill.height * f.width) / f.height) : drawn;
   const scale = width ? width / f.width : 1;
   const at = (p: Point) => ({ left: `${(p.x / f.width) * 100}%`, top: `${(p.y / f.height) * 100}%` });
-  // The chosen area is labelled first, so it gets the best spot.
-  const rings = [...base.areas]
+  // The chosen area is labelled first, so it gets the best spot. Areas beyond REACH_M aren't on the map.
+  const near = nearBase(base);
+  const rings = base.areas
+    .filter(near)
     .sort((a, b) => Number(b.ref === base.chosen) - Number(a.ref === base.chosen))
     .map((a) => ({ area: a, name: a.name, x: f.x(a.lon), y: f.y(a.lat), r: f.metres(a.radius_m, a.lat) }));
-  const spots = pins.map((p) => ({ x: f.x(p.lon), y: f.y(p.lat) }));
+  // A location beyond the frame is drawn at its edge, toward where it is, with its distance from the base.
+  const inFrame = (p: Pin) => p.lat >= f.bounds.south && p.lat <= f.bounds.north && p.lon >= f.bounds.west && p.lon <= f.bounds.east;
+  const off = pins.map((p) => !near(p) && !inFrame(p));
+  const chosen = chosenArea(base);
+  const home = chosen ? { x: f.x(chosen.lon), y: f.y(chosen.lat) } : { x: f.width / 2, y: f.height / 2 };
+  const truth = pins.map((p) => ({ x: f.x(p.lon), y: f.y(p.lat) }));
+  const credit = { width: CREDIT_CORNER.width / scale, height: CREDIT_CORNER.height / scale };
+  const spots = truth.map((spot, i) => (off[i] ? edgePoint(home, spot, f.width, f.height, EDGE_INSET / scale, credit) : spot));
   const placed = placePins(spots);
-  const names = placeLabels(rings, placed, f.width, f.height, scale);
-  const chosen = base.areas.find((a) => a.ref === base.chosen);
+  // Every tag is kept clear even while its pin is lit and shows its name instead, so the area names never shift.
+  const distance = (i: number) => `${kmFromBase(base, pins[i])} km`;
+  const tags = placed.flatMap((p, i) => (off[i] ? [{ i, box: awayBox(p, distance(i), f.width, f.height, scale) }] : []));
+  const names = placeLabels(
+    rings,
+    placed,
+    f.width,
+    f.height,
+    scale,
+    tags.map((t) => t.box),
+  );
+  const away = pins.filter((_, i) => off[i]).map((p) => `${p.n} is ${kmFromBase(base, p)} km away`);
   const summary =
     `${mock ? "Synthetic heatmap" : "Qloo heatmap"} of ${city} for this audience, in contour lines: strongest around ${base.areas.map((a) => a.name).join(", then ")}.` +
     (chosen ? ` The shoot is based in ${chosen.name}.` : "") +
-    (pins.length > 0 ? ` Locations ${pins.map((p) => p.n).join(", ")} are marked.` : "");
+    (pins.length > 0 ? ` Locations ${pins.map((p) => p.n).join(", ")} are marked.` : "") +
+    (away.length > 0 ? ` Beyond the map: location ${away.join(", ")}.` : "");
   // On paper, beside the locations, the map takes the left of its block and the words the right (ShootBaseBlock), so the
   // block is only as tall as the map and the first location fits under it, on US Letter too. Its width follows from its
   // height, 26rem, a little under the screen's cap.
@@ -484,7 +593,8 @@ function HeatMap({
               />
             ))}
             {spots.map((spot, i) => (
-              <g key={i}>
+              // A location beyond the map has no spot on it to mark.
+              <g key={i} display={off[i] ? "none" : undefined}>
                 {(placed[i].x !== spot.x || placed[i].y !== spot.y) && (
                   <line
                     x1={spot.x}
@@ -522,8 +632,21 @@ function HeatMap({
           })}
           {pins.map((p, i) => {
             const on = active !== undefined && p.n === active + 1;
+            const name = off[i] ? `${mapName(p.name)}, ${kmFromBase(base, p)} km away` : mapName(p.name);
             return (
               <Fragment key={p.n}>
+                {off[i] && !on && (
+                  <span
+                    aria-hidden
+                    className="absolute flex items-center gap-1 rounded-[4px] bg-frame/85 px-1.5 py-[3px] text-label leading-none whitespace-nowrap text-foreground"
+                    style={{ ...at(placed[i]), transform: awayShift(placed[i], f.width, f.height) }}
+                  >
+                    <span className="inline-block" style={{ transform: `rotate(${bearing(home, truth[i])}deg)` }}>
+                      →
+                    </span>
+                    {distance(i)}
+                  </span>
+                )}
                 <span
                   aria-hidden
                   title={p.name}
@@ -545,20 +668,21 @@ function HeatMap({
                       ...pinNameStyle(
                         placePinName(
                           placed[i],
-                          mapName(p.name),
+                          name,
                           rings,
                           names,
                           placed.filter((_, j) => j !== i),
                           f.width,
                           f.height,
                           scale,
+                          tags.filter((t) => t.i !== i).map((t) => t.box),
                         ),
                         (placed[i].x / f.width) * 100,
                         scale,
                       ),
                     }}
                   >
-                    {mapName(p.name)}
+                    {name}
                   </span>
                 )}
               </Fragment>
@@ -592,6 +716,7 @@ function HeatMap({
         </span>
         <span>Rings: the strongest areas, {base.areas[0]?.radius_m / 1000} km around; solid is the shoot base</span>
         {pins.length > 0 && <span>Numbers: the locations {compact ? "beside the map" : "below"}</span>}
+        {off.some(Boolean) && <span>Arrows: locations beyond the map, with their distance from {chosen?.name ?? "the base"}</span>}
       </div>
     </div>
   );
@@ -644,6 +769,9 @@ export function ShootBaseBlock({
   const chosen = base?.areas.find((a) => a.ref === base.chosen) ?? base?.areas[0];
   if (!base || !chosen) return null;
   const others = base.areas.filter((a) => a.ref !== chosen.ref);
+  // An area too far away to be on the map says how far it is.
+  const near = nearBase(base);
+  const away = (a: BaseArea) => (near(a) ? "" : `, ${kmFromBase(base, a)} km away`);
   const evidence = evidenceTone(mock);
   const km = `${chosen.radius_m / 1000} km`;
   const locations = pins.length > 0 ? "Every location" : "Every location in the treatment";
@@ -687,7 +815,7 @@ export function ShootBaseBlock({
             {base.held
               ? `${locations} is within ${km} of ${chosen.name}, so the unit can stay in one area.`
               : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${city}.`}
-            {others.length > 0 && ` Also strong: ${others.map((a) => `${a.name} (${percent(a.share)})`).join(", ")}.`}
+            {others.length > 0 && ` Also strong: ${others.map((a) => `${a.name} (${percent(a.share)}${away(a)})`).join(", ")}.`}
           </p>
         )}
       </div>
@@ -724,6 +852,7 @@ export function ShootBaseBlock({
                   <span>
                     {a.name}
                     {a.district && <span className="text-dim">, {a.district}</span>}
+                    {away(a) && <span className="text-dim">{away(a)}</span>}
                   </span>
                   <span className={`type-evidence text-label leading-4 ${evidence}`}>{percent(a.share)}</span>
                 </li>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FRAME_MARGIN_M, distanceM, frameAround } from "../geo";
 import { INSIGHT_MODES, entityList, entityUrn, heatmapCells, localityKind, type HeatCell, type QlooClient, type QlooEntity } from "../qloo";
 import { mockEntityId } from "../qloo/mock/catalog";
 import { defineTool, entityIds, normalizeName } from "./shared";
@@ -68,12 +69,7 @@ export function framedGrid({ bounds, cell, tiles }: HeatGrid): HeatGrid {
  */
 export const heatOf = (cell: HeatCell) => cell.affinity * cell.popularity;
 
-export function distanceM(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const rad = Math.PI / 180;
-  const h =
-    Math.sin(((b.lat - a.lat) * rad) / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(((b.lon - a.lon) * rad) / 2) ** 2;
-  return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
-}
+export { distanceM };
 
 const round = (value: number, places: number) => Number(value.toFixed(places));
 
@@ -109,13 +105,6 @@ export function hotAreas(cells: HeatCell[], count: number, radiusM: number): Unn
     }));
 }
 
-const METRES_PER_DEGREE = 111_320;
-/** Room around the outermost area, and the smallest frame either way, so rings and pins read at a glance. */
-const FRAME_MARGIN_M = 1_500;
-const MIN_FRAME_M = 6_000;
-/** No frame taller than 5:4 or wider than 8:5: a long city (Mumbai) gets more of the land and sea beside it. */
-const MAX_TALL = 1.25;
-const MAX_WIDE = 1.6;
 /**
  * How much taller than wide, and wider than tall, a board's pinned map may be drawn when it fills its column
  * (base-map.tsx): its box is at most 3:2 tall, and about 1.4:1 wide in an 80rem page on a screen 34rem tall. The grid
@@ -144,16 +133,7 @@ export function heatGrid(
   if (cells.length === 0) return undefined;
   const spots =
     areas.length > 0 ? areas.map((a) => ({ ...a, reach: a.radius_m + FRAME_MARGIN_M })) : cells.map((c) => ({ ...c, reach: 0 }));
-  const kx = Math.cos(((spots.reduce((sum, s) => sum + s.lat, 0) / spots.length) * Math.PI) / 180);
-  let south = Math.min(...spots.map((s) => s.lat - s.reach / METRES_PER_DEGREE));
-  let north = Math.max(...spots.map((s) => s.lat + s.reach / METRES_PER_DEGREE));
-  let west = Math.min(...spots.map((s) => s.lon - s.reach / METRES_PER_DEGREE / kx));
-  let east = Math.max(...spots.map((s) => s.lon + s.reach / METRES_PER_DEGREE / kx));
-  // Grow the short side (in ground degrees), keeping the frame centred.
-  const tall = Math.max(north - south, MIN_FRAME_M / METRES_PER_DEGREE, ((east - west) * kx) / MAX_WIDE);
-  const wide = Math.max((east - west) * kx, MIN_FRAME_M / METRES_PER_DEGREE, tall / MAX_TALL);
-  const [midLat, midLon] = [(north + south) / 2, (east + west) / 2];
-  [south, north, west, east] = [midLat - tall / 2, midLat + tall / 2, midLon - wide / kx / 2, midLon + wide / kx / 2];
+  const { south, north, west, east, tall, wide, midLat, midLon, kx } = frameAround(spots);
 
   const within = (b: Bounds) => (c: HeatCell) => c.lat >= b.south && c.lat <= b.north && c.lon >= b.west && c.lon <= b.east;
   const inside = cells.filter(within({ south, north, west, east }));

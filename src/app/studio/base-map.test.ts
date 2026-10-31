@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapName, placeLabels, placePinName } from "./base-map";
+import { awayBox, edgePoint, frameBounds, mapName, placeLabels, placePinName } from "./base-map";
 import { CREDIT_CORNER } from "./street-map";
 
 // A 480 × 600 frame at a pixel per unit, so the credit takes its corner at full size.
@@ -99,5 +99,76 @@ describe("mapName", () => {
   it("keeps a name that has nothing added, or would be left too short", () => {
     for (const name of ["Bombay Salad Co.", "McDonald's", "A-1 Diner", "Nehru Nagar ST Stand Canteen"]) expect(mapName(name)).toBe(name);
     expect(mapName("Q - The Bar")).toBe("Q - The Bar");
+  });
+});
+
+describe("frameBounds", () => {
+  // Kerala as live Qloo maps one audience (2026-10-31): two strong areas 88 km apart, so a grid framed on both.
+  const area = (ref: string, name: string, lat: number, lon: number) => ({
+    ref,
+    rank: Number(ref.slice(1)),
+    name,
+    near: [],
+    lat,
+    lon,
+    radius_m: 2000,
+    share: 0.1,
+  });
+  const kochi = area("A1", "Kochi", 9.9658, 76.2421);
+  const thrissur = area("A2", "Thrissur", 10.5276, 76.2144);
+  // A city's grid has squares of a few hundred metres; a state's, Qloo's own 5 km tiles.
+  const grid = (south: number, west: number, north: number, east: number, cell = 0.044) => ({
+    bounds: { south, west, north, east },
+    cell: { lat: cell, lon: cell },
+    tiles: [{ lat: south, lon: west, heat: 1 }],
+  });
+  const kmAcross = (b: { south: number; north: number; west: number; east: number }) =>
+    Math.max((b.north - b.south) * 111.32, (b.east - b.west) * 111.32 * Math.cos((((b.north + b.south) / 2) * Math.PI) / 180));
+
+  it("keeps the grid's own frame when every area is near the base, as on the examples", () => {
+    const map = grid(18.9, 72.78, 19.1, 72.92, 0.005);
+    const base = { chosen: "A1", held: true, areas: [area("A1", "Bandra West", 19.06, 72.83), area("A2", "Churchgate", 18.93, 72.83)] };
+    expect(frameBounds(map, [{ n: 1, name: "Cafe", lat: 19.061, lon: 72.831 }], base)).toEqual(map.bounds);
+  });
+
+  it("frames the base, not a strong area 88 km away or a location 60 km away", () => {
+    const map = grid(9.93, 76.17, 10.56, 76.29);
+    const base = { chosen: "A1", held: false, areas: [kochi, thrissur] };
+    const pins = [
+      { n: 1, name: "Near", lat: 9.975, lon: 76.25 },
+      { n: 2, name: "Far", lat: 10.5, lon: 76.2 },
+    ];
+    const framed = frameBounds(map, pins, base);
+    expect(kmAcross(framed)).toBeLessThan(12);
+    expect(framed.south).toBeLessThan(kochi.lat);
+    expect(framed.north).toBeGreaterThan(9.975);
+    expect(framed.north).toBeLessThan(10.2);
+  });
+});
+
+describe("edgePoint", () => {
+  const credit = { width: 200, height: 34 };
+
+  it("draws a location beyond the frame on its edge, toward where it is", () => {
+    expect(edgePoint({ x: 300, y: 300 }, { x: 1500, y: 300 }, 600, 600, 18, credit)).toEqual({ x: 582, y: 300 });
+    expect(edgePoint({ x: 300, y: 300 }, { x: 300, y: -900 }, 600, 600, 18, credit)).toEqual({ x: 300, y: 18 });
+  });
+
+  it("lifts it above the OpenStreetMap credit in the bottom-right corner", () => {
+    const at = edgePoint({ x: 300, y: 300 }, { x: 1500, y: 1500 }, 600, 600, 18, credit);
+    expect(at.x).toBe(582);
+    expect(at.y).toBe(600 - 34 - 18);
+  });
+});
+
+describe("awayBox", () => {
+  it("keeps an area's name off a distance tag at the frame's edge", () => {
+    // A location 35 km away drawn at the left edge, its tag running right, over where the base's name would go.
+    const pin = { x: 18, y: 84 };
+    const tag = awayBox(pin, "35 km", W, H);
+    expect(tag.left).toBeGreaterThan(pin.x);
+    const ring = { name: "Ashutosh Nagar", x: 80, y: 130, r: 40 };
+    expect(placeLabels([ring], [pin], W, H)).toEqual([{ side: "above", along: 0 }]);
+    expect(placeLabels([ring], [pin], W, H, 1, [tag])).not.toEqual([{ side: "above", along: 0 }]);
   });
 });
