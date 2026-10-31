@@ -250,21 +250,9 @@
   }
 }
 
-/* ---------- Palette: the swatches lift as a pointer passes over them ---------- */
+/* ---------- Palette: a ring marks the swatch under the pointer, as focus does; nothing moves ---------- */
 .swatch {
-  position: relative;
-  transition: transform 300ms var(--ease-out);
-}
-/* The lifted swatch's shadow is its own layer, faded in, so only transform and opacity animate. */
-.swatch::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: 0 30px 56px rgb(0 0 0 / 0.45);
-  opacity: 0;
-  transition: opacity 300ms var(--ease-out);
-  pointer-events: none;
+  transition: box-shadow 150ms var(--ease-out);
 }
 .swatch-btn:focus-visible {
   outline: none;
@@ -274,19 +262,7 @@
     0 0 0 3px var(--background),
     0 0 0 5px var(--foreground);
 }
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .swatch-btn:hover {
-    position: relative;
-    z-index: 2;
-  }
-  .swatch-btn:hover .swatch {
-    transform: translateY(-14px) scale(1.08);
-  }
-  .swatch-btn:hover .swatch::after {
-    opacity: 1;
-  }
-}
-@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+@media (hover: hover) and (pointer: fine) {
   .swatch-btn:hover .swatch {
     box-shadow:
       0 0 0 3px var(--background),
@@ -295,11 +271,7 @@
 }
 @media print {
   .swatch {
-    transform: none !important;
     box-shadow: none !important;
-  }
-  .swatch::after {
-    display: none;
   }
 }
 

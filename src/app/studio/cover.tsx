@@ -170,7 +170,7 @@ function CoverPalette({ palette }: { palette: Treatment["palette"] }) {
 
 /**
  * The palette, each colour a button that copies its hex, which colourists paste straight into a grade or a deck. A
- * swatch lifts as a pointer passes over it (board.css); a phone gets three to a row.
+ * ring marks the swatch under a pointer, as focus does (board.css); a phone gets three to a row.
  */
 export function PaletteSwatches({ palette }: { palette: Treatment["palette"] }) {
   const { copied, copy } = useCopied();
