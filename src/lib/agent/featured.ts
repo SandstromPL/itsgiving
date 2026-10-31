@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { llmConfigFromEnv } from "../llm/config";
+import type { LlmProviderKind } from "../llm/types";
 import { qlooConfigFromEnv } from "../qloo";
 import { distanceM, framedGrid } from "../tools/heatmap";
 import { briefKey, briefSchema, normalizeBrief } from "./brief";
@@ -131,8 +132,11 @@ export interface FeaturedRun {
   tags: string[];
   qlooCalls: number;
   modelCalls: number;
+  /** The writer by its maker's name ("DeepSeek"); the board's own credit keeps the model's id. */
   writtenBy: string;
 }
+
+const WRITERS: Record<LlmProviderKind, string> = { deepseek: "DeepSeek", gemini: "Gemini", groq: "Groq", mock: "Mock LLM" };
 
 const round = (n: number, places: number) => Number(n.toFixed(places));
 
@@ -177,6 +181,6 @@ export function featuredRun(items: FeaturedItem[] = loadFeatured()): FeaturedRun
     tags: [...t.tone.map((tone) => tone.tag.name), ...t.audience.taste_tags.map((tag) => tag.name)],
     qlooCalls: t.qloo.calls,
     modelCalls: t.llm.length,
-    writtenBy: t.writtenBy.model,
+    writtenBy: WRITERS[t.writtenBy.provider] ?? t.writtenBy.model,
   };
 }

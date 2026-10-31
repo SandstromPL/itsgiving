@@ -167,7 +167,7 @@ describe("featured examples", () => {
       logline: "Two people keep almost meeting.",
       qlooCalls: 21,
       modelCalls: 2,
-      writtenBy: "deepseek-flash",
+      writtenBy: "DeepSeek",
       tags: ["Introspective", "Indie folk"],
     });
     // The same shoot base the board draws, with only the heat inside the frame the homepage draws.
