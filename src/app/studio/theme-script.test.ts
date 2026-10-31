@@ -29,3 +29,13 @@ describe("the room script", () => {
     expect(run({ "itsgiving:room": "sodium" })).toEqual({ theme: "dark" });
   });
 });
+
+describe("the intro mark", () => {
+  it("marks an intro seen in this browser, so the homepage opens on the headline", () => {
+    expect(run({ "itsgiving:intro": "seen" })).toEqual({ theme: "dark", intro: "seen" });
+  });
+
+  it("leaves a first visit unmarked", () => {
+    expect(run({ "itsgiving:intro": "1" })).toEqual({ theme: "dark" });
+  });
+});

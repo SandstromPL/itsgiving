@@ -2,16 +2,35 @@
 
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from "react";
 import { LETTERMARK_BOX, Lettermark, lettermarkPortal } from "../marks";
-import { useScrollFrame } from "../smooth";
+import { scrollToY, useScrollFrame } from "../smooth";
+import { INTRO_KEY } from "../studio/theme-script";
 import { clamp, outCubic, rackFocus, reducedMotion, tween } from "./motion";
 import "./home.css";
 
-// The homepage's first screen: the title card, the 2B lettermark on black, loaded in 1B rack focus, its reels rolling.
-// Scrolling parks a window of the second g at the top and dollies through it until the window is the screen; after a
-// beat of black, "your voice, their taste." racks into focus word by word and holds the screen. It's all the scroll's,
-// both ways and at any speed: the words sharpen as far as the reader has scrolled, so a fast scroll can't leave them
-// behind, and scrolling back up blurs them out and pulls back out of the window to the card. Under reduced motion the
-// card fades out instead and the words fade in.
+// The homepage's first screen. A first visit gets the title card: the 2B lettermark on black, loaded in 1B rack focus,
+// its reels rolling. Scrolling parks a window of the second g at the top and dollies through it until the window is the
+// screen; after a beat of black, "your voice, their taste." racks into focus word by word and holds the screen. It's all
+// the scroll's, both ways and at any speed: the words sharpen as far as the reader has scrolled, so a fast scroll can't
+// leave them behind, and scrolling back up blurs them out and pulls back out of the window to the card. Skip intro jumps
+// to the words. Once someone has reached the words, their next visits open on the headline, racked in once, with a way
+// to play the intro again. Under reduced motion the card fades out instead and the words fade in.
+
+/** Whether this browser has been through the intro before (the head script reads the same key, theme-script.ts). */
+function seenBefore() {
+  try {
+    return localStorage.getItem(INTRO_KEY) === "seen";
+  } catch {
+    return false;
+  }
+}
+function remember(seen: boolean) {
+  try {
+    if (seen) localStorage.setItem(INTRO_KEY, "seen");
+    else localStorage.removeItem(INTRO_KEY);
+  } catch {
+    // storage blocked: the intro plays on every visit
+  }
+}
 
 const [BX, BY, BW, BH] = LETTERMARK_BOX;
 /** Where the mark sits: as wide as 72% of the screen or 155% of its height, whichever is less, its baseline 46% down. */
@@ -63,8 +82,14 @@ export function Opening() {
   const hole = useRef<HTMLDivElement>(null);
   const mark = useRef<HTMLDivElement>(null);
   const ui = useRef<HTMLDivElement>(null);
+  const skipButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const s = useRef({
+    /** Whether the title card plays: decided once per page, so Back to a page Next kept keeps the layout it left. */
+    on: null as boolean | null,
+    /** This visit has reached the words (or skipped to them), so the next visit opens on them. */
+    marked: false,
+    skip: true,
     /** The title card has loaded (its rack focus played): once per page, even when Next shows it again after Back. */
     started: false,
     reduce: false,
@@ -137,7 +162,7 @@ export function Opening() {
 
   const draw = () => {
     const f = film.current;
-    if (!s.W || !f) return;
+    if (!s.on || !s.W || !f) return;
     const m = placeMark(s.W, s.H);
     const P = lettermarkPortal(s.angle, 1);
     const x = m.left + (P.cx - BX) * m.k;
@@ -165,7 +190,18 @@ export function Opening() {
       ui.current.style.opacity = String(1 - clamp(s.p / 0.06));
       ui.current.style.visibility = s.p > 0.06 ? "hidden" : "";
     }
+    // Skip stays until the push is through (until the words have faded in, under reduced motion); the words reached,
+    // later visits open on them.
+    const skip = s.p < (s.reduce ? 0.8 : 1);
+    if (skip !== s.skip && skipButton.current) {
+      s.skip = skip;
+      skipButton.current.hidden = !skip;
+    }
     focusWords();
+    if (!s.marked && (s.reduce ? s.p >= 0.85 : s.q >= 0.6)) {
+      s.marked = true;
+      remember(true);
+    }
   };
 
   const measure = () => {
@@ -177,9 +213,10 @@ export function Opening() {
     s.vh = innerHeight;
     s.W = st.clientWidth;
     s.H = st.clientHeight;
-    // After the push, the scroll that racks the words in and then keeps them on the screen before the page moves on.
-    s.hold = s.reduce ? 0 : Math.round(innerHeight * 1.1);
-    s.dist = Math.round(innerHeight * 1.6);
+    // After the push, the scroll that racks the words in and then keeps them on the screen before the page moves on. A
+    // returning visitor's headline is a screen of its own.
+    s.hold = s.reduce || !s.on ? 0 : Math.round(innerHeight * 1.1);
+    s.dist = s.on ? Math.round(innerHeight * 1.6) : 0;
     sec.style.height = `${s.H + s.dist + s.hold}px`;
     s.top = sec.getBoundingClientRect().top + scrollY;
     place(scrollY);
@@ -228,13 +265,29 @@ export function Opening() {
   };
 
   useLayoutEffect(() => {
+    const sec = section.current;
+    if (s.on === null && sec) {
+      s.on = !seenBefore();
+      if (!s.on) {
+        sec.dataset.off = "";
+        delete sec.dataset.dark;
+      }
+    }
     measure();
-    // The title loads in rack focus, once, then the reels start to roll.
+    // The title loads in rack focus, once, then the reels start to roll. A returning visitor's headline racks in instead.
     if (!s.started) {
       s.started = true;
-      rackFocus(Array.from(mark.current?.querySelectorAll(".wl") ?? []), { stagger: 70, duration: 900, scale: 1.06, blur: 14 });
+      if (s.on) rackFocus(Array.from(mark.current?.querySelectorAll(".wl") ?? []), { stagger: 70, duration: 900, scale: 1.06, blur: 14 });
+      else
+        rackFocus(Array.from(heading.current?.querySelectorAll(".hero-w") ?? []), {
+          stagger: 90,
+          duration: 900,
+          scale: 1,
+          blur: 14,
+          delay: 120,
+        });
     }
-    if (s.ready) return;
+    if (s.ready || !s.on) return;
     const ready = setTimeout(
       () => {
         s.ready = true;
@@ -263,12 +316,32 @@ export function Opening() {
   useScrollFrame((y) => {
     // A phone's address bar coming and going changes the height a little: only a real resize lays the scene out again.
     if (innerWidth !== s.vw || Math.abs(innerHeight - s.vh) > 150) measure();
+    if (!s.on) return;
     place(y);
     if (s.p < 0.012) {
       if (s.ready) startRolling();
     } else if (s.rolling && !s.parking) park();
     draw();
   });
+
+  // Straight to the words, sharp: past the push, where the last word has racked in (faded in, under reduced motion).
+  const skip = () => {
+    const top = s.reduce ? s.top + Math.round(s.dist * 0.85) : s.top + s.dist + Math.round(s.hold * 0.62);
+    scrollToY(top);
+    s.marked = true;
+    remember(true);
+    const h = heading.current;
+    if (h) {
+      h.tabIndex = -1;
+      h.focus({ preventScroll: true });
+    }
+  };
+  // The whole intro again, from the top: the page opens as it does on a first visit.
+  const replay = () => {
+    remember(false);
+    window.scrollTo(0, 0);
+    window.location.reload();
+  };
 
   return (
     <section ref={section} className="intro" aria-label="itsgiving" data-dark="">
@@ -297,6 +370,12 @@ export function Opening() {
             <i />
           </p>
         </div>
+        <button ref={skipButton} type="button" className="intro-skip surface-dark press" onClick={skip}>
+          Skip intro
+        </button>
+        <button type="button" className="intro-replay press" onClick={replay}>
+          Play the intro
+        </button>
       </div>
     </section>
   );

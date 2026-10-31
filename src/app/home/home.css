@@ -52,6 +52,10 @@
   display: block;
   white-space: nowrap;
 }
+/* Skip intro hands focus to the headline (opening.tsx): no ring round 300px words, as with the skip link's <main>. */
+.hero-h:focus {
+  outline: none;
+}
 .hero-w {
   display: inline-block;
 }
@@ -107,6 +111,66 @@
   width: 1.5px;
   height: 34px;
   background: linear-gradient(var(--dim), transparent);
+}
+/* A way past the title card, at its top right (no header shows there yet), until the push is through. */
+.intro-skip {
+  position: absolute;
+  z-index: 4;
+  top: max(18px, env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--edge);
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--text-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+/* A returning visitor (opening.tsx marks the section; the head script marks <html> before first paint, so a reload
+   never flashes the card): the headline is the first screen, with the intro a click away at its foot. */
+.intro-replay {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  translate: -50% 0;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1.5px solid var(--edge);
+  background: transparent;
+  color: var(--dim);
+  font-size: var(--text-small);
+  font-weight: 700;
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .intro-skip:hover,
+  .intro-replay:hover {
+    border-color: var(--foreground);
+    color: var(--foreground);
+  }
+}
+.intro[data-off],
+:root[data-intro="seen"] .intro {
+  height: 100vh;
+  height: 100svh;
+}
+.intro[data-off] .intro-film,
+.intro[data-off] .intro-ui,
+.intro[data-off] .intro-skip,
+:root[data-intro="seen"] .intro-film,
+:root[data-intro="seen"] .intro-ui,
+:root[data-intro="seen"] .intro-skip {
+  display: none;
+}
+.intro[data-off] .intro-replay,
+:root[data-intro="seen"] .intro-replay {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ---------- 2: the pitch, alone on the screen, lighting up word by word ---------- */
@@ -454,7 +518,9 @@
     position: relative;
   }
   .intro-film,
-  .intro-ui {
+  .intro-ui,
+  .intro-skip,
+  .intro-replay {
     display: none;
   }
   .intro[data-dark] .hero-w,
