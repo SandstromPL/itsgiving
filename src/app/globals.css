@@ -5,6 +5,16 @@
    bar. Shorter than 34rem, it all scrolls with the page. */
 @custom-variant pin (@media (min-height: 34rem));
 
+/* Hover styles need a mouse-like pointer as well as hover: a few touch screens say they can hover, and there a tapped
+   button kept its hover shade. Tailwind's own `hover:` asks only for (hover: hover). */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 /*
  * itsgiving: Gen Z, professionally. Four rooms, named after night-shoot light, share these tokens: 3A grade (the
  * default, a colourist's neutral grey, so stills read true), 3B tungsten (warm, lamp-lit), 3D tri-x (no hue but the
