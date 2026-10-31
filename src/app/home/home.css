@@ -182,19 +182,9 @@
   align-items: center;
 }
 
-/* ---------- 2: the pitch, alone on the screen, lighting up word by word ---------- */
-.say {
-  position: relative;
-  height: 210svh;
-}
+/* ---------- 2: the pitch, at its own height, lighting up word by word as it comes up the screen ---------- */
 .say-stage {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  height: 100svh;
-  display: grid;
-  align-items: center;
-  overflow: hidden;
+  padding-block: clamp(96px, 12vw, 160px);
 }
 .say-p {
   max-width: 29ch;
@@ -205,14 +195,6 @@
 }
 .say-p .w {
   opacity: var(--o, 1);
-}
-.say[data-static] {
-  height: auto;
-}
-.say[data-static] .say-stage {
-  position: relative;
-  height: auto;
-  padding-block: clamp(96px, 16vw, 200px);
 }
 
 /* ---------- 3: the flatbed, the examples run sideways before the page goes on ---------- */
@@ -397,13 +379,11 @@
   }
 }
 
-/* ---------- 4: watch it work, one step to a screen: the step, then what it made ---------- */
+/* ---------- 4: watch it work, step by step at their own height: the step, then what it made ---------- */
 .how-head {
-  min-height: 86vh;
-  min-height: 86svh;
   display: grid;
-  align-content: center;
   gap: 16px;
+  padding-block: 120px 8px;
 }
 .how-step {
   position: relative;
@@ -412,14 +392,7 @@
   display: grid;
   gap: clamp(22px, 3vw, 34px);
   align-content: center;
-  padding-block: clamp(40px, 7vw, 88px);
-}
-.how-step[data-pinned] .how-pin {
-  position: sticky;
-  top: var(--head, 72px);
-  height: calc(100vh - var(--head, 72px));
-  height: calc(100svh - var(--head, 72px));
-  padding-block: 24px;
+  padding-block: clamp(40px, 6vw, 72px);
 }
 .how-pin--split {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
@@ -484,13 +457,11 @@
   transition: none;
 }
 
-/* ---------- 5: the way in, a screen of its own ---------- */
+/* ---------- 5: the way in ---------- */
 .home-end {
-  min-height: 100vh;
-  min-height: 100svh;
   display: grid;
   align-content: center;
-  padding-block: 72px;
+  padding-block: 120px;
 }
 
 /* ---------- /examples ---------- */

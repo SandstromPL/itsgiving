@@ -8,7 +8,7 @@ import { Pitch } from "./home/pitch";
 import { SiteHeader } from "./studio/site-header";
 
 /**
- * The pitch, one block to a screen: the title card dollied through to the line, the pitch, the featured treatments on a
+ * The pitch, block by block: the title card dollied through to the line, the pitch, the featured treatments on a
  * flatbed, one real run step by step, and the way in. It holds no form and reads nothing per request, so the whole page
  * is built once, featured treatments included. The header comes in with the headline, once the title card is through.
  */

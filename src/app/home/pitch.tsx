@@ -9,47 +9,40 @@ const PITCH =
 const WORDS = PITCH.split(" ");
 
 /**
- * The pitch, alone on its screen, lighting up word by word as you scroll through it. Under reduced motion it's a plain
- * paragraph in the page.
+ * The pitch, at its own height, lighting up word by word as it comes up the screen. Under reduced motion it's a plain
+ * paragraph.
  */
 export function Pitch() {
-  const section = useRef<HTMLElement>(null);
   const para = useRef<HTMLParagraphElement>(null);
-  const s = useRef({ pinned: false, top: 0, len: 1, vw: 0, vh: 0 }).current;
+  const s = useRef({ moving: false, top: 0, vw: 0, vh: 0 }).current;
 
   const measure = () => {
-    const sec = section.current;
     const p = para.current;
-    if (!sec || !p) return;
+    if (!p) return;
     s.vw = innerWidth;
     s.vh = innerHeight;
-    s.pinned = !reducedMotion();
-    if (s.pinned) delete sec.dataset.static;
-    else sec.dataset.static = "";
-    sec.style.height = s.pinned ? `${Math.round(innerHeight * 2.1)}px` : "";
-    s.top = sec.getBoundingClientRect().top + scrollY;
-    s.len = Math.max(1, sec.offsetHeight - innerHeight);
-    if (!s.pinned) {
-      p.querySelectorAll<HTMLElement>(".w").forEach((w) => w.style.removeProperty("--o"));
-      p.style.transform = "";
-    }
+    s.moving = !reducedMotion();
+    p.style.transform = "";
+    s.top = p.getBoundingClientRect().top + scrollY;
+    if (!s.moving) p.querySelectorAll<HTMLElement>(".w").forEach((w) => w.style.removeProperty("--o"));
   };
 
   useScrollFrame((y) => {
     if (innerWidth !== s.vw || Math.abs(innerHeight - s.vh) > 150) measure();
     const p = para.current;
-    if (!s.pinned || !p) return;
-    // The words light up from when the block is a third of the way in to halfway through its hold.
-    const from = s.top - innerHeight * 0.66;
-    const q = clamp((y - from) / (s.top + s.len * 0.5 - from));
+    if (!s.moving || !p) return;
+    // Where the paragraph's top is, as a share of the screen: the words light up from when it comes on at the foot
+    // until it is a third of the way down, as it rises the last 48px into place.
+    const at = (s.top - y) / innerHeight;
+    const q = clamp((0.92 - at) / 0.58);
     const words = p.querySelectorAll<HTMLElement>(".w");
     const n = words.length;
     words.forEach((w, i) => w.style.setProperty("--o", (0.14 + 0.86 * clamp((q * (n + 6) - i) / 6)).toFixed(3)));
-    p.style.transform = `translateY(${((1 - clamp((y - from) / (innerHeight * 0.66))) * 48).toFixed(1)}px)`;
+    p.style.transform = `translateY(${((1 - clamp((0.92 - at) / 0.3)) * 48).toFixed(1)}px)`;
   });
 
   return (
-    <section ref={section} className="say" aria-label="What itsgiving does">
+    <section className="say" aria-label="What itsgiving does">
       <div className="say-stage">
         <div className="mx-auto w-full max-w-[80rem] px-4 sm:px-8">
           <p ref={para} className="say-p text-subsection lg:text-display-sm">

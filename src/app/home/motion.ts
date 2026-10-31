@@ -49,9 +49,3 @@ export function tween(ms: number, step: (eased: number) => void, curve: (t: numb
 }
 
 export const outCubic = (t: number) => 1 - (1 - t) ** 3;
-
-/** The header's height while it shows (the lead's `--head`), for what pins under it. */
-export function headHeight() {
-  const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--head"));
-  return Number.isFinite(value) && value > 0 ? value : 72;
-}

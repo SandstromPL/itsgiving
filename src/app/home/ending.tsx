@@ -29,7 +29,7 @@ export function useArrivals<T extends HTMLElement>() {
   return root;
 }
 
-/** The way in, a screen of its own at the end of the homepage. */
+/** The way in, at the end of the homepage. */
 export function Ending({ examples }: { examples: boolean }) {
   const root = useArrivals<HTMLElement>();
   return (

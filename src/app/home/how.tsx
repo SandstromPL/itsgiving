@@ -11,7 +11,6 @@ import { titleFont, titleStyle, suggestTitleFontFrom } from "../studio/title-fon
 import { evidenceTone, rankMark, slip } from "../studio/ui";
 import { CutLink } from "./cut-link";
 import { useArrivals } from "./ending";
-import { headHeight, reducedMotion } from "./motion";
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const percent = (share: number) => `${Math.round(share * 100)}%`;
@@ -25,8 +24,8 @@ interface Step {
 }
 
 /**
- * Lays the steps out for the screen: each one holds the screen for a while when it fits on one (on a short screen it
- * just scrolls), its words rising in first, then what it made. Step 2's map is as tall as its words and card together.
+ * Lays the steps out, one after another at their own height: each step's words rise in as it comes up the screen,
+ * then what it made as that comes up too. Step 2's map is as tall as its words and card together.
  */
 function useSteps() {
   const list = useRef<HTMLOListElement>(null);
@@ -36,8 +35,6 @@ function useSteps() {
     if (!ol) return;
     s.vw = innerWidth;
     s.vh = innerHeight;
-    const reduce = reducedMotion();
-    const avail = innerHeight - headHeight();
     ol.querySelectorAll<HTMLElement>(".how-map").forEach((map) => {
       const words = map.parentElement?.querySelector<HTMLElement>(".how-words");
       const base = map.parentElement?.querySelector<HTMLElement>(".how-base");
@@ -46,25 +43,11 @@ function useSteps() {
       // The block's own padding and the legend under the map take about 76px of that.
       map.style.setProperty("--map-height", `${Math.max(256, Math.round(left - 76))}px`);
     });
-    ol.querySelectorAll<HTMLElement>(".how-step").forEach((step) => {
-      delete step.dataset.pinned;
-      step.style.height = "";
-      const pin = step.querySelector<HTMLElement>(".how-pin");
-      if (!pin) return;
-      const cs = getComputedStyle(pin);
-      const need = pin.scrollHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) + 48;
-      if (!reduce && need <= avail) {
-        step.dataset.pinned = "";
-        step.style.height = `${Math.round(avail + innerHeight * 0.7)}px`;
-      }
-    });
   };
   useScrollFrame(() => {
     if (innerWidth !== s.vw || Math.abs(innerHeight - s.vh) > 150) measure();
-    list.current?.querySelectorAll<HTMLElement>(".how-step").forEach((step) => {
-      const top = step.getBoundingClientRect().top;
-      if (top < innerHeight * 0.74) step.querySelectorAll<HTMLElement>(".home-sa").forEach((x) => (x.dataset.on = ""));
-      if (top < innerHeight * 0.38) step.querySelectorAll<HTMLElement>(".home-sb").forEach((x) => (x.dataset.on = ""));
+    list.current?.querySelectorAll<HTMLElement>(".home-sa:not([data-on]), .home-sb:not([data-on])").forEach((x) => {
+      if (x.getBoundingClientRect().top < innerHeight * (x.classList.contains("home-sa") ? 0.74 : 0.86)) x.dataset.on = "";
     });
   });
   // A step the keyboard reaches is simply there: its links are never focused while they fade in.
@@ -96,7 +79,7 @@ function StepWords({ i, title, text }: { i: number; title: string; text: string 
   );
 }
 
-/** "Watch it work": one real featured run, a step to a screen, each step and then what it made. */
+/** "Watch it work": one real featured run, step by step, each step and then what it made. */
 export function HowItWorks({
   run,
   still,
