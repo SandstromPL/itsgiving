@@ -411,15 +411,15 @@
 }
 
 /* Arrivals: the step's words, then what it made, rise into place once (2A glide and rise). */
-.sa,
-.sb,
-.rv {
+.home-sa,
+.home-sb,
+.home-rv {
   opacity: 0;
   transform: translateY(32px);
 }
-.sa[data-on],
-.sb[data-on],
-.rv[data-on] {
+.home-sa[data-on],
+.home-sb[data-on],
+.home-rv[data-on] {
   opacity: 1;
   transform: none;
   transition:
@@ -450,14 +450,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sa,
-  .sb,
-  .rv {
+  .home-sa,
+  .home-sb,
+  .home-rv {
     transform: none;
   }
-  .sa[data-on],
-  .sb[data-on],
-  .rv[data-on] {
+  .home-sa[data-on],
+  .home-sb[data-on],
+  .home-rv[data-on] {
     transition: opacity 250ms ease-out;
   }
 }
@@ -474,9 +474,9 @@
     display: none;
   }
   .intro[data-dark] .hero-w,
-  .sa,
-  .sb,
-  .rv {
+  .home-sa,
+  .home-sb,
+  .home-rv {
     opacity: 1;
     transform: none;
   }

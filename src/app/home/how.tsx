@@ -62,8 +62,8 @@ function useSteps() {
     if (innerWidth !== s.vw || Math.abs(innerHeight - s.vh) > 150) measure();
     list.current?.querySelectorAll<HTMLElement>(".how-step").forEach((step) => {
       const top = step.getBoundingClientRect().top;
-      if (top < innerHeight * 0.74) step.querySelectorAll<HTMLElement>(".sa").forEach((x) => (x.dataset.on = ""));
-      if (top < innerHeight * 0.38) step.querySelectorAll<HTMLElement>(".sb").forEach((x) => (x.dataset.on = ""));
+      if (top < innerHeight * 0.74) step.querySelectorAll<HTMLElement>(".home-sa").forEach((x) => (x.dataset.on = ""));
+      if (top < innerHeight * 0.38) step.querySelectorAll<HTMLElement>(".home-sb").forEach((x) => (x.dataset.on = ""));
     });
   });
   return list;
@@ -71,7 +71,7 @@ function useSteps() {
 
 function StepWords({ i, of, title, text }: { i: number; of: number; title: string; text: string }) {
   return (
-    <div className="how-words sa flex max-w-[44rem] flex-col gap-2.5">
+    <div className="how-words home-sa flex max-w-[44rem] flex-col gap-2.5">
       <span className="text-ui font-semibold text-faint tabular-nums">
         Step {i + 1} of {of}
       </span>
@@ -133,7 +133,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
         ),
         map: (
           <div
-            className="how-map sb"
+            className="how-map home-sb"
             style={{ "--d": "160ms" } as CSSProperties}
             role="img"
             aria-label={`Map of ${run.city}: where ${run.audience} is strongest, as contour lines, with ${chosen.name} ringed as the shoot base`}
@@ -189,7 +189,7 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
   return (
     <section aria-labelledby="how" className="pb-6 sm:pb-18">
       <div ref={head} className="how-head mx-auto w-full max-w-[80rem] px-4 sm:px-8">
-        <div className="rv flex flex-col gap-4">
+        <div className="home-rv flex flex-col gap-4">
           <h2 id="how" className="type-head text-display leading-[0.95] tracking-[-0.045em]">
             {t.watchItWork}
           </h2>
@@ -204,13 +204,13 @@ export function HowItWorks({ run }: { run: FeaturedRun }) {
             {step.split ? (
               <div className="how-pin how-pin--split mx-auto w-full max-w-[80rem] px-4 sm:px-8">
                 <StepWords i={i} of={steps.length} title={step.title} text={step.text} />
-                <div className="how-base sb">{step.split.base}</div>
+                <div className="how-base home-sb">{step.split.base}</div>
                 {step.split.map}
               </div>
             ) : (
               <div className="how-pin mx-auto w-full max-w-[80rem] px-4 sm:px-8">
                 <StepWords i={i} of={steps.length} title={step.title} text={step.text} />
-                <div className="sb w-full">{step.show}</div>
+                <div className="home-sb w-full">{step.show}</div>
               </div>
             )}
           </li>

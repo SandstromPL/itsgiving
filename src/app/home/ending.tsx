@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { primaryButton, secondaryButton } from "../studio/ui";
 
-/** Marks each `.rv` inside `root` as it comes on screen, once, so it rises into place. */
+/** Marks each `.home-rv` inside `root` as it comes on screen, once, so it rises into place. */
 export function useArrivals<T extends HTMLElement>() {
   const root = useRef<T>(null);
   useEffect(() => {
@@ -19,7 +19,7 @@ export function useArrivals<T extends HTMLElement>() {
         }),
       { rootMargin: "0px 0px -8% 0px", threshold: 0.01 },
     );
-    el.querySelectorAll<HTMLElement>(".rv").forEach((x) => {
+    el.querySelectorAll<HTMLElement>(".home-rv").forEach((x) => {
       // Already above the screen (a page come back to): in place at once.
       if (x.getBoundingClientRect().bottom < 0) x.dataset.on = "";
       else observer.observe(x);
@@ -34,7 +34,7 @@ export function Ending({ examples }: { examples: boolean }) {
   const root = useArrivals<HTMLElement>();
   return (
     <section ref={root} aria-labelledby="end-heading" className="home-end">
-      <div className="rv mx-auto flex w-full max-w-[80rem] flex-col items-center gap-5.5 px-4 text-center sm:px-8">
+      <div className="home-rv mx-auto flex w-full max-w-[80rem] flex-col items-center gap-5.5 px-4 text-center sm:px-8">
         <h2 id="end-heading" className="type-head max-w-[14ch] text-display leading-[0.95] tracking-[-0.045em]">
           Make one for your next video or short.
         </h2>

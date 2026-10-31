@@ -17,7 +17,8 @@ const FILTERS: { id: "all" | Format; label: string }[] = [
   { id: "short_film", label: "Short films" },
 ];
 
-const card = "rv press flex h-full flex-col overflow-hidden rounded-[26px] border border-line bg-card [--press:0.985] hover:border-edge";
+const card =
+  "home-rv press flex h-full flex-col overflow-hidden rounded-[26px] border border-line bg-card [--press:0.985] hover:border-edge";
 
 /** The examples as cards, with a filter by format when there are both; the last card is the one still to be made. */
 export function ExampleGrid({ frames }: { frames: ShowFrame[] }) {
