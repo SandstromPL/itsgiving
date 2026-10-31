@@ -178,12 +178,12 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   chips take it to the studio as their own take. **Your treatments** (`/saved`) lists them, and at its foot deletes
   the account along with everything saved in it.
 - **One header on every page:** the camera and the lettermark, Examples, Studio and About, with the current section
-  lit (a featured treatment counts as Examples), then the unc-mode switch, the source code on GitHub and the profile
-  menu (the room, plus Sign in, or your initial with your treatments and Sign out), since those choices carry across
-  pages. Pages add only status
-  badges, live or mock. The homepage keeps it away until "Watch it work", and a board until you scroll; on the other
-  pages it stays at the top. On phones it takes two rows, and only the mock warnings among the badges show there.
-- **Four rooms,** picked in the profile menu and remembered per browser: Grade (the default, a colourist's neutral
+  lit (a featured treatment counts as Examples), then the room you're in, the unc-mode switch, the source code on
+  GitHub and the profile menu (Sign in, or your initial with your treatments and Sign out), since those choices carry
+  across pages. Pages add only status badges, live or mock. The homepage brings it in with the headline, once the
+  title card is through (a returning visitor opens on the headline, header and all); every other page has it from the
+  start. On phones it takes two rows, and only the mock warnings among the badges show there.
+- **Four rooms,** picked from the header's room button and remembered per browser: Grade (the default, a colourist's neutral
   grey), Tungsten (warm, lamp-lit), Tri-X (black and white; only the films keep colour) and Light (the paper room).
   Nothing on a page changes the room. Smooth scrolling (Lenis) runs on every page but the studio, and not at all with
   reduced motion.

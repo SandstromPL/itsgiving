@@ -7,6 +7,7 @@ import { AccountButton } from "./account";
 import { Wordmark } from "./eggs";
 import { onScreen } from "./jump";
 import { UncSwitch } from "./lingo";
+import { RoomSwitch } from "./theme";
 import { GitHubIcon } from "./icons";
 import { NAV, REPO, type Section } from "./nav";
 
@@ -31,14 +32,15 @@ export type Reveal = "always" | { after: string };
 
 /**
  * The header on every page: the camera tile and the lettermark, the same three links with the current section lit,
- * the plain-copy switch (its choice carries across pages, so it's on every one), the source code on GitHub and the
- * profile menu (the rooms, and the account when accounts are set up). Pages add only status badges, live or mock.
- * Each page names its section rather than the header reading the URL: with Cache Components a pathname read can
- * suspend on a route's fallback shell, and a featured treatment's page must stay static.
+ * the room the page is in (a button of its own), the plain-copy switch (its choice carries across pages, so it's on
+ * every one), the source code on GitHub and the profile menu (the account, when accounts are set up). Pages add only
+ * status badges, live or mock. Each page names its section rather than the header reading the URL: with Cache
+ * Components a pathname read can suspend on a route's fallback shell, and a featured treatment's page must stay static.
  * It stays at the top. The homepage keeps it away through the title card and brings it in with the headline
- * (`reveal={{ after }}`, a mark the opening places at that point of its scroll, so a returning visitor, who opens on the
- * headline, has it at once): there it lies over the page instead of above it. Keyboard focus inside it always shows it. Its height is `--head` on <html>, for what sticks below it. On phones it takes two
- * rows: the marks, the unc switch and the profile menu, then the links.
+ * (`reveal={{ after }}`, a mark the opening places at that point of its scroll, so a returning visitor, who opens on
+ * the headline, has it at once): there it lies over the page instead of above it. Keyboard focus inside it always
+ * shows it. Its height is `--head` on <html>, for what sticks below it. On phones it takes two rows: the marks, the
+ * unc switch and the profile menu, then the links with the room and GitHub at their end.
  */
 export function SiteHeader({
   home = false,
@@ -89,15 +91,17 @@ export function SiteHeader({
         <div className="order-1 lg:mr-2">
           <Wordmark href={home ? undefined : "/"} />
         </div>
-        <div className={`order-2 ml-auto sm:order-4 ${badges ? "sm:ml-0" : ""}`}>
+        {/* Before the unc switch; on phones, where the first row is full, at the end of the links, before GitHub. */}
+        <RoomSwitch className={`order-6 ml-auto sm:order-4 ${badges ? "sm:ml-0" : ""}`} />
+        <div className="order-2 ml-auto sm:order-4 sm:ml-0">
           <UncSwitch />
         </div>
-        {/* Between the unc switch and the profile menu; on phones, where that row is full, at the end of the links. */}
+        {/* Between the unc switch and the profile menu; on phones, after the room at the end of the links. */}
         <a
           href={REPO}
           aria-label="itsgiving's source code on GitHub"
           title="Source on GitHub"
-          className="press order-6 ml-auto grid size-10 place-items-center rounded-full border border-foreground bg-card text-foreground hover:bg-field sm:order-5 sm:ml-0 sm:size-12"
+          className="press order-6 grid size-10 place-items-center rounded-full border border-foreground bg-card text-foreground hover:bg-field sm:order-5 sm:size-12"
         >
           <GitHubIcon />
         </a>

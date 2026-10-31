@@ -18,8 +18,8 @@
 /*
  * itsgiving: Gen Z, professionally. Four rooms, named after night-shoot light, share these tokens: 3A grade (the
  * default, a colourist's neutral grey, so stills read true), 3B tungsten (warm, lamp-lit), 3D tri-x (no hue but the
- * treatment's own) and light (the paper room). The reader picks one in the profile menu (theme.tsx; the script in
- * layout.tsx sets `data-room` before first paint), and nothing on the page changes it. One highlighter accent is used
+ * treatment's own) and light (the paper room). The reader picks one from the header's room button (theme.tsx; the
+ * script in layout.tsx sets `data-room` before first paint), and nothing on the page changes it. One highlighter accent is used
  * only where it means something; Qloo evidence wears `--tungsten` (lime in grade, amber in tungsten, white in tri-x,
  * brown on paper). Covers, the map and the run stage are dark frames in every room (`.surface-dark`). Receipts and the
  * windows stay on paper. Tape pink marks anything mocked; safelight red marks errors. Every text pair passes WCAG AA.
@@ -382,7 +382,17 @@ body {
   --safelight: var(--light-safelight);
   --safelight-wash: var(--light-safelight-wash);
 }
-/* The account menu drops from the header's right-hand corner, where its button is. */
+/* The room button shows the room `data-room` names, before any script runs (theme.tsx, RoomSwitch). */
+.room-now {
+  display: none;
+}
+:root:not([data-room]) .room-now[data-for="grade"],
+:root[data-room="tungsten"] .room-now[data-for="tungsten"],
+:root[data-room="trix"] .room-now[data-for="trix"],
+:root[data-room="light"] .room-now[data-for="light"] {
+  display: inline-flex;
+}
+/* The header's menus (the rooms, the account) drop from its right-hand side, where their buttons are. */
 [popover].menu {
   position: fixed;
   inset: calc(var(--head, 4rem) + 0.5rem) 1rem auto auto;

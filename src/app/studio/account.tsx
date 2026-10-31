@@ -6,7 +6,6 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 import { accountsOn } from "@/lib/supabase/config";
 import type { Provider } from "@/lib/supabase/browser";
 import { GitHubIcon } from "./icons";
-import { RoomPicker } from "./theme";
 
 // Accounts in the browser: who's signed in, the header's account button, and the sign-in window that Save opens too.
 // The session is read here, never on the server, so the pages that must stay static (the homepage, a featured
@@ -154,8 +153,8 @@ export function SignInButton({ next, className }: { next?: string; className: st
 }
 
 /**
- * The header's profile menu: the person's initial when they're signed in, else a person glyph. It opens on the room
- * picker (four rooms, for everyone), with Sign in, or their treatments and Sign out, above it when accounts are on.
+ * The header's profile menu: the person's initial when they're signed in, else a person glyph. It holds the account:
+ * Sign in, or their treatments and Sign out. Without accounts set up there's none (the rooms have a button of their own).
  */
 export function AccountButton({ className = "" }: { className?: string }) {
   const account = useAccount();
@@ -164,13 +163,16 @@ export function AccountButton({ className = "" }: { className?: string }) {
   const menu = `${id}-menu`;
   const signedIn = account.state === "in";
   const initial = signedIn ? account.name.trim().charAt(0).toUpperCase() || "?" : "";
+  if (account.state === "off") return null;
   return (
     <>
       <button
         type="button"
         popoverTarget={menu}
-        aria-label={signedIn ? `Account and room: ${account.name}` : "Room and sign in"}
-        title={signedIn ? account.name : "Room"}
+        // Until the session is read there's nothing to offer yet.
+        disabled={account.state === "checking"}
+        aria-label={signedIn ? `Account: ${account.name}` : "Account"}
+        title={signedIn ? account.name : "Account"}
         className={`press grid size-11 place-items-center rounded-full border border-foreground sm:size-12 ${
           signedIn ? "bg-foreground text-body font-extrabold text-background" : "bg-card text-foreground hover:bg-field"
         } ${className}`}
@@ -184,7 +186,7 @@ export function AccountButton({ className = "" }: { className?: string }) {
           </svg>
         )}
       </button>
-      <div id={menu} popover="auto" className="menu" aria-label={signedIn ? "Account and room" : "Room"}>
+      <div id={menu} popover="auto" className="menu" aria-label="Account">
         <div className="flex flex-col gap-1 p-2">
           {signedIn && (
             <>
@@ -205,7 +207,6 @@ export function AccountButton({ className = "" }: { className?: string }) {
               Sign in
             </button>
           )}
-          <RoomPicker name={`${id}-room`} />
           {signedIn && (
             <button
               type="button"

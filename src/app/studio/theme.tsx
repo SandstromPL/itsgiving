@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useId, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { ROOM_KEY } from "./theme-script";
 
@@ -61,7 +61,7 @@ export function useRoom(): RoomId {
   return useSyncExternalStore(room.subscribe, room.read, () => "grade" as const);
 }
 
-/** The rooms as a radio group, for the profile menu. */
+/** The rooms as a radio group, for the room button's menu. */
 export function RoomPicker({ name }: { name: string }) {
   const current = useRoom();
   return (
@@ -89,5 +89,41 @@ export function RoomPicker({ name }: { name: string }) {
         </label>
       ))}
     </fieldset>
+  );
+}
+
+/**
+ * The header's room button: the room the page is in, its dots and (from a tablet up) its name, opening the four rooms.
+ * Every room's face is in the page and the stylesheet shows the one `data-room` names (set before first paint), so a
+ * page never opens on Grade's name in another room while its script loads.
+ */
+export function RoomSwitch({ className = "" }: { className?: string }) {
+  const id = useId();
+  return (
+    <>
+      <button
+        type="button"
+        popoverTarget={`${id}-rooms`}
+        title="Room"
+        className={`press inline-flex size-10 items-center justify-center rounded-full border border-foreground bg-card text-ui font-bold text-foreground hover:bg-field sm:h-12 sm:w-auto sm:px-3.5 ${className}`}
+      >
+        <span className="sr-only">Room: </span>
+        {ROOMS.map((r) => (
+          <span key={r.id} data-for={r.id} className="room-now items-center gap-2">
+            <span aria-hidden className="inline-flex">
+              {r.dots.map((c, i) => (
+                <i key={c} className={`size-3.5 rounded-full ring-2 ring-card ${i ? "-ml-1" : ""}`} style={{ background: c }} />
+              ))}
+            </span>
+            <span className="max-sm:sr-only">{r.name}</span>
+          </span>
+        ))}
+      </button>
+      <div id={`${id}-rooms`} popover="auto" className="menu" aria-label="Room">
+        <div className="flex flex-col gap-1 p-2">
+          <RoomPicker name={`${id}-room`} />
+        </div>
+      </div>
+    </>
   );
 }
