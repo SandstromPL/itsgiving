@@ -54,8 +54,8 @@ export function ModeBadges({ qloo, llm, treatment }: { qloo: QlooMode; llm: LlmM
         writer.mock ? (
           <Tape title="A deterministic template wrote this treatment, not a language model.">Mock LLM</Tape>
         ) : (
-          // Phones keep the header short; the run log and the credits name the model too.
-          <span className="hidden text-dim lg:inline">
+          // Only from 1280 px: narrower, it would push the header onto a second row. The credits name the model too.
+          <span className="hidden text-dim xl:inline">
             Written by <span className="font-semibold text-foreground">{writer.model}</span>
             {writer.reasoning && `, ${thinkingName(writer.reasoning)}`}
           </span>
