@@ -124,9 +124,11 @@ export function HowItWorks({
         base: (
           <div className="surface-dark flex flex-col gap-2.5 rounded-[28px] bg-frame p-5 text-foreground sm:p-8">
             <p className="type-poster text-display-sm">{chosen.name}</p>
-            <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-lead leading-normal text-dim">
-              <span>Shoot base:</span>
-              <b className={`rounded-md px-2 py-0.5 text-subhead font-extrabold ${rankMark(run.mock)}`}>{percent(chosen.share)}</b>
+            <p className="text-lead leading-[1.8] text-dim">
+              Shoot base:{" "}
+              <b className={`inline-block rounded-md px-2 py-0.5 text-subhead leading-tight font-extrabold ${rankMark(run.mock)}`}>
+                {percent(chosen.share)}
+              </b>{" "}
               of this audience&apos;s strongest spots in {run.city}
             </p>
             <p className="max-w-[42ch] text-lead leading-normal text-dim">
