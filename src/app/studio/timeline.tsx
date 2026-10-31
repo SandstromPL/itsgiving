@@ -205,26 +205,33 @@ function sweepHalves(from: number, to: number): [CSSProperties, CSSProperties] {
 
 /**
  * A film leader that follows the run itself: the sweep fills as each step finishes (easing to its new place) and the
- * number counts the steps still to go. Nothing is estimated, so a long write holds it near the end.
+ * number counts the steps still to go. Nothing is estimated. With only the write left, which runs for most of a minute,
+ * the count steps back and the leader's sweep turns until the board lands, so the dial never sits still on "1".
  */
 function Leader({ settled, total }: { settled: number; total: number }) {
   const turn = Math.round((settled / total) * 360);
+  const rolling = total - settled <= 1;
   // Where the sweep comes from, for a step that carries it past six o'clock: the last render's turn.
   const [sweep, setSweep] = useState({ turn, from: turn });
   if (sweep.turn !== turn) setSweep({ turn, from: sweep.turn });
   const [right, left] = sweepHalves(sweep.from, turn);
   return (
-    <span aria-hidden className="leader relative grid size-[120px] shrink-0 place-items-center rounded-full sm:size-[132px]">
+    <span
+      aria-hidden
+      data-rolling={rolling || undefined}
+      className="leader relative grid size-[120px] shrink-0 place-items-center rounded-full sm:size-[132px]"
+    >
       <span className="leader-half leader-right">
         <span style={right} />
       </span>
       <span className="leader-half leader-left">
         <span style={left} />
       </span>
+      <span className="leader-roll" />
       <span className="absolute inset-x-1.5 top-1/2 h-0.5 -translate-y-1/2 bg-ink" />
       <span className="absolute inset-y-1.5 left-1/2 w-0.5 -translate-x-1/2 bg-ink" />
-      <span className="relative grid size-[84px] place-items-center rounded-full border-2 border-foreground bg-background text-[50px] leading-none font-extrabold tabular-nums sm:size-[92px] sm:text-[54px]">
-        {Math.max(1, total - settled)}
+      <span className="leader-plate relative grid size-[84px] place-items-center rounded-full border-2 border-foreground bg-background text-[50px] leading-none font-extrabold tabular-nums sm:size-[92px] sm:text-[54px]">
+        <span className="leader-count">{Math.max(1, total - settled)}</span>
       </span>
     </span>
   );

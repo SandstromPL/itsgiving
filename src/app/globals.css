@@ -492,6 +492,52 @@ body {
   left: 0;
   background: linear-gradient(to left, var(--foreground) 50%, transparent 0);
 }
+/* Only the write left (timeline.tsx): the fill and the count step back, the plate shrinks to the leader's centre and
+   the sweep turns, a turn a second, as a leader's does between numbers. Only its rotation moves. Reduced motion: the
+   sweep stays still and breathes. */
+.leader-roll {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(transparent 0 58%, var(--foreground));
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+}
+.leader-half,
+.leader-count {
+  transition: opacity 300ms var(--ease-out);
+}
+.leader-plate {
+  transition: scale 450ms var(--ease-out);
+}
+.leader[data-rolling] .leader-half,
+.leader[data-rolling] .leader-count {
+  opacity: 0;
+}
+.leader[data-rolling] .leader-plate {
+  scale: 0.34;
+}
+.leader[data-rolling] .leader-roll {
+  opacity: 0.7;
+  animation: leader-roll 1s linear infinite;
+}
+@keyframes leader-roll {
+  to {
+    rotate: 1turn;
+  }
+}
+@keyframes leader-breathe {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .leader[data-rolling] .leader-roll {
+    animation: leader-breathe 1.6s ease-in-out infinite;
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
 
 /* Decorations kept for the director's cut (eggs.tsx sets data-cut on <html>): the INTERVAL card, the film edge and
    the date stamps on location photos. Off by default, so a board reads calmly. */
