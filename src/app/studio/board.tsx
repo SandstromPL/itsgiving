@@ -89,22 +89,13 @@ function fill(n: number, at: "first" | "last"): { grid: string; span: (i: number
   };
 }
 
-/** A section starts a new printed page, unless it `follows` the one before (the short ones at the end share a page). */
-function Section({
-  id,
-  title,
-  note,
-  follows = false,
-  children,
-}: {
-  id: string;
-  title: string;
-  note?: ReactNode;
-  follows?: boolean;
-  children: ReactNode;
-}) {
+/**
+ * A section of the board. On paper the sections run on from one another, so a page fills before the next one starts
+ * (a page per section left pages holding one line); a heading stays with what follows it, and cards never split.
+ */
+function Section({ id, title, note, children }: { id: string; title: string; note?: ReactNode; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className={`flex flex-col gap-6 ${follows ? "" : "print:break-before-page"}`}>
+    <section aria-labelledby={id} className="flex flex-col gap-6 print:gap-4 print:border-t print:border-line print:pt-5">
       <div className="rv flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 print:break-after-avoid">
         {/* The section bar's jump lands on the heading, so the room it leaves for the header and the sticky bar is the
             heading's. */}
@@ -138,7 +129,8 @@ function EvidenceChips({ tags, mock, shared }: { tags: CompactTag[]; mock: boole
 function Also({ label, items, mock }: { label: string; items: CompactEntity[]; mock: boolean }) {
   if (items.length === 0) return null;
   return (
-    <p className="text-ui leading-6 text-dim">
+    // On paper it stays whole: a page break inside it left one name alone at the top of the next page.
+    <p className="text-ui leading-6 text-dim print:break-inside-avoid">
       {label} <span className={`font-mono text-caption ${evidenceTone(mock)}`}>{listWithYears(items)}</span>
     </p>
   );
@@ -1051,7 +1043,6 @@ export function Board({
       <Section
         id="audience"
         title="Audience"
-        follows
         note={
           mock
             ? "Synthetic fixtures standing in for Qloo's taste graph: real names, invented affinities."
@@ -1126,7 +1117,7 @@ export function Board({
         </div>
       </Section>
 
-      <Section id="credits" title="Credits" follows>
+      <Section id="credits" title="Credits">
         <div className="grid items-start gap-5 xl:grid-cols-2">
           <div className={`${card} rv p-6`}>
             <dl className="grid gap-x-8 gap-y-3 text-ui leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
