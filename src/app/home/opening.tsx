@@ -144,16 +144,22 @@ export function Opening() {
     });
   };
 
-  /** 1B rack focus, as far as the scroll has come: each word from dark, blurred and a little large, to sharp. */
+  /**
+   * 1B rack focus, as far as the scroll has come: each word from dark, blurred and a little large, to sharp. While a
+   * word racks in it is a layer of its own, so the compositor blurs and scales it instead of the page repainting 300px
+   * type on every frame (about a tenth less raster work on a phone); unseen or sharp, it's plain text.
+   */
   const focusWords = () => {
     heading.current?.querySelectorAll<HTMLElement>(".hero-w").forEach((word, i) => {
       const at = s.reduce ? FADES : WORDS;
       const e = outCubic(clamp(((s.reduce ? s.p : s.q) - at.start - i * at.step) / at.span));
       if (s.focus[i] === e) return;
       s.focus[i] = e;
+      const soft = !s.reduce && e < 1;
       word.style.opacity = e.toFixed(3);
-      word.style.filter = s.reduce || e === 1 ? "" : `blur(${(18 * (1 - e)).toFixed(2)}px)`;
-      word.style.transform = s.reduce || e === 1 ? "" : `scale(${(1.06 - 0.06 * e).toFixed(4)})`;
+      word.style.filter = soft ? `blur(${(18 * (1 - e)).toFixed(2)}px)` : "";
+      word.style.transform = soft ? `scale(${(1.06 - 0.06 * e).toFixed(4)})` : "";
+      word.style.willChange = soft && e > 0 ? "transform, filter, opacity" : "";
     });
   };
   const place = (y: number) => {
