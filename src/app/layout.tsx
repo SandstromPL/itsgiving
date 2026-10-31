@@ -19,9 +19,9 @@ export const metadata: Metadata = {
  * stay as static as its own content allows.
  */
 export default function RootLayout({ children }: LayoutProps<"/">) {
-  // The theme script may set data-theme before React hydrates, so <html> is allowed to differ from the server's.
+  // The room script may set data-room and data-theme before React hydrates, so <html> may differ from the server's.
   return (
-    <html lang="en" className={`${fontVariables} h-full antialiased`} suppressHydrationWarning>
+    <html lang="en" data-theme="dark" className={`${fontVariables} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>

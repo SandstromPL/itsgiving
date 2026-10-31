@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Treatment } from "@/lib/agent/types";
 import { useLingo } from "./lingo";
-import { CameraMark } from "./mark";
+import { CameraTile, Lettermark } from "../marks";
 
 // Easter eggs: harmless, hidden, and never in the way of the work.
 
@@ -70,17 +70,18 @@ export function DirectorsCut() {
 
 const CYCLE = ["it's giving… A24", "it's giving… Wes Anderson", "it's giving… Wong Kar-wai", "it's giving… Bollywood"];
 
-/** A lime cinema camera on an ink tile, like the tab icon (src/app/icon.svg), and the name. */
+/** The marks: the camera on its tile (2C) and the lettermark (2B), or a line the wordmark egg is cycling through. */
 export function Mark({ name }: { name: string }) {
   return (
     <>
-      {/* An ink tile in either room: in the dark one its edge keeps it visible. */}
-      <span aria-hidden className="grid h-[26px] w-[34px] shrink-0 place-items-center rounded-lg bg-ink ring-1 ring-edge/60">
-        <CameraMark height={17} />
-      </span>
-      <span aria-hidden className="text-title leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
-        {name}
-      </span>
+      <CameraTile className="size-[34px] shrink-0" />
+      {name === "itsgiving" ? (
+        <Lettermark className="h-[22px] w-auto shrink-0 text-foreground" />
+      ) : (
+        <span aria-hidden className="text-title leading-none font-extrabold tracking-[-0.045em] whitespace-nowrap">
+          {name}
+        </span>
+      )}
     </>
   );
 }

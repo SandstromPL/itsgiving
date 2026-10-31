@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { accountsOn } from "@/lib/supabase/config";
 import type { Provider } from "@/lib/supabase/browser";
+import { RoomPicker } from "./theme";
 
 // Accounts in the browser: who's signed in, the header's account button, and the sign-in window that Save opens too.
 // The session is read here, never on the server, so the pages that must stay static (the homepage, a featured
@@ -160,76 +161,73 @@ export function SignInButton({ next, className }: { next?: string; className: st
 }
 
 /**
- * The header's account button: "Sign in", or the person's initial with their treatments and Sign out. Below laptop
- * width "Sign in" is a person glyph (the words stay for screen readers), so the header keeps its rows: two on a
- * phone, where this sits in the first, and one on a tablet.
+ * The header's profile menu: the person's initial when they're signed in, else a person glyph. It opens on the room
+ * picker (four rooms, for everyone), with Sign in, or their treatments and Sign out, above it when accounts are on.
  */
 export function AccountButton({ className = "" }: { className?: string }) {
   const account = useAccount();
   const router = useRouter();
   const id = useId();
-  if (account.state === "off") return null;
-  if (account.state !== "in") {
-    return (
-      <>
-        {/* While the session is read, the button holds its place unseen, so the header doesn't jump. */}
-        <button
-          type="button"
-          popoverTarget={`${id}-in`}
-          title="Sign in"
-          className={`inline-flex size-11 items-center justify-center rounded-full border border-foreground bg-card text-ui font-semibold hover:bg-field sm:size-12 lg:w-auto lg:px-4 ${account.state === "checking" ? "invisible" : ""} ${className}`}
-        >
-          <svg
-            aria-hidden
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            className="lg:hidden"
-          >
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" strokeLinecap="round" />
-          </svg>
-          <span className="sr-only lg:not-sr-only">Sign in</span>
-        </button>
-        <SignInWindow id={`${id}-in`} />
-      </>
-    );
-  }
-  const initial = account.name.trim().charAt(0).toUpperCase() || "?";
+  const menu = `${id}-menu`;
+  const signedIn = account.state === "in";
+  const initial = signedIn ? account.name.trim().charAt(0).toUpperCase() || "?" : "";
   return (
     <>
       <button
         type="button"
-        popoverTarget={`${id}-menu`}
-        aria-label={`Account: ${account.name}`}
-        title={account.name}
-        className={`grid size-11 place-items-center rounded-full border border-foreground bg-foreground text-body font-extrabold text-background sm:size-12 ${className}`}
+        popoverTarget={menu}
+        aria-label={signedIn ? `Account and room: ${account.name}` : "Room and sign in"}
+        title={signedIn ? account.name : "Room"}
+        className={`press grid size-11 place-items-center rounded-full border border-foreground sm:size-12 ${
+          signedIn ? "bg-foreground text-body font-extrabold text-background" : "bg-card text-foreground hover:bg-field"
+        } ${className}`}
       >
-        {initial}
+        {signedIn ? (
+          initial
+        ) : (
+          <svg aria-hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" strokeLinecap="round" />
+          </svg>
+        )}
       </button>
-      <div id={`${id}-menu`} popover="auto" className="menu" aria-label="Account">
+      <div id={menu} popover="auto" className="menu" aria-label={signedIn ? "Account and room" : "Room"}>
         <div className="flex flex-col gap-1 p-2">
-          <p className="truncate px-3 pt-2 pb-1 text-caption text-faint">{account.email ?? account.name}</p>
-          <MenuLink href="/saved" menu={`${id}-menu`}>
-            Your treatments
-          </MenuLink>
-          <button
-            type="button"
-            onClick={async () => {
-              const { signOut } = await loadClient();
-              await signOut();
-              document.getElementById(`${id}-menu`)?.hidePopover();
-              router.refresh();
-            }}
-            className="rounded-xl px-3 py-2.5 text-left text-ui font-semibold hover:bg-background"
-          >
-            Sign out
-          </button>
+          {signedIn && (
+            <>
+              <p className="truncate px-3 pt-2 pb-1 text-caption text-faint">{account.email ?? account.name}</p>
+              <MenuLink href="/saved" menu={menu}>
+                Your treatments
+              </MenuLink>
+            </>
+          )}
+          {account.state === "out" && (
+            <button
+              type="button"
+              popoverTarget={`${id}-in`}
+              className="rounded-xl px-3 py-2.5 text-left text-ui font-semibold hover:bg-background"
+            >
+              Sign in
+            </button>
+          )}
+          <RoomPicker name={`${id}-room`} />
+          {signedIn && (
+            <button
+              type="button"
+              onClick={async () => {
+                const { signOut } = await loadClient();
+                await signOut();
+                document.getElementById(menu)?.hidePopover();
+                router.refresh();
+              }}
+              className="rounded-xl px-3 py-2.5 text-left text-ui font-semibold hover:bg-background"
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </div>
+      {account.state === "out" && <SignInWindow id={`${id}-in`} />}
     </>
   );
 }

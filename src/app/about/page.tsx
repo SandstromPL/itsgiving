@@ -3,6 +3,7 @@ import { STEP_LABELS } from "@/lib/agent/options";
 import { accountsOn } from "@/lib/supabase/config";
 import { StartYourOwn } from "../studio/landing";
 import { slip } from "../studio/ui";
+import { SmoothScroll } from "../smooth";
 import { SiteHeader } from "../studio/site-header";
 
 // About: who itsgiving is for (first), what it is, what Qloo is, and how one uses the other. Static, like the homepage.
@@ -122,6 +123,7 @@ export default function About() {
   return (
     <>
       <SiteHeader current="about" />
+      <SmoothScroll />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-24 px-4 pt-10 pb-20 sm:px-8 sm:pt-14">
         <section aria-labelledby="who-heading" className="flex flex-col gap-10">
           <div className="flex flex-col gap-6">

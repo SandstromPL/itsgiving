@@ -364,15 +364,13 @@ export function RunStage({
           {elapsed >= 60 && <p className="mt-2 font-serif text-title leading-tight italic">{t.slowBurn}</p>}
         </div>
       </div>
-      {/* One cell per pipeline step, like frames on a strip: a sequence, so it reads left to right. */}
+      {/* One cell per pipeline step, like frames on a strip: a sequence, so it reads left to right. The run log itself
+          stays off this screen; the board's credits keep it. */}
       <ol aria-hidden className="grid gap-1" style={{ gridTemplateColumns: `repeat(${STEP_ORDER.length}, minmax(0, 1fr))` }}>
         {STEP_ORDER.map((id) => (
           <li key={id} title={STEP_LABELS[id]} className={`h-1.5 rounded-full ${STRIP_TONE[status(id)]}`} />
         ))}
       </ol>
-      <div className="rounded-[28px] border border-line bg-card p-5 sm:p-6">
-        <Timeline steps={steps} size="stage" />
-      </div>
     </div>
   );
 }

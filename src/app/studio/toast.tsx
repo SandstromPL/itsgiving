@@ -49,11 +49,11 @@ export function Toast({ toast }: { toast: ToastNote | null }) {
     <div
       aria-hidden
       data-open={toast?.open || undefined}
-      className="pointer-events-none fixed right-4 bottom-4 z-40 flex max-w-[min(25rem,calc(100vw-2rem))] translate-y-[calc(100%+1rem)] items-center gap-3.5 rounded-[20px] bg-ink px-4 py-3.5 text-white opacity-0 shadow-[6px_6px_0_rgb(0_0_0/0.15)] transition-[opacity,translate] duration-200 motion-reduce:translate-y-0 data-open:translate-y-0 data-open:opacity-100 data-open:delay-400 data-open:duration-300 print:hidden"
+      className="pointer-events-none fixed right-4 bottom-4 z-40 flex max-w-[min(25rem,calc(100vw-2rem))] translate-y-[calc(100%+1rem)] items-center gap-3.5 rounded-[20px] bg-foreground px-4 py-3.5 text-background opacity-0 shadow-[6px_6px_0_rgb(0_0_0/0.15)] transition-[opacity,translate] duration-200 motion-reduce:translate-y-0 data-open:translate-y-0 data-open:opacity-100 data-open:delay-400 data-open:duration-300 print:hidden"
     >
       {toast && (
         <>
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-ink">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-background text-foreground">
             <svg
               width="18"
               height="18"
@@ -69,7 +69,7 @@ export function Toast({ toast }: { toast: ToastNote | null }) {
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="text-lead leading-tight font-extrabold tracking-[-0.03em]">{toast.title}</span>
-            <span className="truncate text-small text-[#d9d5cc]">{toast.line}</span>
+            <span className="truncate text-small opacity-80">{toast.line}</span>
           </span>
         </>
       )}

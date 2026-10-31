@@ -6,7 +6,7 @@ import { TMDB_NOTICE } from "@/lib/agent/options";
 import { accountsOn } from "@/lib/supabase/config";
 import { Mark } from "./eggs";
 import { useLingo } from "./lingo";
-import { NAV, toExamples } from "./nav";
+import { NAV } from "./nav";
 
 /** The header's sections, then the saved list that otherwise sits in the account menu (only when accounts are on). */
 const PAGES = [...NAV, ...(accountsOn ? [{ id: "saved", href: "/saved", label: "Saved treatments" }] : [])];
@@ -55,7 +55,7 @@ export function SiteFooter() {
           <ul className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-ui text-dim sm:flex sm:flex-col">
             {PAGES.map((page) => (
               <li key={page.href}>
-                <Link href={page.href} onClick={page.id === "examples" ? toExamples : undefined} className={sweep}>
+                <Link href={page.href} className={sweep}>
                   {page.label}
                 </Link>
               </li>

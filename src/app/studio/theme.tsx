@@ -1,98 +1,93 @@
 "use client";
 
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
-import { THEME_KEY } from "./theme-script";
+import { ROOM_KEY } from "./theme-script";
 
-export type ThemeChoice = "light" | "dark";
+export type RoomId = "grade" | "tungsten" | "trix" | "light";
+
+/** The four rooms, each with the three colours its dots show: the room, its ink and its evidence. */
+export const ROOMS: { id: RoomId; name: string; note: string; dots: [string, string, string] }[] = [
+  { id: "grade", name: "Grade", note: "Neutral grey, so stills read true. The default.", dots: ["#141414", "#ededed", "#e4ff3a"] },
+  { id: "tungsten", name: "Tungsten", note: "Warm and lamp-lit, with amber evidence.", dots: ["#16110c", "#f4e9d9", "#ffbf7a"] },
+  { id: "trix", name: "Tri-X", note: "Black and white; only the films keep colour.", dots: ["#101010", "#f2f2f2", "#ffffff"] },
+  { id: "light", name: "Light", note: "The paper room.", dots: ["#f2f0ea", "#121211", "#e4ff3a"] },
+];
+
+const isRoom = (value: unknown): value is RoomId => ROOMS.some((r) => r.id === value);
 
 /**
- * The room's theme, kept where the stylesheet reads it: `data-theme` on <html>. Light unless the visitor picked dark;
- * the device's setting doesn't decide it. Storage can be missing or blocked; then the choice lasts for the visit.
+ * The room, kept where the stylesheet reads it: `data-room` on <html> (none for grade), with `data-theme` saying light
+ * or dark for the rules that only care which. Storage can be missing or blocked; then the choice lasts for the visit.
  */
-const theme = {
+const room = {
   listeners: new Set<() => void>(),
-  read(): ThemeChoice {
-    return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  read(): RoomId {
+    const id = document.documentElement.dataset.room;
+    return isRoom(id) ? id : "grade";
   },
-  write(choice: ThemeChoice) {
-    document.documentElement.dataset.theme = choice;
+  write(id: RoomId) {
+    const html = document.documentElement;
+    if (id === "grade") delete html.dataset.room;
+    else html.dataset.room = id;
+    html.dataset.theme = id === "light" ? "light" : "dark";
     try {
-      localStorage.setItem(THEME_KEY, choice);
+      if (id === "grade") localStorage.removeItem(ROOM_KEY);
+      else localStorage.setItem(ROOM_KEY, id);
     } catch {
       // kept for this visit only
     }
-    theme.listeners.forEach((listener) => listener());
+    room.listeners.forEach((listener) => listener());
   },
   subscribe(listener: () => void) {
-    theme.listeners.add(listener);
-    return () => theme.listeners.delete(listener);
+    room.listeners.add(listener);
+    return () => room.listeners.delete(listener);
   },
 };
 
 /**
  * Switches the room with a quick crossfade of the whole page, where the browser has view transitions: a fade, so
- * reduced motion keeps it. The switch re-renders inside the transition (flushSync), so the picture it fades to has the
- * new choice pressed.
+ * reduced motion keeps it. The picker re-renders inside the transition (flushSync), so the picture it fades to has the
+ * new room checked.
  */
-function choose(choice: ThemeChoice) {
-  if (choice === theme.read()) return;
-  if (!document.startViewTransition) return theme.write(choice);
-  document.startViewTransition(() => flushSync(() => theme.write(choice))).ready.catch(() => {});
+function choose(id: RoomId) {
+  if (id === room.read()) return;
+  if (!document.startViewTransition) return room.write(id);
+  document.startViewTransition(() => flushSync(() => room.write(id))).ready.catch(() => {});
 }
 
-const icon = {
-  width: 20,
-  height: 20,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-} as const;
+/** The room the page is in, for code that draws with its colours (the camera cut reads the tokens instead). */
+export function useRoom(): RoomId {
+  return useSyncExternalStore(room.subscribe, room.read, () => "grade" as const);
+}
 
-const OPTIONS: { id: ThemeChoice; label: string; glyph: ReactNode }[] = [
-  {
-    id: "light",
-    label: "Light",
-    glyph: (
-      <svg aria-hidden {...icon}>
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-      </svg>
-    ),
-  },
-  {
-    id: "dark",
-    label: "Dark",
-    glyph: (
-      <svg aria-hidden {...icon}>
-        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-      </svg>
-    ),
-  },
-];
-
-/** Light or dark: two icon buttons, the chosen one inked in. */
-export function ThemeSwitch() {
-  // The server renders the default; the browser reads a saved choice once hydrated.
-  const choice = useSyncExternalStore(theme.subscribe, theme.read, () => "light" as const);
+/** The rooms as a radio group, for the profile menu. */
+export function RoomPicker({ name }: { name: string }) {
+  const current = useRoom();
   return (
-    <div role="group" aria-label="Theme" className="flex gap-0.5 rounded-full border border-foreground bg-card p-[3px] print:hidden">
-      {OPTIONS.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          aria-label={option.label}
-          aria-pressed={choice === option.id}
-          title={option.label}
-          onClick={() => choose(option.id)}
-          className="grid size-10 place-items-center rounded-full text-foreground hover:bg-field aria-pressed:bg-foreground aria-pressed:text-background"
+    <fieldset className="border-y border-line px-1.5 pt-3 pb-1.5">
+      <legend className="px-1.5 text-small font-bold text-dim">Room</legend>
+      {ROOMS.map((r) => (
+        <label
+          key={r.id}
+          className="room-option grid min-h-13 cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-background"
         >
-          {option.glyph}
-        </button>
+          <input type="radio" name={name} value={r.id} checked={current === r.id} onChange={() => choose(r.id)} className="peer sr-only" />
+          <span aria-hidden className="inline-flex">
+            {r.dots.map((c, i) => (
+              <i key={c} className={`size-4 rounded-full ring-2 ring-field ${i ? "-ml-1.5" : ""}`} style={{ background: c }} />
+            ))}
+          </span>
+          <span>
+            <b className="block text-ui">{r.name}</b>
+            <small className="block text-caption leading-tight text-faint">{r.note}</small>
+          </span>
+          <span
+            aria-hidden
+            className="grid size-5 place-items-center rounded-full border-[1.5px] border-edge peer-checked:border-foreground peer-checked:bg-foreground peer-checked:after:size-2 peer-checked:after:rounded-full peer-checked:after:bg-background peer-checked:after:content-[''] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-foreground"
+          />
+        </label>
       ))}
-    </div>
+    </fieldset>
   );
 }

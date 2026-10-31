@@ -1,4 +1,5 @@
 import type { MouseEvent } from "react";
+import { scrollToY } from "../smooth";
 
 // In-page links: the board's section bar and the homepage's Examples link. Two things make the browser's own "#id"
 // jump wrong here. Next keeps the pages it leaves in the document, hidden, ids and all, so an id can find a hidden
@@ -19,7 +20,9 @@ export function onScreen(id: string): HTMLElement | null {
  * where the keyboard goes next, and a keyboard's focus ring then circles the heading rather than a whole section.
  */
 export function jumpTo(target: HTMLElement) {
-  target.scrollIntoView({ block: "start" });
+  // Through smooth scrolling when it runs, so a glide in progress doesn't pull the page back after the jump.
+  const margin = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+  scrollToY(Math.max(0, window.scrollY + target.getBoundingClientRect().top - margin));
   const heading = target.matches("h1, h2, h3") ? target : (target.querySelector<HTMLElement>("h1, h2, h3") ?? target);
   if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
   heading.focus({ preventScroll: true });

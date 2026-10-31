@@ -5,8 +5,10 @@ import { THEME_SCRIPT } from "../studio/theme-script";
 // status once it starts streaming, and only notFound and its kind set one before then. So the proxy answers with this
 // page: plain HTML in the site's colours, light or dark as the visitor chose, with the way back.
 
-const STYLE = `:root{color-scheme:light;--bg:#f2f0ea;--fg:#121211;--dim:#4a4741}
-:root[data-theme=dark]{color-scheme:dark;--bg:#1b1916;--fg:#f2f0ea;--dim:#d6d1c7}
+const STYLE = `:root{color-scheme:dark;--bg:#141414;--fg:#ededed;--dim:#b8b8b8}
+:root[data-room=tungsten]{--bg:#16110c;--fg:#f4e9d9;--dim:#d2c2ac}
+:root[data-room=trix]{--bg:#101010;--fg:#f2f2f2;--dim:#bbbbbb}
+:root[data-room=light]{color-scheme:light;--bg:#f2f0ea;--fg:#121211;--dim:#4a4741}
 body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif}
 header{padding:20px 16px}
 header a{color:inherit;font-size:22px;font-weight:800;letter-spacing:-.03em;text-decoration:none}

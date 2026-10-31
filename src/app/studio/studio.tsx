@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { EXAMPLES } from "@/lib/agent/examples";
 import { THINKING, type Nudge } from "@/lib/agent/options";
 import type { AgentEvent, Ambiguity, StepEvent, Treatment } from "@/lib/agent/types";
 import type { LlmMode } from "@/lib/llm/config";
 import type { QlooMode } from "@/lib/qloo/client";
 import { accountsOn } from "@/lib/supabase/config";
+import { playCut, slateDate } from "../cut";
 import { Board } from "./board";
 import { useBoardHistory } from "./board-history";
 import { BriefForm } from "./brief-form";
@@ -14,7 +16,6 @@ import { useReceipts } from "./eggs";
 import { briefLine, formFromBrief, toBrief, validateForm, type FormProblem, type FormState } from "./form";
 import { HandoffReader, type Handoff } from "./handoff";
 import { onScreen } from "./jump";
-import { YourPoster } from "./landing";
 import { useLingo } from "./lingo";
 import { BackArrow } from "./icons";
 import { ModeBadges } from "./parts";
@@ -97,6 +98,13 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
   const running = phase === "running";
   const onBoard = treatment !== null && view === "board";
   useReceipts(treatment);
+  /** Whether the run stage is what's on screen, and the take on the board, for a run's events as they land. */
+  const stageOn = useRef(false);
+  const takeNow = useRef(take);
+  useEffect(() => {
+    stageOn.current = !onBoard;
+    takeNow.current = take;
+  });
 
   // The visit remembers the studio as it was left.
   useEffect(() => {
@@ -173,23 +181,38 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
           setStatus(`itsgiving needs your choice. ${event.message}`);
           break;
         case "treatment": {
-          focusTitle.current = true;
-          setTreatment(event.treatment);
-          setSeal(event.seal ?? null);
-          setSaveOnOpen(false);
-          // A board opened from the brief gets its history entry; a rework replaces the board in place.
-          showBoard("unless-there");
-          setShown(input);
-          setPhase("done");
-          if (event.cached) setSteps(replaySteps(event.treatment));
-          else
-            setToast({
-              title: failedBefore.current ? lingo.back : lingo.done,
-              line: `${event.treatment.title}: ${Math.round((Date.now() - began) / 1000)} s, ${event.treatment.qloo.calls} Qloo calls`,
-              open: true,
-            });
-          failedBefore.current = false;
-          setStatus(`Treatment ready: ${event.treatment.title}.`);
+          const landed = event.treatment;
+          // Built from the brief, the run stage is on screen: the slate claps, it's pulled up out of frame, and the
+          // camera cuts to the board. A rework replaces the board in place.
+          const fromStage = stageOn.current;
+          const land = () => {
+            focusTitle.current = true;
+            setTreatment(landed);
+            setSeal(event.seal ?? null);
+            setSaveOnOpen(false);
+            // A board opened from the brief gets its history entry; a rework replaces the board in place.
+            showBoard("unless-there");
+            setShown(input);
+            setPhase("done");
+            if (event.cached) setSteps(replaySteps(landed));
+            if (fromStage) window.scrollTo(0, 0);
+          };
+          const toast = () => {
+            if (!event.cached)
+              setToast({
+                title: failedBefore.current ? lingo.back : lingo.done,
+                line: `${landed.title}: ${Math.round((Date.now() - began) / 1000)} s, ${landed.qloo.calls} Qloo calls`,
+                open: true,
+              });
+            failedBefore.current = false;
+          };
+          if (fromStage) {
+            void playCut(() => flushSync(land), { slate: { scene: landed.title, take: takeNow.current, date: slateDate() } }).then(toast);
+          } else {
+            land();
+            toast();
+          }
+          setStatus(`Treatment ready: ${landed.title}.`);
           // A rework asked for by a featured page runs once its board is open, as take 2.
           const nudge = pendingNudge.current;
           if (nudge) {
@@ -406,29 +429,29 @@ export function Studio({ initialBadges }: { initialBadges: ReactNode }) {
                 )}
               </div>
             )}
-            <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,36rem)_minmax(0,19rem)] lg:justify-center lg:gap-16">
-              <div className="flex min-w-0 flex-col gap-7">
-                <div className="flex flex-col gap-3">
-                  <h1 className="type-poster text-display">new treatment</h1>
-                  <p className="max-w-[40ch] text-lead leading-[1.5] text-dim">
-                    {form.format === "music_video" ? "An artist and a city" : "A film it's after and a city"} are enough to start.
-                    Everything else is optional.
-                  </p>
-                </div>
-                <BriefForm
-                  form={form}
-                  onChange={setForm}
-                  onSubmit={() => startOver(form)}
-                  onStop={stream.stop}
-                  running={running}
-                  problem={formProblem}
-                  examples={TRY}
-                  onExample={fillExample}
-                />
+            <div className="flex w-full max-w-[40rem] min-w-0 flex-col gap-7 self-center">
+              <div className="flex flex-col gap-3">
+                <h1 className="type-poster text-display">new treatment</h1>
+                <p className="max-w-[40ch] text-lead leading-[1.5] text-dim">
+                  {form.format === "music_video" ? "An artist and a city" : "A film it's after and a city"} are enough to start. Everything
+                  else is optional.
+                </p>
               </div>
-              <div className="hidden lg:sticky lg:top-8 lg:block">
-                <YourPoster form={form} />
-              </div>
+              {/* What the brief adds up to so far, where the floating poster card used to sit. */}
+              <p className="flex flex-col gap-0.5 rounded-[20px] border border-line bg-card px-5 py-3.5" aria-live="polite">
+                <small className="text-caption font-semibold text-faint">Your treatment</small>
+                <b className="text-body leading-snug">{briefLine(form)}</b>
+              </p>
+              <BriefForm
+                form={form}
+                onChange={setForm}
+                onSubmit={() => startOver(form)}
+                onStop={stream.stop}
+                running={running}
+                problem={formProblem}
+                examples={TRY}
+                onExample={fillExample}
+              />
             </div>
           </div>
         )}
