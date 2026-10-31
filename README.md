@@ -112,9 +112,8 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   rises into place as you reach it (everything shows at once on paper, under reduced motion it only fades, and a jump
   lands on a part already in place). The tone tags lie beside the concept as small cards, each at its own angle. A
   character's name or a brand's opens a card from the right with the face (Qloo's picture or TMDB's, "Known as", the
-  receipt) or the brand (its picture, traits, price and style). In Wardrobe, the brand being read is held beside the
-  looks on wide screens, with its picture, traits, prices and receipt. The palette's big swatches lift under the
-  pointer.
+  receipt) or the brand (its picture, traits, price and style). On wide screens the wardrobe's looks sit in two
+  columns. The palette's big swatches lift under the pointer.
 - **Section bar and held map.** Under the cover, one bar lists the sections, lights up the one being read and fills
   a thin line as you go; once the cover scrolls away, the title and the way back join it. In Locations, the places
   come one to a screen while the shoot-base map is held beside them, lighting the pin of the one being read.
