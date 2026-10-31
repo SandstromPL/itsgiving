@@ -403,7 +403,8 @@ body {
   [popover].window {
     inset: auto 0.75rem 0.75rem 0.75rem;
     width: auto;
-    max-height: 70dvh;
+    /* As tall as it needs, up to near the top: at 70% the share window's last row sat under its Done bar. */
+    max-height: calc(100dvh - 1.5rem);
     opacity: 1;
     scale: 1;
     translate: 0 calc(100% + 1rem);
@@ -639,10 +640,16 @@ html.lenis body {
   opacity: 0;
   pointer-events: none;
 }
+/* The page's content, focused from the header's skip link: no ring round the whole page. */
+main:focus {
+  outline: none;
+}
 .site-header[data-hidden]:focus-within {
   transform: none;
   opacity: 1;
   pointer-events: auto;
+  /* Called in by the keyboard, it's simply there: no motion answers a key. */
+  transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .site-header[data-hidden] {

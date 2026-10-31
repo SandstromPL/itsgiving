@@ -312,6 +312,13 @@
   .bed {
     --fw: 72vw;
   }
+  /* Smaller reels on a phone, so they frame the lit example rather than cover its title. */
+  .reel--take {
+    --r: 40px;
+  }
+  .reel--feed {
+    --r: 52px;
+  }
   .cap-log {
     display: none;
   }
@@ -397,6 +404,11 @@
   transition:
     opacity 640ms ease-out var(--d, 0ms),
     transform 920ms var(--ease-focal, cubic-bezier(0.16, 1, 0.3, 1)) var(--d, 0ms);
+}
+/* Reached by the keyboard (how.tsx): shown at once, under reduced motion too. */
+.home-sa[data-on][data-now],
+.home-sb[data-on][data-now] {
+  transition: none;
 }
 
 /* ---------- 5: the way in, a screen of its own ---------- */

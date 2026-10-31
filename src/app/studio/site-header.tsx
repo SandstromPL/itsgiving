@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useScrollFrame } from "../smooth";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { scrollToY, useScrollFrame } from "../smooth";
 import { AccountButton } from "./account";
 import { Wordmark } from "./eggs";
 import { onScreen } from "./jump";
@@ -11,6 +11,20 @@ import { GitHubIcon } from "./icons";
 import { NAV, REPO, type Section } from "./nav";
 
 export type { Section } from "./nav";
+
+/**
+ * Past the header to the page's own content, for the keyboard: focus moves into the <main> on screen (Next keeps pages
+ * you've left in the document, hidden) without a #hash, which would add a history entry Back trips on (jump.ts).
+ */
+function skipToContent(event: MouseEvent<HTMLAnchorElement>) {
+  const main = [...document.querySelectorAll("main")].find((m) => m.getClientRects().length > 0);
+  if (!main) return;
+  event.preventDefault();
+  main.tabIndex = -1;
+  main.focus({ preventScroll: true });
+  const head = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--head")) || 0;
+  scrollToY(Math.max(0, main.getBoundingClientRect().top + window.scrollY - head));
+}
 
 /** When the header is on screen: always, once the page has scrolled, or once an element's top is above 62% of it. */
 export type Reveal = "always" | "scroll" | { after: string };
@@ -65,6 +79,13 @@ export function SiteHeader({
       data-hidden={shown ? undefined : ""}
       className={`site-header inset-x-0 top-0 z-40 border-b border-line bg-background print:hidden ${reveal === "always" ? "sticky" : "fixed"}`}
     >
+      <a
+        href="#main"
+        onClick={skipToContent}
+        className="sr-only rounded-full bg-foreground px-4 py-2.5 text-ui font-bold text-background focus:not-sr-only focus:absolute focus:top-2.5 focus:left-4 focus:z-50"
+      >
+        Skip to content
+      </a>
       <div className="mx-auto flex min-h-16 w-full max-w-[80rem] flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:px-8">
         <div className="order-1 lg:mr-2">
           <Wordmark href={home ? undefined : "/"} />

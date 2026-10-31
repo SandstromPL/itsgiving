@@ -41,11 +41,13 @@ const moved = () => {
 };
 
 const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** A mouse or trackpad: Lenis smooths the wheel only, so on a touch screen it would add blocking listeners for nothing. */
+const finePointer = () => matchMedia("(hover: hover) and (pointer: fine)").matches;
 
-/** Smooth scrolling for as long as the page that renders it is on screen. */
+/** Smooth scrolling for as long as the page that renders it is on screen, with a mouse or trackpad. */
 export function SmoothScroll() {
   useEffect(() => {
-    if (reduceMotion()) return;
+    if (reduceMotion() || !finePointer()) return;
     const smooth = new Lenis({ lerp: 0.1, smoothWheel: true, autoRaf: false, allowNestedScroll: true, stopInertiaOnNavigate: true });
     lenis = smooth;
     wake();

@@ -198,6 +198,8 @@ export function AccountButton({ className = "" }: { className?: string }) {
             <button
               type="button"
               popoverTarget={`${id}-in`}
+              // The menu closes first, so the sign-in window opens on its own rather than over the menu it came from.
+              onClick={() => document.getElementById(menu)?.hidePopover()}
               className="rounded-xl px-3 py-2.5 text-left text-ui font-semibold hover:bg-background"
             >
               Sign in

@@ -62,7 +62,8 @@
 @media screen and (prefers-reduced-motion: reduce) {
   .rack .rack-w {
     animation-name: rack-fade;
-    animation-duration: 320ms;
+    /* A fade, so it keeps its time: globals.css cuts every other animation short under reduced motion. */
+    animation-duration: 320ms !important;
     animation-delay: calc(var(--i, 0) * 40ms);
   }
 }
@@ -89,11 +90,12 @@
   box-shadow: 0 30px 70px rgb(0 0 0 / 0.5);
   opacity: 0;
   translate: calc(100% + 48px) -50%;
+  /* Leaving, it goes on the ease-out curve and quicker than it came: an ease-in start feels slow to the dismissing tap. */
   transition:
-    translate 260ms cubic-bezier(0.5, 0, 0.75, 0),
+    translate 220ms var(--ease-out),
     opacity 200ms ease,
-    overlay 260ms allow-discrete,
-    display 260ms allow-discrete;
+    overlay 220ms allow-discrete,
+    display 220ms allow-discrete;
 }
 [popover].side-card:popover-open {
   opacity: 1;
@@ -235,11 +237,16 @@
     justify-content: center;
     padding-block: 1.75rem;
   }
-  .locs[data-live] .loc {
-    transition: opacity 420ms ease;
+  /* The places not being read step back by their photos alone, dim and grey; their words keep full contrast, and the lit
+     place has the lime pin chip. Dimming the words too took them to 1.7:1. */
+  .locs[data-live] .loc-photo {
+    transition:
+      opacity 420ms ease,
+      filter 420ms ease;
   }
-  .locs[data-live] .loc:not([data-lit]) {
+  .locs[data-live] .loc:not([data-lit]) .loc-photo {
     opacity: 0.32;
+    filter: grayscale(1);
   }
 }
 

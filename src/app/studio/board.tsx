@@ -423,27 +423,70 @@ function Rework({
   );
 }
 
+/** Keys that move the page a screen or more at a time. */
+const JUMP_KEYS = new Set([" ", "PageDown", "PageUp", "End", "Home"]);
+
 /**
  * 3A reading glide (board.css): each part marked `rv` rises into place the first time the reader reaches it. Only a part
  * that starts below the screen waits; one already above or in view shows at once, and so does one the reader lands on by
- * a jump (#hash, Back, a section tab), which arrives high on the screen rather than at its foot. The state lives in
+ * a jump (#hash, Back, a section tab), which arrives high on the screen rather than at its foot. A fast scroll (a flick,
+ * PageDown, End) shows what it lands on at once too, and so does the keyboard: Tab scrolls a link only to the screen's
+ * edge, short of the line a part waits to cross, and a focused link must never be invisible. The state lives in
  * `data-rv`, which React never writes, so a re-render can't undo it; and nothing is hidden on paper or without script.
  */
 function useGlide(article: RefObject<HTMLElement | null>, take: string) {
   useLayoutEffect(() => {
     const root = article.current;
     if (!root) return;
+    // A jump key (PageDown, Space, End...) starts a jump; so does moving more than 0.4 screens in 150 ms. A part entering
+    // in a jump shows at once, and one still gliding in when a jump starts finishes there and then.
+    const trail: { t: number; y: number }[] = [];
+    let jumpUntil = 0;
+    const gliding = new Set<HTMLElement>();
+    const fast = () =>
+      performance.now() < jumpUntil || (trail.length > 1 && Math.abs(trail[trail.length - 1].y - trail[0].y) > window.innerHeight * 0.4);
+    const land = () => {
+      for (const part of gliding) part.dataset.rv = "now";
+      gliding.clear();
+    };
+    const onScroll = () => {
+      const t = performance.now();
+      trail.push({ t, y: window.scrollY });
+      while (trail.length > 1 && t - trail[0].t > 150) trail.shift();
+      if (fast()) land();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (!JUMP_KEYS.has(event.key)) return;
+      jumpUntil = performance.now() + 600;
+      land();
+    };
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
           const part = entry.target as HTMLElement;
-          part.dataset.rv = entry.boundingClientRect.top < window.innerHeight * 0.7 ? "now" : "in";
+          const now = fast() || entry.boundingClientRect.top < window.innerHeight * 0.7;
+          part.dataset.rv = now ? "now" : "in";
+          if (!now) gliding.add(part);
           io.unobserve(part);
         }
       },
       { rootMargin: "0px 0px -8% 0px" },
     );
+    const onFocus = (event: FocusEvent) => {
+      for (
+        let part = (event.target as Element).closest<HTMLElement>(".rv");
+        part;
+        part = part.parentElement?.closest<HTMLElement>(".rv") ?? null
+      ) {
+        if (part.dataset.rv !== "wait") continue;
+        part.dataset.rv = "now";
+        io.unobserve(part);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("keydown", onKey);
+    root.addEventListener("focusin", onFocus);
     const fold = window.innerHeight;
     for (const part of root.querySelectorAll<HTMLElement>(".rv")) {
       if (part.dataset.rv === "in" || part.dataset.rv === "now") continue;
@@ -455,7 +498,12 @@ function useGlide(article: RefObject<HTMLElement | null>, take: string) {
         io.observe(part);
       }
     }
-    return () => io.disconnect();
+    return () => {
+      io.disconnect();
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("keydown", onKey);
+      root.removeEventListener("focusin", onFocus);
+    };
   }, [article, take]);
 }
 
@@ -825,7 +873,7 @@ export function Board({
                         src={l.entity.image}
                         alt={`Photo of ${l.entity.name}`}
                         className={`${
-                          held ? "aspect-[16/10] rounded-[20px] lg:pin:max-h-[44dvh]" : `aspect-[3/2] ${placeGrid.wide(i)}`
+                          held ? "loc-photo aspect-[16/10] rounded-[20px] lg:pin:max-h-[44dvh]" : `aspect-[3/2] ${placeGrid.wide(i)}`
                         } w-full print:aspect-video print:max-h-none print:rounded-none`}
                       />
                       {/* Director's cut only: on a real photo of the place, a date reads as the day it was taken. */}

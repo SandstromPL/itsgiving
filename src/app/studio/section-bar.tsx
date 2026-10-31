@@ -105,8 +105,12 @@ export function SectionBar({
     placed.current = to;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (animate && from && !reduce && (from.x !== to.x || from.w !== to.w)) {
+      // Its width, not a scale: a scaled pill squashes its round ends on the way. One small pill, laid out alone.
       el.animate(
-        [{ transform: `translate(${from.x}px, ${y}px) scaleX(${from.w / to.w})` }, { transform: `translate(${to.x}px, ${y}px)` }],
+        [
+          { transform: `translate(${from.x}px, ${y}px)`, width: `${from.w}px` },
+          { transform: `translate(${to.x}px, ${y}px)`, width: `${to.w}px` },
+        ],
         { duration: 260, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
       );
     }

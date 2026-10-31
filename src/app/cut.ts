@@ -1,4 +1,5 @@
 import { CAMERA, cameraMarkup, cameraPortal } from "./marks";
+import { holdScroll } from "./smooth";
 
 // The camera cut: a board opens through the camera's window (2C). The frame goes dark with the camera in the middle,
 // its reels run up to speed like a motor, a window parks at the top, and the shot pushes through it until the window
@@ -132,6 +133,35 @@ let running = false;
 /** Whether a cut is playing (a second click waits for it rather than starting another). */
 export const cutBusy = () => running;
 
+/** The keys that scroll a page. */
+const SCROLL_KEYS = new Set([" ", "PageDown", "PageUp", "ArrowDown", "ArrowUp", "Home", "End"]);
+
+/**
+ * Holds the page under the frame still while a cut plays: a wheel, a swipe or a key would scroll a page no one can see,
+ * and the board would open part-way down (seen live: 2,400 px). Caught on the window as they start, before Lenis or the
+ * page sees them. Returns the release.
+ */
+function holdInput() {
+  const stop = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const key = (event: KeyboardEvent) => {
+    if (SCROLL_KEYS.has(event.key)) stop(event);
+  };
+  const options = { capture: true, passive: false };
+  window.addEventListener("wheel", stop, options);
+  window.addEventListener("touchmove", stop, options);
+  window.addEventListener("keydown", key, { capture: true });
+  holdScroll(true);
+  return () => {
+    window.removeEventListener("wheel", stop, options);
+    window.removeEventListener("touchmove", stop, options);
+    window.removeEventListener("keydown", key, { capture: true });
+    holdScroll(false);
+  };
+}
+
 /**
  * Plays the cut. `go` swaps the page underneath while the frame is dark (a navigation, or a board shown in place); the
  * window opens once it has finished, or after 3 s at most. With `slate`, the slate claps first.
@@ -141,6 +171,7 @@ export async function playCut(go: () => unknown, { slate }: { slate?: Slate } = 
   running = true;
   const { svg, take } = ensureLayers();
   const settle = (work: unknown) => Promise.race([Promise.resolve(work).catch(() => {}), wait(3000)]);
+  const release = holdInput();
   try {
     svg.removeAttribute("hidden");
     const W = innerWidth;
@@ -231,6 +262,7 @@ export async function playCut(go: () => unknown, { slate }: { slate?: Slate } = 
     await tween(1050, (e) => (z = Math.exp(Math.log(zMax) * e)), ease.inOutCubic);
     spinning = false;
   } finally {
+    release();
     svg.setAttribute("hidden", "");
     svg.innerHTML = "";
     svg.style.opacity = "";

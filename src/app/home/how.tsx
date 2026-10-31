@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { FeaturedRun } from "@/lib/agent/featured";
 import { STEP_LABELS, tmdbSize } from "@/lib/agent/options";
 import { useScrollFrame } from "../smooth";
@@ -67,6 +67,21 @@ function useSteps() {
       if (top < innerHeight * 0.38) step.querySelectorAll<HTMLElement>(".home-sb").forEach((x) => (x.dataset.on = ""));
     });
   });
+  // A step the keyboard reaches is simply there: its links are never focused while they fade in.
+  useEffect(() => {
+    const ol = list.current;
+    if (!ol) return;
+    const shown = (event: FocusEvent) =>
+      (event.target as Element)
+        .closest(".how-step")
+        ?.querySelectorAll<HTMLElement>(".home-sa, .home-sb")
+        .forEach((x) => {
+          x.dataset.now = "";
+          x.dataset.on = "";
+        });
+    ol.addEventListener("focusin", shown);
+    return () => ol.removeEventListener("focusin", shown);
+  }, []);
   return list;
 }
 
