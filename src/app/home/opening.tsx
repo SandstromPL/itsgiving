@@ -6,10 +6,11 @@ import { useScrollFrame } from "../smooth";
 import { clamp, outCubic, rackFocus, reducedMotion, tween } from "./motion";
 import "./home.css";
 
-// The homepage's first screen. A new visitor gets the title card: the 2B lettermark on black, loaded in 1B rack focus,
-// its reels rolling. Scrolling parks a window of the second g at the top and dollies through it until the window is the
-// screen; after a beat of black, "your voice, their taste." racks into focus word by word and holds the screen. Seen
-// once this visit, the page opens on the words. Under reduced motion the card fades out instead and the words fade in.
+// The homepage's first screen: the title card, the 2B lettermark on black, loaded in 1B rack focus, its reels rolling.
+// Scrolling parks a window of the second g at the top and dollies through it until the window is the screen; after a
+// beat of black, "your voice, their taste." racks into focus word by word and holds the screen. It's all part of the
+// scroll, both ways: scrolling back up darkens the words and pulls back out of the window to the card, and coming
+// through again racks the words in again. Under reduced motion the card fades out instead and the words fade in.
 
 const [BX, BY, BW, BH] = LETTERMARK_BOX;
 /** Where the mark sits: as wide as 72% of the screen or 155% of its height, whichever is less, its baseline 46% down. */
@@ -18,7 +19,6 @@ const TALL = 1.55;
 const BASELINE = 0.46;
 /** The g's take-up window, at rest: the opening the dolly goes through. */
 const P0 = lettermarkPortal(0, 1);
-const SEEN = "itsgiving:intro";
 /** The five windows come round every 72 degrees. */
 const WINDOW = 72;
 
@@ -47,21 +47,6 @@ const holeStyle = {
   top: `calc(${BASELINE * 100}cqh + var(--ww) * ${(264 + P0.cy - HOLE) / BW})`,
 } as CSSProperties;
 
-const read = (key: string) => {
-  try {
-    return sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
-};
-const write = (key: string, value: string) => {
-  try {
-    sessionStorage.setItem(key, value);
-  } catch {
-    // remembered for this page only
-  }
-};
-
 export function Opening() {
   const section = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
@@ -71,8 +56,8 @@ export function Opening() {
   const ui = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const s = useRef({
-    /** Decided once per page: Back to a page Next kept keeps its intro, so the scroll it restores still fits. */
-    on: null as boolean | null,
+    /** The title card has loaded (its rack focus played): once per page, even when Next shows it again after Back. */
+    started: false,
     reduce: false,
     W: 0,
     H: 0,
@@ -123,10 +108,17 @@ export function Opening() {
     rackFocus(words, { delay, stagger: 150, duration: 1150, scale: 1.06, blur: 18 });
     delete section.current?.dataset.dark;
   };
+  /** Back up into the window: the words go dark again, so coming through brings them into focus again. */
+  const conceal = () => {
+    if (!s.revealed) return;
+    s.revealed = false;
+    heading.current?.querySelectorAll<HTMLElement>(".hero-w").forEach((word) => word.getAnimations().forEach((a) => a.cancel()));
+    if (section.current) section.current.dataset.dark = "";
+  };
 
   const draw = () => {
     const f = film.current;
-    if (!s.on || !s.W || !f) return;
+    if (!s.W || !f) return;
     const m = placeMark(s.W, s.H);
     const P = lettermarkPortal(s.angle, 1);
     const x = m.left + (P.cx - BX) * m.k;
@@ -154,10 +146,9 @@ export function Opening() {
       ui.current.style.opacity = String(1 - clamp(s.p / 0.06));
       ui.current.style.visibility = s.p > 0.06 ? "hidden" : "";
     }
-    if (done) {
-      reveal(s.reduce ? 0 : 750);
-      write(SEEN, "1");
-    }
+    // A little way back before the words go dark, so a reader resting at the edge doesn't flicker them.
+    if (done) reveal(s.reduce ? 0 : 750);
+    else if (s.reduce ? s.p < 0.42 : zp < 0.97) conceal();
   };
 
   const measure = () => {
@@ -171,7 +162,7 @@ export function Opening() {
     s.H = st.clientHeight;
     // After the push and the words, the words keep the screen a while before the page moves on.
     s.hold = s.reduce ? 0 : Math.round(innerHeight * 0.95);
-    s.dist = s.on ? Math.round(innerHeight * 1.6) : 0;
+    s.dist = Math.round(innerHeight * 1.6);
     sec.style.height = `${s.H + s.dist + s.hold}px`;
     s.top = sec.getBoundingClientRect().top + scrollY;
     fit();
@@ -219,21 +210,13 @@ export function Opening() {
   };
 
   useLayoutEffect(() => {
-    const sec = section.current;
-    if (!sec) return;
-    const first = s.on === null;
-    if (first) {
-      s.on = read(SEEN) !== "1";
-      if (!s.on) sec.dataset.off = "";
-    }
     measure();
-    if (!first) return;
-    if (!s.on) {
-      reveal(250);
-      return;
+    // The title loads in rack focus, once, then the reels start to roll.
+    if (!s.started) {
+      s.started = true;
+      rackFocus(Array.from(mark.current?.querySelectorAll(".wl") ?? []), { stagger: 70, duration: 900, scale: 1.06, blur: 14 });
     }
-    // The title loads in rack focus, then the reels start to roll.
-    rackFocus(Array.from(mark.current?.querySelectorAll(".wl") ?? []), { stagger: 70, duration: 900, scale: 1.06, blur: 14 });
+    if (s.ready) return;
     const ready = setTimeout(
       () => {
         s.ready = true;
@@ -262,18 +245,12 @@ export function Opening() {
   useScrollFrame((y) => {
     // A phone's address bar coming and going changes the height a little: only a real resize lays the scene out again.
     if (innerWidth !== s.vw || Math.abs(innerHeight - s.vh) > 150) measure();
-    if (!s.on) return;
     s.p = s.dist ? clamp((y - s.top) / s.dist) : 1;
     if (s.p < 0.012) {
       if (s.ready) startRolling();
     } else if (s.rolling && !s.parking) park();
     draw();
   });
-
-  const skip = () => {
-    const top = s.top + s.dist + 2;
-    window.scrollTo({ top, behavior: s.reduce ? "auto" : "smooth" });
-  };
 
   return (
     <section ref={section} className="intro" aria-label="itsgiving" data-dark="">
@@ -297,9 +274,6 @@ export function Opening() {
           </div>
         </div>
         <div ref={ui} className="intro-ui surface-dark">
-          <button type="button" className="intro-skip" onClick={skip}>
-            Skip intro
-          </button>
           <p className="intro-cue" aria-hidden>
             Scroll
             <i />

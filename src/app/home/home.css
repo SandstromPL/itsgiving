@@ -9,16 +9,6 @@
   position: relative;
   height: calc(100svh * 3.55);
 }
-.intro[data-off],
-:root[data-intro="seen"] .intro {
-  height: calc(100svh * 1.95);
-}
-/* `data-intro="seen"` on <html>, if the head script sets it before first paint (sessionStorage "itsgiving:intro" is
-   "1"), keeps a returning visitor's reload from flashing the title card before the scripts arrive. */
-:root[data-intro="seen"] .intro-film,
-:root[data-intro="seen"] .intro-ui {
-  display: none;
-}
 .intro-stage {
   position: sticky;
   top: 0;
@@ -64,7 +54,9 @@
 }
 .hero-w {
   display: inline-block;
+  transition: opacity 280ms ease;
 }
+/* Dark until the push is through, and again when the reader backs up into the window (opening.tsx). */
 .intro[data-dark] .hero-w {
   opacity: 0;
 }
@@ -73,10 +65,6 @@
   inset: 0;
   z-index: 2;
   transform-origin: 0 0;
-}
-.intro[data-off] .intro-film,
-.intro[data-off] .intro-ui {
-  display: none;
 }
 /* The frame's black is a ring round the take-up window: closed until the push starts, then open, and scaled with the
    mark so the window and the hole through the black stay one. */
@@ -102,21 +90,6 @@
   inset: 0;
   z-index: 3;
   pointer-events: none;
-}
-.intro-skip {
-  position: absolute;
-  top: max(18px, env(safe-area-inset-top, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
-  pointer-events: auto;
-  min-height: 44px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1.5px solid var(--edge);
-  background: transparent;
-  color: var(--foreground);
-  font-size: var(--text-small);
-  font-weight: 700;
-  cursor: pointer;
 }
 .intro-cue {
   position: absolute;

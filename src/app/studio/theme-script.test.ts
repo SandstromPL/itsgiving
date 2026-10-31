@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import { THEME_SCRIPT } from "./theme-script";
 
 /** Runs the pre-paint script against a stand-in <html> and storage, and returns what it set. */
-function run(stored: Record<string, string>, session: Record<string, string> = {}) {
+function run(stored: Record<string, string>) {
   const dataset: Record<string, string> = {};
   const document = { documentElement: { dataset } };
   const localStorage = { getItem: (key: string) => stored[key] ?? null };
-  const sessionStorage = { getItem: (key: string) => session[key] ?? null };
-  new Function("document", "localStorage", "sessionStorage", THEME_SCRIPT)(document, localStorage, sessionStorage);
+  new Function("document", "localStorage", THEME_SCRIPT)(document, localStorage);
   return dataset;
 }
 
@@ -28,9 +27,5 @@ describe("the room script", () => {
 
   it("ignores a room it doesn't know", () => {
     expect(run({ "itsgiving:room": "sodium" })).toEqual({ theme: "dark" });
-  });
-
-  it("marks the homepage intro as seen in this tab", () => {
-    expect(run({}, { "itsgiving:intro": "1" })).toEqual({ theme: "dark", intro: "seen" });
   });
 });
