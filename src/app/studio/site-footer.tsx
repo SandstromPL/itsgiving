@@ -6,7 +6,8 @@ import { TMDB_NOTICE } from "@/lib/agent/options";
 import { accountsOn } from "@/lib/supabase/config";
 import { Mark } from "./eggs";
 import { useLingo } from "./lingo";
-import { NAV } from "./nav";
+import { GitHubIcon } from "./icons";
+import { NAV, REPO } from "./nav";
 
 /** The header's sections, then the saved list that otherwise sits in the account menu (only when accounts are on). */
 const PAGES = [...NAV, ...(accountsOn ? [{ id: "saved", href: "/saved", label: "Saved treatments" }] : [])];
@@ -25,10 +26,9 @@ const sweep =
 const inline = "underline decoration-line underline-offset-4 transition-colors hover:decoration-foreground";
 
 /**
- * The footer on every page, set like a film's end credits: what itsgiving is, its pages, and who played which part,
- * with the credits the data sources' terms ask for (TMDB's logo and notice, OpenStreetMap's copyright line). It reads
- * no URL, so every page stays as static as its own content allows; the Examples link looks at the page only when
- * clicked.
+ * The footer on every page, set like a film's end credits: what itsgiving is and where its source lives, its pages,
+ * and who played which part, with the credits the data sources' terms ask for (TMDB's logo and notice, OpenStreetMap's
+ * copyright line). It reads no URL, so every page stays as static as its own content allows.
  */
 export function SiteFooter() {
   const { t } = useLingo();
@@ -45,6 +45,13 @@ export function SiteFooter() {
             Treatments for music videos and short films, built from what their audience loves on Qloo.
           </p>
           <p className="text-ui font-bold">{t.footer}</p>
+          <a
+            href={REPO}
+            className="press mt-1 inline-flex min-h-10 items-center gap-2 rounded-full border border-line px-4 py-2 text-small font-semibold transition-colors hover:border-foreground"
+          >
+            <GitHubIcon size={16} />
+            Source on GitHub
+          </a>
         </div>
 
         <nav aria-labelledby={pages} className="lg:col-span-2">

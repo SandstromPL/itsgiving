@@ -6,3 +6,6 @@ export const NAV = [
 ] as const;
 
 export type Section = (typeof NAV)[number]["id"];
+
+/** The source code, public under the MIT licence. */
+export const REPO = "https://github.com/SandstromPL/itsgiving";

@@ -7,7 +7,8 @@ import { AccountButton } from "./account";
 import { Wordmark } from "./eggs";
 import { onScreen } from "./jump";
 import { UncSwitch } from "./lingo";
-import { NAV, type Section } from "./nav";
+import { GitHubIcon } from "./icons";
+import { NAV, REPO, type Section } from "./nav";
 
 export type { Section } from "./nav";
 
@@ -16,8 +17,8 @@ export type Reveal = "always" | "scroll" | { after: string };
 
 /**
  * The header on every page: the camera tile and the lettermark, the same three links with the current section lit,
- * the plain-copy switch (its choice carries across pages, so it's on every one) and the profile menu (the rooms, and
- * the account when accounts are set up). Pages add only status badges, live or mock.
+ * the plain-copy switch (its choice carries across pages, so it's on every one), the source code on GitHub and the
+ * profile menu (the rooms, and the account when accounts are set up). Pages add only status badges, live or mock.
  * Each page names its section rather than the header reading the URL: with Cache Components a pathname read can
  * suspend on a route's fallback shell, and a featured treatment's page must stay static.
  * It stays at the top. The homepage keeps it away until "Watch it work" (`reveal={{ after }}`) and a board until you
@@ -71,7 +72,16 @@ export function SiteHeader({
         <div className={`order-2 ml-auto sm:order-4 ${badges ? "sm:ml-0" : ""}`}>
           <UncSwitch />
         </div>
-        <AccountButton className="order-3 sm:order-5" />
+        {/* Between the unc switch and the profile menu; on phones, where that row is full, at the end of the links. */}
+        <a
+          href={REPO}
+          aria-label="itsgiving's source code on GitHub"
+          title="Source on GitHub"
+          className="press order-6 ml-auto grid size-10 place-items-center rounded-full border border-foreground bg-card text-foreground hover:bg-field sm:order-5 sm:ml-0 sm:size-12"
+        >
+          <GitHubIcon />
+        </a>
+        <AccountButton className="order-3 sm:order-6" />
         <span aria-hidden className="order-4 basis-full sm:hidden" />
         <nav aria-label="Site" className="order-5 -ml-2.5 flex items-center gap-1 sm:order-2 sm:ml-0">
           {NAV.map((item) => {

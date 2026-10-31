@@ -110,9 +110,11 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   English for producers, label people and judges. The treatment, the receipts and the run log read the same in both.
 - **A board to read slowly.** The title comes into focus word by word the first time a board opens, and each part
   rises into place as you reach it (everything shows at once on paper, under reduced motion it only fades, and a jump
-  lands on a part already in place). "How the tone reads" is a card of its own under the concept. A character's name
-  or a brand's opens a card from the right with the face (Qloo's picture or TMDB's, "Known as", the receipt) or the
-  brand (its picture, traits, price and style). The palette's big swatches lift under the pointer.
+  lands on a part already in place). The tone tags lie beside the concept as small cards, each at its own angle. A
+  character's name or a brand's opens a card from the right with the face (Qloo's picture or TMDB's, "Known as", the
+  receipt) or the brand (its picture, traits, price and style). In Wardrobe, the brand being read is held beside the
+  looks on wide screens, with its picture, traits, prices and receipt. The palette's big swatches lift under the
+  pointer.
 - **Section bar and held map.** Under the cover, one bar lists the sections, lights up the one being read and fills
   a thin line as you go; once the cover scrolls away, the title and the way back join it. In Locations, the places
   come one to a screen while the shoot-base map is held beside them, lighting the pin of the one being read.
@@ -130,8 +132,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   coming into focus) dollies through the second g's reel window into black, then "your voice, their taste." comes into
   focus word by word; the pitch lights up word by word as you scroll; "Now showing" runs the featured treatments past
   a film gate as you scroll, ending on a frame for the reader's own; "Watch it work" takes one real featured run a step
-  to a screen, each step and then what it made (the shoot base beside its map); and only then "Start a treatment" and
-  "See a finished one". The intro plays once a visit, with Skip intro; under reduced motion everything fades instead.
+  to a screen, each step and then what it made (the shoot base beside its map, the treatment beside its small title
+  card); and only then "Start a treatment" and "See a finished one". The zoom is part of the scroll both ways:
+  scrolling back up pulls out of the window to the title card. Under reduced motion everything fades instead.
 - **Examples** (`/examples`) lists the featured treatments as cards (still, title in its face, logline, tones and
   palette), filterable by format. Opening one, from here or the homepage, goes through the camera cut: the frame goes
   dark, the camera's reels run up to speed and the shot pushes through a reel window into the board.
@@ -157,8 +160,9 @@ Iterate chips (darker, more 90s, deeper cuts, cheaper locations) re-run plan and
   chips take it to the studio as their own take. **Your treatments** (`/saved`) lists them, and at its foot deletes
   the account along with everything saved in it.
 - **One header on every page:** the camera and the lettermark, Examples, Studio and About, with the current section
-  lit (a featured treatment counts as Examples), then the unc-mode switch and the profile menu (the room, plus Sign in,
-  or your initial with your treatments and Sign out), since those choices carry across pages. Pages add only status
+  lit (a featured treatment counts as Examples), then the unc-mode switch, the source code on GitHub and the profile
+  menu (the room, plus Sign in, or your initial with your treatments and Sign out), since those choices carry across
+  pages. Pages add only status
   badges, live or mock. The homepage keeps it away until "Watch it work", and a board until you scroll; on the other
   pages it stays at the top. On phones it takes two rows, and only the mock warnings among the badges show there.
 - **Four rooms,** picked in the profile menu and remembered per browser: Grade (the default, a colourist's neutral
