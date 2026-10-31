@@ -282,7 +282,23 @@ export const PINNED = {
   note: "lg:pin:[grid-area:4/1] lg:pin:mx-6 lg:pin:mt-4 lg:pin:mb-6",
 };
 
-/** Where a board's pinned map fills its column: PINNED's `lg:pin:`, and so never on paper. */
+/**
+ * A board's map held beside its locations (board.css `.loc-map`, from a laptop's width on a screen 34rem tall): only the
+ * shoot-base line above it, the map filling the rest of the held column, its frame widened to fill it (HeatMap). The
+ * caption, the legend and the note stay for phones and paper. None of the `lg:pin:` parts applies on paper.
+ */
+const HELD = {
+  card: "lg:pin:h-full lg:pin:gap-3 lg:pin:p-4",
+  head: "",
+  heat: "lg:pin:flex lg:pin:min-h-0 lg:pin:flex-1 lg:pin:flex-col",
+  caption: "hidden print:block",
+  map: "lg:pin:min-h-0 lg:pin:flex-1 lg:pin:aspect-auto lg:pin:max-w-none lg:pin:[container-type:size]",
+  layer: PINNED.layer,
+  legend: "lg:pin:hidden",
+  note: "lg:pin:hidden",
+};
+
+/** Where a board's pinned or held map fills its column: PINNED's and HELD's `lg:pin:`, and so never on paper. */
 const FILL = "screen and (min-width: 64rem) and (min-height: 34rem)";
 
 /**
@@ -333,6 +349,8 @@ function HeatMap({
   active,
   compact = false,
   pinned = false,
+  held = false,
+  bare = false,
 }: {
   base: ShootBase;
   map: HeatGrid;
@@ -347,12 +365,16 @@ function HeatMap({
   compact?: boolean;
   /** In a board's block beside its locations, which pins (PINNED). */
   pinned?: boolean;
+  /** Held beside a board's locations, filling its column (HELD). */
+  held?: boolean;
+  /** Without its caption: the homepage's step says the same beside it. */
+  bare?: boolean;
 }) {
   // The frame and its lines are kept while the bounds and the box stay the same: the board draws the map again as each
   // location is read, and tracing the lines takes a few milliseconds.
   const { south, west, north, east } = frameBounds(map, pins);
   const box = useRef<HTMLDivElement>(null);
-  const fill = useFill(box, pinned);
+  const fill = useFill(box, pinned || held);
   const own = useMemo(() => mapFrame({ south, west, north, east }, W, SHARP), [south, west, north, east]);
   // Filling its column, the map is drawn larger, and wider or taller than the frame: the frame grows to the box's shape
   // where the grid has the heat for it (`reach`; older grids stay at their own shape, centred), and the tiles come at the
@@ -403,14 +425,16 @@ function HeatMap({
         legend: "print:col-start-2 print:row-start-3 print:mt-0",
       }
     : { wrap: "", caption: "", map: "", legend: "" };
-  const pin = pinned ? PINNED : { heat: "", caption: "", map: "", layer: "", legend: "" };
+  const pin = pinned ? PINNED : held ? HELD : { heat: "", caption: "", map: "", layer: "", legend: "" };
 
   return (
     <div className={`${heat} ${paper.wrap} ${pin.heat}`}>
-      <p className={`mb-3 max-w-[60ch] text-small leading-5 text-dim ${paper.caption} ${pin.caption}`}>
-        <span className="font-semibold text-foreground">Where the fans are.</span> {mock ? "A synthetic heatmap" : "Qloo's heatmap"} of{" "}
-        {audience} across {city}, drawn as contour lines: the bolder the line, the stronger this audience is inside it.
-      </p>
+      {!bare && (
+        <p className={`mb-3 max-w-[60ch] text-small leading-5 text-dim ${paper.caption} ${pin.caption}`}>
+          <span className="font-semibold text-foreground">Where the fans are.</span> {mock ? "A synthetic heatmap" : "Qloo's heatmap"} of{" "}
+          {audience} across {city}, drawn as contour lines: the bolder the line, the stronger this audience is inside it.
+        </p>
+      )}
       <div
         ref={box}
         className={`relative mx-auto aspect-(--map-aspect) w-full max-w-(--map-max) overflow-hidden rounded-2xl border border-line bg-[#2b2b2b] print:bg-white ${paper.map} ${pin.map}`}
@@ -596,6 +620,8 @@ export function ShootBaseBlock({
   active,
   compact = false,
   pinned = false,
+  held = false,
+  mapOnly = false,
 }: {
   base?: ShootBase;
   /** The scouted places, numbered as on the location cards. */
@@ -610,6 +636,10 @@ export function ShootBaseBlock({
   compact?: boolean;
   /** Beside a board's location cards: compact, and pinned while they scroll (PINNED; the board's wrapper takes `wrap`). */
   pinned?: boolean;
+  /** Held beside a board's locations, one place to a screen (HELD; the board's `.loc-map` holds it). */
+  held?: boolean;
+  /** With `compact`: the map and its legend alone, for the homepage's step, whose own card names the base. */
+  mapOnly?: boolean;
 }) {
   const chosen = base?.areas.find((a) => a.ref === base.chosen) ?? base?.areas[0];
   if (!base || !chosen) return null;
@@ -619,31 +649,47 @@ export function ShootBaseBlock({
   const locations = pins.length > 0 ? "Every location" : "Every location in the treatment";
   const share = <span className={`rounded-md px-1.5 py-0.5 font-bold ${rankMark(mock)}`}>{percent(chosen.share)}</span>;
   const map = base.map && base.map.tiles.length > 0 && base.map;
-  if (compact || pinned) {
-    const pin = pinned ? PINNED : { card: "", head: "", note: "" };
+  if (compact || pinned || held) {
+    const pin = pinned ? PINNED : held ? HELD : { card: "", head: "", note: "" };
     return (
       <div
         className={`surface-dark flex flex-col gap-4 rounded-[28px] bg-background p-5 sm:p-6 print:grid print:break-inside-avoid print:grid-cols-[auto_minmax(0,1fr)] print:grid-rows-[auto_auto_auto_auto_1fr] print:items-start print:gap-x-6 print:gap-y-3 ${PAPER} ${pin.card}`}
       >
         {pinned && <div aria-hidden className={PINNED.bg} />}
-        <div className={`flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1 ${pin.head}`}>
-          <div>
-            <p className="text-small font-semibold text-dim">Shoot base</p>
-            <p className="type-poster mt-1.5 text-section">{chosen.name}</p>
+        {!mapOnly && (
+          <div className={`flex flex-wrap items-end justify-between gap-x-5 gap-y-2 print:col-start-2 print:row-start-1 ${pin.head}`}>
+            <div>
+              <p className="text-small font-semibold text-dim">Shoot base</p>
+              <p className={`type-poster mt-1.5 ${held ? "text-subsection" : "text-section"}`}>{chosen.name}</p>
+            </div>
+            <p className="text-small leading-6">
+              {share} of this audience&apos;s strongest spots in {city}
+            </p>
           </div>
-          <p className="text-small leading-6">
-            {share} of this audience&apos;s strongest spots in {city}
-          </p>
-        </div>
-        {map && (
-          <HeatMap base={base} map={map} pins={pins} city={city} audience={audience} mock={mock} active={active} compact pinned={pinned} />
         )}
-        <p className={`text-small leading-6 text-dim print:col-start-2 print:row-start-4 ${pin.note}`}>
-          {base.held
-            ? `${locations} is within ${km} of ${chosen.name}, so the unit can stay in one area.`
-            : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${city}.`}
-          {others.length > 0 && ` Also strong: ${others.map((a) => `${a.name} (${percent(a.share)})`).join(", ")}.`}
-        </p>
+        {map && (
+          <HeatMap
+            base={base}
+            map={map}
+            pins={pins}
+            city={city}
+            audience={audience}
+            mock={mock}
+            active={active}
+            compact
+            pinned={pinned}
+            held={held}
+            bare={mapOnly}
+          />
+        )}
+        {!mapOnly && (
+          <p className={`text-small leading-6 text-dim print:col-start-2 print:row-start-4 ${pin.note}`}>
+            {base.held
+              ? `${locations} is within ${km} of ${chosen.name}, so the unit can stay in one area.`
+              : `Too few places matched within ${km} of ${chosen.name}, so the locations come from across ${city}.`}
+            {others.length > 0 && ` Also strong: ${others.map((a) => `${a.name} (${percent(a.share)})`).join(", ")}.`}
+          </p>
+        )}
       </div>
     );
   }

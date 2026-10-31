@@ -1,12 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useRef, type Ref } from "react";
+import { Fragment, useEffect, useRef, useState, type AnimationEvent, type CSSProperties, type Ref, type RefObject } from "react";
 import { BUDGETS, FORMATS, joinNames, treatmentSubject, treatmentWho } from "@/lib/agent/options";
 import type { Treatment } from "@/lib/agent/types";
 import { useCopied } from "./clipboard";
 import { EraLayer } from "./era-layer";
-import { useLetterbox } from "./letterbox";
-import { landCover } from "./morph";
 import { darkOf } from "./color";
 import { Still, Tape } from "./parts";
 import { TitleCardPicker, type CoverStill, type EraPick } from "./title-card";
@@ -25,7 +23,6 @@ export function Cover({
   onPickFont,
   stills,
   onPickStill,
-  morph,
   era,
 }: {
   ref?: Ref<HTMLElement>;
@@ -38,33 +35,30 @@ export function Cover({
   /** The references with a still, to choose among. */
   stills: CoverStill[];
   onPickStill: (id: string) => void;
-  /** On an example's own page, its slug: a homepage poster's still may grow into this cover (morph.ts). */
-  morph?: string;
   /** The film tradition's look the cover wears, if any (eras.ts). */
   era: EraPick;
 }) {
-  const stillLayer = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (morph) landCover(morph, stillLayer.current?.parentElement ?? null, stillLayer.current);
-  }, [morph]);
+  const title = useRef<HTMLHeadingElement>(null);
   const take = `${t.id}-${t.createdAt}`;
-  const letterbox = useLetterbox(take);
+  const rack = useRackFocus(take, title);
   const who = treatmentWho(t);
   const subject = treatmentSubject(t);
+  const words = t.title.split(/\s+/).filter(Boolean);
   return (
+    // In the page at about 2.11:1 (the screen's width less the page's gutters), and taller when its words need it: a
+    // fixed ratio would cut a long title off.
     <header
       ref={ref}
       key={take}
-      onAnimationEnd={letterbox.onAnimationEnd}
-      className={`${letterbox.className} surface-dark relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:min-h-[36rem] sm:p-10 print:min-h-[225mm]`}
+      className="surface-dark relative isolate flex min-h-[32rem] flex-col justify-between gap-10 overflow-hidden rounded-[2rem] p-6 sm:p-10 md:min-h-[max(27.5rem,calc((min(100vw,80rem)-4rem)/2.11))] print:min-h-[225mm]"
       style={{ background: darkOf(t.palette.map((c) => c.hex)) }}
     >
       {/* A reference film's still, never its poster (or a mock placeholder): their own lettering would fight the title. */}
-      <div ref={stillLayer} aria-hidden className="absolute inset-0 -z-10">
+      <div aria-hidden className="absolute inset-0 -z-10">
         {still && <Still src={still.src} alt="" loading="eager" className="absolute inset-0 size-full" />}
       </div>
       {/* The pills up top sit on the frame itself, so each brings its own dark: AA over a white frame. */}
-      <div data-morph="top" className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-[19px] border border-edge bg-black/70 px-3.5 py-2 text-small text-dim">
             {FORMATS[t.brief.format]} {subject}, {t.brief.city}, {BUDGETS[t.brief.budget].label.toLowerCase()} budget
@@ -91,18 +85,54 @@ export function Cover({
         />
       </div>
       <EraLayer id={era.id} title={t.title} play={era.moment} />
-      <div
-        data-morph="words"
-        className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]"
-      >
-        <h1 id="treatment-title" tabIndex={-1} className="max-w-[16ch] text-balance" style={titleStyle(titleFont(fontId))}>
-          {t.title}
+      <div className="scrim-under flex flex-col gap-6 [--scrim-b:1.5rem] [--scrim-x:1.5rem] sm:[--scrim-b:2.5rem] sm:[--scrim-x:2.5rem]">
+        {/* 1B rack focus: the first time a take opens, its title sharpens word by word (board.css). */}
+        <h1
+          ref={title}
+          id="treatment-title"
+          tabIndex={-1}
+          onAnimationEnd={rack.onAnimationEnd}
+          className={`${rack.className} max-w-[16ch] text-balance`}
+          style={titleStyle(titleFont(fontId))}
+        >
+          {words.map((word, i) => (
+            <Fragment key={i}>
+              {i > 0 && " "}
+              <span className="rack-w" data-last={i === words.length - 1 ? "" : undefined} style={{ "--i": i } as CSSProperties}>
+                {word}
+              </span>
+            </Fragment>
+          ))}
         </h1>
         <p className="max-w-[40ch] font-serif text-logline leading-[1.2] text-pretty italic">{t.logline}</p>
         <CoverPalette palette={t.palette} />
       </div>
     </header>
   );
+}
+
+/**
+ * The title's rack focus (board.css), once per take. Next only hides a page you leave, and showing it again on Back or
+ * Forward would restart a CSS animation, so the class comes off once the last word has landed. A new take in the studio
+ * racks again.
+ */
+function useRackFocus(take: string, title: RefObject<HTMLElement | null>) {
+  const [racked, setRacked] = useState<string | null>(null);
+  // A short rack (reduced motion's fade), or a page slow to come to life, can finish before anything listens for its
+  // end: then the class comes off as soon as the page is live.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const anims = title.current?.getAnimations({ subtree: true }) ?? [];
+      if (!anims.some((a) => a instanceof CSSAnimation && a.animationName.startsWith("rack"))) setRacked(take);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [take, title]);
+  return {
+    className: racked === take ? "" : "rack",
+    onAnimationEnd: (event: AnimationEvent) => {
+      if ((event.target as HTMLElement).dataset.last !== undefined) setRacked(take);
+    },
+  };
 }
 
 const check = <CheckIcon size={13} />;
@@ -138,26 +168,32 @@ function CoverPalette({ palette }: { palette: Treatment["palette"] }) {
   );
 }
 
-/** The palette, each colour a button that copies its hex, which colourists paste straight into a grade or a deck. */
+/**
+ * The palette, each colour a button that copies its hex, which colourists paste straight into a grade or a deck. A
+ * swatch lifts as a pointer passes over it (board.css); a phone gets three to a row.
+ */
 export function PaletteSwatches({ palette }: { palette: Treatment["palette"] }) {
   const { copied, copy } = useCopied();
   return (
     <>
-      <ul className="grid grid-cols-3 gap-4 sm:grid-cols-6">
+      <ul
+        className="grid grid-cols-3 gap-3 sm:grid-cols-[repeat(var(--n),minmax(0,1fr))] sm:gap-4"
+        style={{ "--n": Math.min(palette.length, 8) } as CSSProperties}
+      >
         {palette.map((c) => (
-          <li key={c.hex}>
+          <li key={c.hex} className="rv">
             <button
               type="button"
               aria-label={`Copy ${c.name}, ${c.hex}`}
               onClick={() => copy(c.hex)}
-              className="block w-full cursor-pointer rounded-[20px] text-left [--press:0.98]"
+              className="swatch-btn block w-full cursor-pointer rounded-[20px] text-left [--press:0.98]"
             >
               <span
                 aria-hidden
-                className="block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10 print:aspect-[3/2]"
+                className="swatch block aspect-[4/5] w-full rounded-[20px] ring-1 ring-black/10 print:aspect-[3/2]"
                 style={{ background: c.hex }}
               />
-              <span className="mt-2 block text-ui leading-tight font-semibold">{c.name}</span>
+              <span className="mt-3 block text-ui leading-tight font-semibold">{c.name}</span>
               <span className="flex items-center gap-1 font-mono text-caption text-faint">
                 {copied === c.hex ? (
                   <>

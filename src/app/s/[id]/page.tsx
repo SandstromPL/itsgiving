@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cache, Suspense } from "react";
 import { ModeBadges } from "@/app/studio/parts";
+import { SmoothScroll } from "@/app/smooth";
 import { SiteHeader } from "@/app/studio/site-header";
 import { SavedStoreError, savedForViewer } from "@/lib/saved/store";
 import { viewerId } from "@/lib/supabase/server";
@@ -39,9 +40,12 @@ export default function SavedPage({ params }: PageProps<"/s/[id]">) {
     <Suspense
       fallback={
         <>
-          <SiteHeader />
+          <SiteHeader reveal="scroll" />
           <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-8 px-4 pt-8 pb-16 sm:px-8 sm:pt-10">
-            <div aria-hidden className="surface-dark min-h-[32rem] rounded-[2rem] bg-background sm:min-h-[36rem]" />
+            <div
+              aria-hidden
+              className="surface-dark min-h-[32rem] rounded-[2rem] bg-background md:min-h-[max(27.5rem,calc((min(100vw,80rem)-4rem)/2.11))]"
+            />
             <p role="status" className="sr-only">
               Opening the treatment…
             </p>
@@ -79,7 +83,12 @@ async function Saved({ params }: { params: PageProps<"/s/[id]">["params"] }) {
   const t = item.treatment;
   return (
     <>
-      <SiteHeader badges={<ModeBadges qloo={t.mock.qloo ? "mock" : "live"} llm={t.writtenBy.mock ? "mock" : "live"} treatment={t} />} />
+      {/* As on an example's page: the board has the screen, and the header comes in once you scroll. */}
+      <SiteHeader
+        reveal="scroll"
+        badges={<ModeBadges qloo={t.mock.qloo ? "mock" : "live"} llm={t.writtenBy.mock ? "mock" : "live"} treatment={t} />}
+      />
+      <SmoothScroll />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-8 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
         <SavedBoard id={item.id} treatment={t} own={item.ownerId === viewer} shared={item.shared} />
       </main>

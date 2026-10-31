@@ -32,7 +32,7 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
   return (
     <div className="flex flex-col gap-8">
       <div className="-mb-2 flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link href="/#now-showing" className={pillButton}>
+        <Link href="/examples" className={pillButton}>
           <BackArrow />
           All examples
         </Link>
@@ -47,13 +47,12 @@ export function FeaturedBoard({ slug, treatment }: { slug: string; treatment: Tr
         take={1}
         log={<Timeline steps={replaySteps(treatment, "Built when the site was deployed: these are the calls that made it.", false)} />}
         back={
-          <Link href="/#now-showing" aria-label="All examples" title="All examples" className={backButton}>
+          <Link href="/examples" aria-label="All examples" title="All examples" className={backButton}>
             <BackArrow />
           </Link>
         }
         reworkNote="Built ahead of time. A change opens it in the studio, which re-runs the plan and the writing with it."
         own={false}
-        morph={slug}
       />
       <StartYourOwn />
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import {
   NUDGES,
   NUDGE_LABELS,
@@ -19,12 +19,13 @@ import {
   type Nudge,
 } from "@/lib/agent/options";
 import type { Character, LlmStep, Treatment } from "@/lib/agent/types";
-import type { KnownRole } from "@/lib/tmdb";
 import type { CompactEntity, CompactTag } from "@/lib/qloo/normalize";
-import { PINNED, ShootBaseBlock, locationPins } from "./base-map";
+import { useScrollFrame } from "@/app/smooth";
+import { ShootBaseBlock, locationPins } from "./base-map";
 import { useEra } from "./era-layer";
 import { useLingo } from "./lingo";
-import { QlooNote, QlooTags, Still, Tape, Why, modelName } from "./parts";
+import { QlooNote, QlooTags, Receipt, Still, Tape, Why, modelName } from "./parts";
+import { BrandCard, FaceCard, NameButton, knownAs } from "./side-card";
 import { type CoverStill } from "./title-card";
 import { suggestTitleFont } from "./title-fonts";
 import { evidenceTone, outlineButton, paperEvidence, rankMark } from "./ui";
@@ -33,6 +34,7 @@ import { Cover, PaletteSwatches } from "./cover";
 import { SectionBar } from "./section-bar";
 import { FilmEdge, Interval, dateStamp } from "./board-cut";
 import { printPicture, printRead, printReceipt, printRow, usePrintTitle } from "./board-print";
+import "./board.css";
 
 const STEP_NAME: Record<LlmStep, string> = { plan: "Plan", replan: "Re-plan", write: "Writing" };
 
@@ -51,9 +53,6 @@ const SKETCH: [string, "wants" | "hides" | "presence" | "look" | "arc"][] = [
   ["Look", "look"],
   ["Arc", "arc"],
 ];
-
-/** "Calum in Aftersun (2022) and Lucius in Gladiator II (2024)". */
-const knownAs = (roles: KnownRole[]) => joinNames(roles.map((role) => `${role.character} in ${withYear(role.title, role.year)}`));
 
 /** What TMDB gave this board, for its credits: stills, the characters its people draw on, and actors' roles and photos. */
 const tmdbGave = (t: Treatment) =>
@@ -106,9 +105,10 @@ function Section({
 }) {
   return (
     <section aria-labelledby={id} className={`flex flex-col gap-6 ${follows ? "" : "print:break-before-page"}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 print:break-after-avoid">
-        {/* The section bar's jump lands on the heading, so the room it leaves for the sticky bar is the heading's. */}
-        <h2 id={id} className="type-head scroll-mt-24 text-section leading-none">
+      <div className="rv flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 print:break-after-avoid">
+        {/* The section bar's jump lands on the heading, so the room it leaves for the header and the sticky bar is the
+            heading's. */}
+        <h2 id={id} className="type-head scroll-mt-[calc(var(--head,0px)+6rem)] text-section leading-none">
           {title}
         </h2>
         {note && <p className="max-w-[60ch] text-ui leading-6 text-faint">{note}</p>}
@@ -144,97 +144,132 @@ function Also({ label, items, mock }: { label: string; items: CompactEntity[]; m
   );
 }
 
+/** A character's initials, for the round mark beside their name: "Marisol \"Sol\" Ferrer" is MF. */
+const initials = (name: string) =>
+  name
+    .replace(/["“”][^"“”]*["“”]\s*/g, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word.charAt(0))
+    .join("")
+    .toUpperCase();
+
 /**
- * The story's people, one to a row: who they are and their sketch in the serif (itsgiving's writing), the character in a
- * title this audience loves that they're drawn from (TMDB's credits, with Qloo's archetypes for the title), and the actor
- * whose presence fits the part, with Qloo's receipt for them and the parts TMDB says they're known for.
+ * The story's people, one to a row: who they are and their sketch in the serif (itsgiving's writing), and the character
+ * in a title this audience loves that they're drawn from (TMDB's credits, with Qloo's archetypes for the title). The
+ * name opens the face this audience knows in a card from the right (side-card.tsx): the actor, the parts TMDB says
+ * they're known for and Qloo's receipt. On paper the face sits in the row itself.
  */
 function Characters({ t, mock, source }: { t: Treatment; mock: boolean; source: string }) {
+  const cards = useId();
   const characters = t.characters ?? [];
   const drawn = characters.some((c) => c.from);
   const faced = characters.some((c) => c.face);
   const note = [
     "itsgiving wrote these characters.",
     drawn && "Each draws on a character in a title this audience loves, as TMDB credits it.",
-    faced && `The actors are ones this audience over-indexes on, each with its rank from ${source}: references for the part, not offers.`,
+    faced && `A name opens the face this audience over-indexes on, with its rank from ${source}: a reference for the part, not an offer.`,
   ]
     .filter(Boolean)
     .join(" ");
   return (
     <Section id="characters" title="Characters" note={note}>
       {characters.length > 0 ? (
-        <ul className="flex flex-col gap-5 print:gap-4">
-          {characters.map((c) => (
-            <li key={c.name} className={`${card} flex flex-col overflow-hidden sm:flex-row`}>
-              {c.face && (
-                <div className="flex shrink-0 flex-col border-line sm:w-48 sm:border-r">
-                  <Still
-                    src={c.face.entity.image ?? c.face.photo}
-                    alt={`Photo of ${c.face.entity.name}`}
-                    className="aspect-[3/2] w-full object-[50%_22%] sm:aspect-[4/5] sm:object-center"
-                  />
-                  <div className="flex flex-col gap-1 p-4">
-                    <p className="text-ui leading-5 font-semibold">{c.face.entity.name}</p>
-                    {c.face.known.length > 0 && (
-                      <p className="text-caption leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
-                    )}
-                    {c.face.photo && <p className="text-caption leading-5 text-faint">Photo: TMDB</p>}
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-1 flex-col gap-4 p-5">
-                <div className="flex flex-col gap-1.5">
-                  <h3 className="type-head text-title leading-tight">{c.name}</h3>
-                  <p className={`${prose} max-w-[64ch]`}>{c.who}</p>
-                </div>
-                <dl className="grid gap-x-8 gap-y-3 xl:grid-cols-2 print:grid-cols-2">
-                  {SKETCH.map(([term, key]) => (
-                    <div key={key} className={`flex flex-col gap-0.5 ${key === "arc" ? "xl:col-span-2 print:col-span-2" : ""}`}>
-                      <dt className="text-caption font-semibold text-faint">{term}</dt>
-                      <dd className="max-w-[64ch] font-serif text-lead leading-snug">
-                        {c[key]}
-                        {key === "arc" && c.beats.length > 0 && (
-                          <>
-                            {" "}
-                            <span className="ml-1 font-sans text-caption whitespace-nowrap text-faint">
-                              {c.beats.length > 1 ? "Beats" : "Beat"} {joinNames(c.beats.map(String))}
-                            </span>
-                          </>
-                        )}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-                {c.from && (
-                  <div className="flex flex-col gap-1 border-t border-line pt-3">
-                    <p className="max-w-[64ch] text-ui leading-6">
-                      <span className="font-semibold">Drawn from {c.from.character}</span> ({c.from.actor}) in{" "}
-                      {withYear(c.from.title.name, c.from.title.year)}
-                      {c.from.take && <span className="font-serif text-lead leading-snug">: {c.from.take}</span>}
-                    </p>
-                    {c.from.archetypes.length > 0 && (
-                      <p className="text-caption leading-5 text-faint">
-                        Qloo&apos;s archetypes for the {c.from.title.kind === "tv_show" ? "series" : "film"}:{" "}
-                        <span className={`font-mono text-label ${evidenceTone(mock)}`}>{c.from.archetypes.join(" / ")}</span>
+        <ul className="flex flex-col gap-12 sm:gap-14 print:gap-5">
+          {characters.map((c, i) => {
+            const card = `${cards}face${i}`;
+            return (
+              <li
+                key={c.name}
+                className="rv grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 gap-y-2 sm:grid-cols-[4.75rem_minmax(0,1fr)] sm:gap-x-6 print:break-inside-avoid"
+              >
+                <span
+                  aria-hidden
+                  className="row-span-2 grid size-14 place-items-center rounded-full bg-field text-subhead font-bold text-dim sm:size-[4.75rem] print:hidden"
+                >
+                  {initials(c.name)}
+                </span>
+                <h3 className="type-head self-center text-title leading-tight print:col-span-2">
+                  {c.face ? (
+                    <NameButton card={card} icon="face">
+                      {c.name}
+                    </NameButton>
+                  ) : (
+                    c.name
+                  )}
+                </h3>
+                <p className={`${prose} max-w-[64ch] print:col-span-2`}>{c.who}</p>
+                <div className="col-span-2 flex flex-col gap-4 sm:col-start-2 sm:col-end-3 print:col-span-2">
+                  <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                    {SKETCH.map(([term, key]) => (
+                      <Fragment key={key}>
+                        <dt className="pt-1 text-small font-semibold text-faint sm:pt-0.5">{term}</dt>
+                        <dd className="max-w-[64ch] font-serif text-lead leading-snug">
+                          {c[key]}
+                          {key === "arc" && c.beats.length > 0 && (
+                            <>
+                              {" "}
+                              <span className="ml-1 font-sans text-caption whitespace-nowrap text-faint">
+                                {c.beats.length > 1 ? "Beats" : "Beat"} {joinNames(c.beats.map(String))}
+                              </span>
+                            </>
+                          )}
+                        </dd>
+                      </Fragment>
+                    ))}
+                  </dl>
+                  {c.from && (
+                    <div className="flex max-w-[70ch] flex-col gap-1 text-small leading-6 text-dim">
+                      <p>
+                        Drawn from <span className="font-semibold text-foreground">{c.from.character}</span> ({c.from.actor}) in{" "}
+                        {withYear(c.from.title.name, c.from.title.year)}
+                        {c.from.take && <span className="font-serif text-lead leading-snug text-foreground">: {c.from.take}</span>}
                       </p>
-                    )}
-                  </div>
-                )}
-                {c.face && (
-                  <Why
-                    label="why this face"
-                    name={c.face.entity.name}
-                    qloo={c.face.qloo}
-                    of="actors"
-                    read={[{ term: "The part", text: c.presence }]}
-                    writtenBy={t.writtenBy}
-                    mock={mock}
-                    className="mt-auto max-w-sm"
-                  />
-                )}
-              </div>
-            </li>
-          ))}
+                      {c.from.archetypes.length > 0 && (
+                        <p className="text-caption leading-5 text-faint">
+                          Qloo&apos;s archetypes for the {c.from.title.kind === "tv_show" ? "series" : "film"}:{" "}
+                          <span className={`font-mono text-label ${evidenceTone(mock)}`}>{c.from.archetypes.join(" / ")}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {c.face && (
+                    <>
+                      <p className="text-small leading-6 text-dim print:hidden">
+                        A face this audience knows:{" "}
+                        <button
+                          type="button"
+                          popoverTarget={card}
+                          aria-haspopup="dialog"
+                          className="cursor-pointer font-semibold text-foreground underline decoration-1 underline-offset-4 [--press:none] hover:decoration-2"
+                        >
+                          {c.face.entity.name}
+                        </button>
+                      </p>
+                      {/* On paper there's no card to open: the face prints in the row, as on the board before. */}
+                      <div className="hidden items-start gap-4 print:flex">
+                        <Still
+                          src={c.face.entity.image ?? c.face.photo}
+                          alt={`Photo of ${c.face.entity.name}`}
+                          className="aspect-[4/5] w-28 shrink-0 rounded-xl"
+                        />
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-ui leading-5 font-semibold">A face for the part: {c.face.entity.name}</p>
+                          {c.face.known.length > 0 && (
+                            <p className="text-caption leading-5 text-faint">Known as {knownAs(c.face.known)}, per TMDB</p>
+                          )}
+                          {c.face.photo && !c.face.entity.image && <p className="text-caption leading-5 text-faint">Photo: TMDB</p>}
+                          <Receipt qloo={c.face.qloo} mock={mock} className="max-w-xs" />
+                        </div>
+                      </div>
+                      <FaceCard id={card} c={c} t={t} mock={mock} />
+                    </>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="text-ui text-dim">The writer sketched no characters for this treatment.</p>
@@ -356,6 +391,42 @@ function Rework({
   );
 }
 
+/**
+ * 3A reading glide (board.css): each part marked `rv` rises into place the first time the reader reaches it. Only a part
+ * that starts below the screen waits; one already above or in view shows at once, and so does one the reader lands on by
+ * a jump (#hash, Back, a section tab), which arrives high on the screen rather than at its foot. The state lives in
+ * `data-rv`, which React never writes, so a re-render can't undo it; and nothing is hidden on paper or without script.
+ */
+function useGlide(article: RefObject<HTMLElement | null>, take: string) {
+  useLayoutEffect(() => {
+    const root = article.current;
+    if (!root) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const part = entry.target as HTMLElement;
+          part.dataset.rv = entry.boundingClientRect.top < window.innerHeight * 0.7 ? "now" : "in";
+          io.unobserve(part);
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px" },
+    );
+    const fold = window.innerHeight;
+    for (const part of root.querySelectorAll<HTMLElement>(".rv")) {
+      if (part.dataset.rv === "in" || part.dataset.rv === "now") continue;
+      // A page Next keeps hidden after you leave it measures nothing: its parts show as they are.
+      const box = part.getBoundingClientRect();
+      if (box.height === 0 || box.top < fold) part.dataset.rv = "now";
+      else {
+        part.dataset.rv = "wait";
+        io.observe(part);
+      }
+    }
+    return () => io.disconnect();
+  }, [article, take]);
+}
+
 export function Board({
   treatment: t,
   state,
@@ -368,7 +439,6 @@ export function Board({
   reworkNote,
   own = true,
   save,
-  morph,
 }: {
   treatment: Treatment;
   /** updating: a re-run is in flight; previous: the last re-run failed, so this is the older version. */
@@ -388,8 +458,6 @@ export function Board({
   own?: boolean;
   /** Saving to an account, beside Save as PDF: the studio's SaveControl, or a saved treatment's own controls. */
   save?: ReactNode;
-  /** On an example's own page, its slug, so the cover can finish a homepage poster's match cut (morph.ts). */
-  morph?: string;
 }) {
   const lingo = useLingo().t;
   const whose = own ? "your" : "the director's";
@@ -411,28 +479,37 @@ export function Board({
   const cover = useRef<HTMLElement>(null);
   const article = useRef<HTMLElement>(null);
   usePrintTitle(t.title, article);
-  // Where the shoot-base map exists, it stays put beside the locations and lights the pin of the one being read.
-  const pinned = (t.base?.map?.tiles.length ?? 0) > 0 && t.locations.length > 0;
+  useGlide(article, `${t.id}-${t.createdAt}`);
+  const cards = useId();
+  // Where the shoot-base map exists, it's held beside the locations, one place to a screen, and lights the pin of the
+  // one being read.
+  const held = (t.base?.map?.tiles.length ?? 0) > 0 && t.locations.length > 0;
   const referenceGrid = fill(t.references.length, "first");
   const beatGrid = fill(t.beats.length, "last");
   const placeGrid = fill(t.locations.length, "first");
   const overlap = withoutIdentity(t.audience.overlap);
   const tasteTags = withoutIdentity(t.audience.taste_tags);
+  const tone = toneOf(t);
   const [reading, setReading] = useState(0);
   const placeCards = useRef<(HTMLLIElement | null)[]>([]);
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setReading(Number((entry.target as HTMLElement).dataset.place));
+  // The place being read is the one nearest the middle of the screen, here and on the map.
+  useScrollFrame(
+    useCallback(() => {
+      const mid = window.innerHeight * 0.55;
+      let best = -1;
+      let bestDistance = Infinity;
+      placeCards.current.forEach((el, i) => {
+        const box = el?.getBoundingClientRect();
+        if (!box || box.height === 0) return;
+        const distance = Math.abs(box.top + box.height / 2 - mid);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = i;
         }
-      },
-      // A location counts as read once it crosses the upper middle of the screen.
-      { rootMargin: "-35% 0px -60% 0px" },
-    );
-    for (const el of placeCards.current) if (el) observer.observe(el);
-    return () => observer.disconnect();
-  }, [t]);
+      });
+      if (best >= 0) setReading((was) => (was === best ? was : best));
+    }, []),
+  );
   return (
     <article
       ref={article}
@@ -452,7 +529,6 @@ export function Board({
       <div className="flex flex-col gap-6 print:break-after-page">
         <Cover
           ref={cover}
-          morph={morph}
           t={t}
           still={still}
           fontId={fontId}
@@ -469,25 +545,29 @@ export function Board({
       <SectionBar t={t} fontId={fontId} take={take} running={running} cover={cover} article={article} back={back} />
 
       <Section id="concept" title="Concept">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem] print:grid-cols-[minmax(0,1fr)_22rem]">
-          <p className="max-w-[44ch] font-serif text-logline leading-[1.32] text-pretty">{t.concept}</p>
-          {toneOf(t).length > 0 && (
-            <div className={`${card} flex flex-col gap-4 p-5`}>
-              <h3 className="text-small font-semibold text-dim">How the tone reads</h3>
-              <ul className="flex flex-col gap-4">
-                {toneOf(t).map((tone) => (
-                  <li key={tone.tag.id} className="flex flex-col gap-1">
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-caption">
-                      <span className={`font-mono font-semibold ${evidenceTone(mock)}`}>{tagLabel(tone.tag.name)}</span>
-                      <span className="text-faint">{tone.source === "overlap" ? lingo.shared(whose) : "audience taste"}</span>
-                    </p>
-                    <p className="font-serif text-prose leading-snug">{tone.note}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        <p className="rv max-w-[52ch] font-serif text-logline leading-[1.4] text-pretty">{t.concept}</p>
+        {tone.length > 0 && (
+          <div className={`${card} rv mt-4 p-6 sm:p-8 lg:mt-8`}>
+            <h3 className="type-head text-subhead leading-tight">How the tone reads</h3>
+            <p className="mt-1.5 text-small text-faint">
+              Each tone tag from {mock ? "the synthetic mock, not Qloo" : "Qloo"}, and what the treatment does with it.
+            </p>
+            <ul className="mt-3 flex flex-col">
+              {tone.map((x) => (
+                <li
+                  key={x.tag.id}
+                  className="rv rv-soft grid gap-x-9 gap-y-2 border-t border-line py-5 first:border-t-0 last:pb-0 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] print:grid-cols-[14rem_minmax(0,1fr)] print:break-inside-avoid"
+                >
+                  <p className="flex flex-col items-start gap-1.5">
+                    <span className={`font-mono text-caption font-semibold ${evidenceTone(mock)}`}>{tagLabel(x.tag.name)}</span>
+                    <span className="text-caption text-faint">{x.source === "overlap" ? lingo.shared(whose) : "audience taste"}</span>
+                  </p>
+                  <p className="max-w-[54ch] font-serif text-prose leading-snug">{x.note}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Section>
 
       <Section
@@ -503,7 +583,7 @@ export function Board({
               const series = r.entity.kind === "tv_show";
               const year = series ? ["Series", r.entity.year].filter(Boolean).join(", ") : r.entity.year;
               return (
-                <li key={r.entity.id} className={`${card} flex flex-col overflow-hidden ${referenceGrid.span(i)} ${printRow}`}>
+                <li key={r.entity.id} className={`${card} rv flex flex-col overflow-hidden ${referenceGrid.span(i)} ${printRow}`}>
                   <Still
                     src={r.still ? tmdbSize(r.still, "w780") : r.entity.image}
                     alt={r.still ? `Still from ${r.entity.name}` : `Poster for ${r.entity.name}`}
@@ -549,7 +629,7 @@ export function Board({
       <Section id="beats" title="Beats">
         <ol className={`grid gap-4 ${beatGrid.grid}`}>
           {t.beats.map((beat, i) => (
-            <li key={i} className={`${card} flex flex-col gap-2.5 p-5 ${beatGrid.span(i)}`}>
+            <li key={i} className={`${card} rv rv-soft flex flex-col gap-2.5 p-5 ${beatGrid.span(i)}`}>
               <span aria-hidden className="type-poster text-display-sm text-foreground/20">
                 {i + 1}
               </span>
@@ -637,22 +717,32 @@ export function Board({
       <Section
         id="wardrobe"
         title="Wardrobe"
-        note={`Brands this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the looks.`}
+        note={`Brands this audience over-indexes on, each with its rank from ${source}. itsgiving wrote the looks. A brand's name opens what ${mock ? "the mock" : "Qloo"} says about it.`}
       >
         {t.wardrobe.length === 0 ? (
           <p className="text-ui text-dim">{mock ? "The mock" : "Qloo"} returned no brands for this brief.</p>
         ) : (
-          <ul className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
+          <ul className="flex flex-col">
             {t.wardrobe.map((w, i) => {
+              const brandCard = `${cards}brand${i}`;
               const price = priceLine(w.entity.brand?.price);
               const reference = aboveBudget(w.entity, t.brief.budget);
               return (
                 <li
                   key={w.entity.id}
-                  className={`${card} flex flex-col gap-3.5 p-5 ${i === t.wardrobe.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
+                  className="rv rv-soft flex flex-col gap-2 border-b border-line py-6 first:pt-0 last:border-b-0 last:pb-0 print:break-inside-avoid print:py-4"
                 >
-                  <div className="flex flex-col gap-1">
-                    <h3 className="type-head text-title leading-tight">{w.entity.name}</h3>
+                  <h3 className="type-head text-subhead leading-tight">
+                    <NameButton card={brandCard} icon="look">
+                      {w.entity.name}
+                    </NameButton>
+                  </h3>
+                  <p className={`${prose} max-w-[62ch]`}>{w.notes.look}</p>
+                  <p className={`font-mono text-label leading-5 tabular-nums ${evidenceTone(mock)} print:hidden`}>
+                    {mock ? "mock " : ""}rank {w.qloo.rank} of {w.qloo.of} for this audience
+                  </p>
+                  {/* On paper there's no card to open: what Qloo says about the brand prints in the row. */}
+                  <div className="hidden flex-col gap-2 print:flex">
                     <QlooTags tags={w.qloo.tags} />
                     {price && (
                       <p className="text-small text-faint">
@@ -660,22 +750,10 @@ export function Board({
                         {reference && `, above ${budgetPhrase(t.brief.budget)}: rent it or match it`}
                       </p>
                     )}
+                    <QlooNote text={w.entity.brand?.style} mock={mock} />
+                    <Receipt qloo={w.qloo} mock={mock} className="max-w-xs" />
                   </div>
-                  <QlooNote text={w.entity.brand?.style} mock={mock} />
-                  <p className={`${prose} max-w-[64ch]`}>{w.notes.look}</p>
-                  <Why
-                    label="why this brand"
-                    name={w.entity.name}
-                    qloo={w.qloo}
-                    facts={[
-                      { term: "Style", text: w.entity.brand?.style },
-                      { term: "Prices", text: price },
-                    ]}
-                    read={[{ term: "The look", text: w.notes.look }]}
-                    writtenBy={t.writtenBy}
-                    mock={mock}
-                    className="mt-auto"
-                  />
+                  <BrandCard id={brandCard} w={w} t={t} mock={mock} />
                 </li>
               );
             })}
@@ -689,22 +767,16 @@ export function Board({
         title="Locations"
         note={`Real places in ${t.brief.city} whose regulars share this audience's taste, found by ${source}. Confirm availability and filming permission with each venue.`}
       >
-        <div className={pinned ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]" : "contents"}>
-          <div className={pinned ? PINNED.wrap : ""}>
-            <ShootBaseBlock
-              base={t.base}
-              pins={locationPins(t)}
-              city={t.brief.city}
-              audience={audiencePhrase(t.subjects)}
-              mock={mock}
-              active={pinned ? reading : undefined}
-              pinned={pinned}
-            />
-          </div>
-          {t.locations.length === 0 ? (
-            <p className="text-ui text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
-          ) : (
-            <ul className={`${pinned ? "flex flex-col gap-5" : `grid gap-5 ${placeGrid.grid}`} print:flex print:flex-col print:gap-4`}>
+        {/* With a map: the places one to a screen on the left, the map held on the right with the one being read lit
+            (board.css; on a phone the map comes first). Without one, the shoot base's own block, then the places. */}
+        {!held && (
+          <ShootBaseBlock base={t.base} pins={locationPins(t)} city={t.brief.city} audience={audiencePhrase(t.subjects)} mock={mock} />
+        )}
+        {t.locations.length === 0 ? (
+          <p className="text-ui text-dim">No locations came back for {t.brief.city}. Check the city name, or try a nearby one.</p>
+        ) : (
+          <div className={held ? "locs" : "contents"} data-live={held && t.locations.length > 1 ? "" : undefined}>
+            <ol className={`${held ? "flex flex-col gap-12" : `grid gap-5 ${placeGrid.grid}`} print:flex print:flex-col print:gap-4`}>
               {t.locations.map((l, i) => {
                 const place = l.entity.place;
                 // Mumbai's neighbourhoods come back as ward codes ("H/W Ward"), which say less than the base does.
@@ -720,6 +792,7 @@ export function Board({
                   place?.lat !== undefined && place?.lon !== undefined
                     ? `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lon}#map=17/${place.lat}/${place.lon}`
                     : undefined;
+                const lit = held && reading === i;
                 return (
                   <li
                     key={l.entity.id}
@@ -727,13 +800,18 @@ export function Board({
                       placeCards.current[i] = el;
                     }}
                     data-place={i}
-                    className={`${card} flex flex-col overflow-hidden ${pinned ? (reading === i ? "ring-2 ring-foreground" : "") : placeGrid.span(i)} ${printRow} print:ring-0`}
+                    data-lit={lit ? "" : undefined}
+                    className={`${
+                      held ? "loc flex flex-col gap-4" : `${card} flex flex-col overflow-hidden ${placeGrid.span(i)}`
+                    } ${printRow} print:overflow-hidden print:rounded-[26px] print:border print:border-line print:bg-card print:break-inside-avoid`}
                   >
                     <div className={`relative ${printPicture}`}>
                       <Still
                         src={l.entity.image}
                         alt={`Photo of ${l.entity.name}`}
-                        className={`${pinned ? "aspect-video" : `aspect-[3/2] ${placeGrid.wide(i)}`} w-full print:aspect-video`}
+                        className={`${
+                          held ? "aspect-[16/10] rounded-[20px] lg:pin:max-h-[44dvh]" : `aspect-[3/2] ${placeGrid.wide(i)}`
+                        } w-full print:aspect-video print:max-h-none print:rounded-none`}
                       />
                       {/* Director's cut only: on a real photo of the place, a date reads as the day it was taken. */}
                       <span className="cut-only">
@@ -747,7 +825,7 @@ export function Board({
                       {t.base?.map && map && (
                         <span
                           className={`absolute top-3 left-3 grid size-8 place-items-center rounded-full text-small font-bold ${
-                            pinned && reading === i ? "bg-accent text-ink" : "bg-ink text-white"
+                            lit ? "bg-accent text-ink" : "bg-ink text-white"
                           }`}
                         >
                           <span className="sr-only">Location </span>
@@ -755,16 +833,18 @@ export function Board({
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-1 flex-col gap-3 p-5 print:contents">
+                    <div className={`flex flex-1 flex-col gap-3 ${held ? "" : "p-5"} print:contents`}>
                       <div className={printRead}>
                         <div>
-                          <h3 className="type-head text-title leading-tight">{l.entity.name}</h3>
+                          <h3 className={`type-head leading-tight ${held ? "text-title lg:pin:text-heading" : "text-title"}`}>
+                            {l.entity.name}
+                          </h3>
                           {where && <p className="mt-1 text-small text-faint">{where}</p>}
                           {hours && <p className="text-small text-faint">Open {hours}</p>}
                           {suits && <p className="text-small text-faint">{suits}</p>}
                         </div>
                         <QlooNote text={place?.ambience} mock={mock} />
-                        <p className={prose}>{l.notes.scene}</p>
+                        <p className={`${prose} ${held ? "max-w-[52ch]" : ""}`}>{l.notes.scene}</p>
                       </div>
                       <Why
                         label="why this place"
@@ -778,7 +858,7 @@ export function Board({
                         read={[{ term: "The scene", text: l.notes.scene }]}
                         writtenBy={t.writtenBy}
                         mock={mock}
-                        className={`mt-auto ${printReceipt}`}
+                        className={`${held ? "max-w-sm" : "mt-auto"} ${printReceipt}`}
                       />
                       {/* The map and the venue's own number and site, to ask about filming there. On paper they close the
                           writing's column (live links in a PDF). */}
@@ -807,25 +887,41 @@ export function Board({
                   </li>
                 );
               })}
-            </ul>
-          )}
-        </div>
+            </ol>
+            {held && (
+              <div className="loc-map print:break-before-avoid">
+                <ShootBaseBlock
+                  base={t.base}
+                  pins={locationPins(t)}
+                  city={t.brief.city}
+                  audience={audiencePhrase(t.subjects)}
+                  mock={mock}
+                  active={reading}
+                  held
+                />
+              </div>
+            )}
+          </div>
+        )}
         <Also label="More to scout:" items={t.extras.locations} mock={mock} />
       </Section>
 
       <Section id="camera" title="Camera and light">
-        <div className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
+        <div className="grid gap-10 md:grid-cols-2 md:gap-14 print:grid-cols-2 print:gap-8">
           {(
             [
               ["Lighting", t.lighting],
               ["Shots", t.shots],
             ] as const
-          ).map(([label, lines]) => (
-            <div key={label} className={`${card} p-5`}>
-              <h3 className="text-small font-semibold text-dim">{label}</h3>
-              <ul className="mt-1 flex flex-col divide-y divide-line">
+          ).map(([label, lines], k) => (
+            <div key={label} className="rv print:break-inside-avoid" style={{ "--d": `${k * 120}ms` } as CSSProperties}>
+              <h3 className="type-head text-title leading-tight">{label}</h3>
+              <ul className="mt-4 flex flex-col gap-3.5">
                 {lines.map((line, i) => (
-                  <li key={i} className={`py-3 ${prose}`}>
+                  <li
+                    key={i}
+                    className={`relative pl-5 ${prose} before:absolute before:top-[0.62em] before:left-0 before:size-[7px] before:rounded-full before:bg-faint`}
+                  >
                     {line}
                   </li>
                 ))}
@@ -851,7 +947,7 @@ export function Board({
               {t.music.map((m, i, all) => (
                 <li
                   key={m.entity.id}
-                  className={`${card} flex flex-col gap-3.5 p-5 ${i === all.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
+                  className={`${card} rv flex flex-col gap-3.5 p-5 ${i === all.length - 1 && i % 2 === 0 ? "md:col-span-2 print:col-span-2" : ""}`}
                 >
                   <div className="flex flex-col gap-1">
                     <h3 className="type-head text-title leading-tight">{m.entity.name}</h3>
@@ -899,7 +995,7 @@ export function Board({
             : "What Qloo's taste graph says about this audience: aggregate affinities, never facts about any one person."
         }
       >
-        <div className={`${card} p-6`}>
+        <div className={`${card} rv p-6`}>
           <dl className="grid gap-x-10 gap-y-6 md:grid-cols-[14rem_minmax(0,1fr)] print:grid-cols-[14rem_minmax(0,1fr)]">
             {overlap.length > 0 && (
               <>
@@ -969,7 +1065,7 @@ export function Board({
 
       <Section id="credits" title="Credits" follows>
         <div className="grid items-start gap-5 xl:grid-cols-2">
-          <div className={`${card} p-6`}>
+          <div className={`${card} rv p-6`}>
             <dl className="grid gap-x-8 gap-y-3 text-ui leading-6 sm:grid-cols-[10rem_minmax(0,1fr)]">
               <dt className="text-faint">Built</dt>
               {/* A fixed locale and UTC, so a board rendered on the server (a featured page) reads the same everywhere. */}
@@ -1021,7 +1117,7 @@ export function Board({
               </p>
             )}
           </div>
-          <div className={`${card} p-6 print:hidden`}>{log}</div>
+          <div className={`${card} rv p-6 print:hidden`}>{log}</div>
         </div>
       </Section>
     </article>

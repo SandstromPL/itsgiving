@@ -1,0 +1,297 @@
+/*
+ * A treatment's board (board.tsx and the parts it draws): the reading glide, the title's rack focus, the slide-in card,
+ * the locations held beside their map, the palette's swatches. Plain CSS over the theme's tokens, so it follows every
+ * room. Paper never sees a motion or a hidden part: the hiding rules are for screens only.
+ */
+
+/* ---------- 3A reading glide: each part rises into place as the reader reaches it, once ----------
+ * board.tsx (useGlide) marks a part `data-rv="wait"` only when it starts below the screen; a part already above or in
+ * view, or reached by a jump (#hash, Back, a section tab), shows at once ("now"). Without script nothing is hidden. */
+@media screen {
+  .rv[data-rv="wait"] {
+    opacity: 0;
+    translate: 0 28px;
+  }
+  .rv.rv-soft[data-rv="wait"] {
+    translate: 0 14px;
+  }
+  .rv[data-rv="in"] {
+    transition:
+      opacity 620ms ease-out var(--d, 0ms),
+      translate 900ms var(--ease-focal, cubic-bezier(0.16, 1, 0.3, 1)) var(--d, 0ms);
+  }
+  .rv.rv-soft[data-rv="in"] {
+    transition-duration: 700ms, 820ms;
+  }
+}
+@media screen and (prefers-reduced-motion: reduce) {
+  .rv[data-rv="wait"],
+  .rv.rv-soft[data-rv="wait"] {
+    translate: none;
+  }
+  .rv[data-rv="in"],
+  .rv.rv-soft[data-rv="in"] {
+    transition: opacity 250ms ease-out;
+  }
+}
+
+/* ---------- 1B rack focus: the title sharpens word by word, once per take (cover.tsx) ----------
+ * A CSS animation, so it starts with the first paint of a prerendered page rather than after the page comes to life.
+ * Reduced motion: a fade, word after word. */
+@keyframes rack-in {
+  from {
+    opacity: 0;
+    filter: blur(16px);
+    transform: scale(1.08);
+  }
+}
+@keyframes rack-fade {
+  from {
+    opacity: 0;
+  }
+}
+.rack-w {
+  display: inline-block;
+}
+@media screen {
+  .rack .rack-w {
+    animation: rack-in 1000ms var(--ease-soft, cubic-bezier(0.22, 1, 0.36, 1)) backwards;
+    animation-delay: calc(180ms + var(--i, 0) * 110ms);
+  }
+}
+@media screen and (prefers-reduced-motion: reduce) {
+  .rack .rack-w {
+    animation-name: rack-fade;
+    animation-duration: 320ms;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+}
+
+/* ---------- The slide-in card: a character's face or a brand, from the right (side-card.tsx) ----------
+ * A popover in the top layer. It slides in on the drawer's curve and leaves a little faster; reduced motion only fades.
+ * On a phone it takes the screen's width, at the foot of the screen. */
+[popover].side-card {
+  position: fixed;
+  inset: auto;
+  /* Centred in the screen below the site header (--head), when there is one. */
+  top: calc(50% + var(--head, 0px) / 2);
+  right: max(16px, env(safe-area-inset-right, 0px));
+  margin: 0;
+  width: min(22rem, calc(100vw - 32px));
+  max-height: calc(100dvh - var(--head, 0px) - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 30px 70px rgb(0 0 0 / 0.5);
+  opacity: 0;
+  translate: calc(100% + 48px) -50%;
+  transition:
+    translate 260ms cubic-bezier(0.5, 0, 0.75, 0),
+    opacity 200ms ease,
+    overlay 260ms allow-discrete,
+    display 260ms allow-discrete;
+}
+[popover].side-card:popover-open {
+  opacity: 1;
+  translate: 0 -50%;
+  transition:
+    translate 480ms var(--ease-drawer),
+    opacity 180ms ease,
+    overlay 480ms allow-discrete,
+    display 480ms allow-discrete;
+}
+@starting-style {
+  [popover].side-card:popover-open {
+    opacity: 0;
+    translate: calc(100% + 48px) -50%;
+  }
+}
+@media (max-width: 40rem) {
+  [popover].side-card {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100dvh - 24px);
+    translate: calc(100% + 16px) 0;
+  }
+  [popover].side-card:popover-open {
+    translate: 0 0;
+  }
+  @starting-style {
+    [popover].side-card:popover-open {
+      translate: calc(100% + 16px) 0;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [popover].side-card,
+  [popover].side-card:popover-open {
+    translate: 0 -50%;
+  }
+  @starting-style {
+    [popover].side-card:popover-open {
+      translate: 0 -50%;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 40rem) {
+  [popover].side-card,
+  [popover].side-card:popover-open {
+    translate: 0 0;
+  }
+  @starting-style {
+    [popover].side-card:popover-open {
+      translate: 0 0;
+    }
+  }
+}
+[popover].side-card::backdrop {
+  background: transparent;
+}
+
+/* The name that opens it: the name itself, underlined on hover, with a small mark after it. */
+.namebtn {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.14em;
+  text-decoration-thickness: 0.06em;
+  transition: scale 150ms var(--ease-out);
+}
+.namebtn .nb {
+  display: inline-grid;
+  place-items: center;
+  width: 1.05em;
+  height: 1.05em;
+  margin-left: 0.32em;
+  vertical-align: -0.12em;
+  border-radius: 50%;
+  background: var(--field);
+  color: var(--dim);
+}
+.namebtn .nb svg {
+  width: 0.6em;
+  height: 0.6em;
+}
+.namebtn:focus-visible {
+  text-decoration-color: currentColor;
+}
+@media print {
+  .namebtn .nb {
+    display: none;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .namebtn:hover {
+    text-decoration-color: currentColor;
+  }
+  .namebtn:hover .nb {
+    background: var(--foreground);
+    color: var(--background);
+  }
+}
+
+/* ---------- Locations: one place to a screen on the left, the map held on the right ----------
+ * From a laptop's width on a screen at least 34rem tall (base-map.tsx's FILL is the same query). The map sits under the
+ * site header (--head, when there is one) and the section bar. Below that, the map comes first and the places follow. */
+.locs {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.loc-map {
+  order: -1;
+}
+@media screen and (min-width: 64rem) and (min-height: 34rem) {
+  .locs {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.94fr);
+    align-items: start;
+    gap: clamp(28px, 4vw, 64px);
+  }
+  .loc-map {
+    order: 0;
+    position: sticky;
+    top: calc(var(--head, 0px) + 4.5rem);
+    height: calc(100dvh - var(--head, 0px) - 5.5rem);
+  }
+  .loc {
+    min-height: calc(100dvh - var(--head, 0px) - 5rem);
+    justify-content: center;
+    padding-block: 1.75rem;
+  }
+  .locs[data-live] .loc {
+    transition: opacity 420ms ease;
+  }
+  .locs[data-live] .loc:not([data-lit]) {
+    opacity: 0.32;
+  }
+}
+
+/* ---------- Palette: the swatches lift as a pointer passes over them ---------- */
+.swatch {
+  position: relative;
+  transition: transform 300ms var(--ease-out);
+}
+/* The lifted swatch's shadow is its own layer, faded in, so only transform and opacity animate. */
+.swatch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 30px 56px rgb(0 0 0 / 0.45);
+  opacity: 0;
+  transition: opacity 300ms var(--ease-out);
+  pointer-events: none;
+}
+.swatch-btn:focus-visible {
+  outline: none;
+}
+.swatch-btn:focus-visible .swatch {
+  box-shadow:
+    0 0 0 3px var(--background),
+    0 0 0 5px var(--foreground);
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .swatch-btn:hover {
+    position: relative;
+    z-index: 2;
+  }
+  .swatch-btn:hover .swatch {
+    transform: translateY(-14px) scale(1.08);
+  }
+  .swatch-btn:hover .swatch::after {
+    opacity: 1;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+  .swatch-btn:hover .swatch {
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 0 5px var(--foreground);
+  }
+}
+@media print {
+  .swatch {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .swatch::after {
+    display: none;
+  }
+}

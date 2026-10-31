@@ -136,11 +136,13 @@ export function SectionBar({
     let frame = 0;
     const update = () => {
       frame = 0;
-      setStuck((cover.current?.getBoundingClientRect().bottom ?? 1) < 0);
+      // The site header's height, when it's over the page (site-header.tsx sets --head).
+      const head = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--head")) || 0;
+      setStuck((cover.current?.getBoundingClientRect().bottom ?? 1) < head);
       let reading: string | null = null;
       for (const id of ids.split(" ")) {
         const heading = article.current?.querySelector(`#${id}`);
-        if (heading && heading.getBoundingClientRect().top <= 120) reading = id;
+        if (heading && heading.getBoundingClientRect().top <= 120 + head) reading = id;
       }
       setCurrent(reading);
       const box = article.current?.getBoundingClientRect();
@@ -171,7 +173,8 @@ export function SectionBar({
       : undefined;
 
   return (
-    <div className="sticky top-0 z-30 bg-background shadow-[0_0_0_100vmax_var(--background)] [clip-path:inset(0_-100vmax)] print:hidden">
+    // Under the site header once that's on screen (its height is --head), else at the very top.
+    <div className="sticky top-[var(--head,0px)] z-30 bg-background shadow-[0_0_0_100vmax_var(--background)] [clip-path:inset(0_-100vmax)] print:hidden">
       <div className="flex items-center gap-3 py-2">
         <div
           inert={!stuck}

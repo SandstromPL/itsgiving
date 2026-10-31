@@ -7,6 +7,7 @@ import { SiteHeader } from "@/app/studio/site-header";
 import { EXAMPLES } from "@/lib/agent/examples";
 import { featuredItem, featuredOffered } from "@/lib/agent/featured";
 import { forBrowser } from "@/lib/agent/redact";
+import { SmoothScroll } from "@/app/smooth";
 import { FeaturedBoard } from "./featured-board";
 
 // A featured treatment as a page of its own: built with the site from the pre-built set, so it opens at once, and
@@ -42,7 +43,9 @@ export default async function FeaturedPage({ params }: PageProps<"/t/[slug]">) {
   const item = lookup(slug);
   return (
     <>
-      <SiteHeader current="examples" badges={item && <ModeBadges qloo="live" llm="live" treatment={item.treatment} />} />
+      {/* The board arrives through the camera, so its title card has the screen: the header comes in once you scroll. */}
+      <SiteHeader current="examples" reveal="scroll" badges={item && <ModeBadges qloo="live" llm="live" treatment={item.treatment} />} />
+      <SmoothScroll />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-8 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
         {item ? (
           <FeaturedBoard slug={slug} treatment={item.treatment} />
