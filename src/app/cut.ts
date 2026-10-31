@@ -84,8 +84,9 @@ function ensureLayers() {
 }
 
 /**
- * The slate fills the frame, claps, and is pulled up out of it; `pulled` runs as the pull starts. Its arrival and its
- * pull are Web Animations of transform and opacity, so the compositor keeps them smooth while the board renders
+ * The slate fills the frame, claps, and is pulled up out of it; `pulled` runs as the pull starts. It keeps a slate's
+ * own brisk pace on set (about 1.8 s in all), while the camera that follows rolls at its slower one. Its arrival and
+ * its pull are Web Animations of transform and opacity, so the compositor keeps them smooth while the board renders
  * underneath; only the stick's clap is drawn frame by frame.
  */
 async function slateScene(take: HTMLDivElement, info: Slate, pulled?: () => void) {
@@ -95,31 +96,31 @@ async function slateScene(take: HTMLDivElement, info: Slate, pulled?: () => void
   const stick = take.querySelector("[data-stick]")!;
   const set = (k: number) => stick.setAttribute("transform", `rotate(${(STICK_OPEN * k).toFixed(2)} 1.6 7.9)`);
   if (reduced()) {
-    await card.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: "ease-out", fill: "both" }).finished;
-    await wait(650);
+    await card.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease-out", fill: "both" }).finished;
+    await wait(450);
     set(0);
-    await wait(750);
+    await wait(520);
     pulled?.();
-    await card.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 360, easing: "ease-in", fill: "both" }).finished;
+    await card.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: "ease-in", fill: "both" }).finished;
   } else {
     await card.animate(
       [
-        { opacity: 0, transform: "translateY(64px) scale(0.94)" },
+        { opacity: 0, transform: "translateY(40px) scale(0.95)" },
         { opacity: 1, transform: "none" },
       ],
       {
-        duration: 760,
+        duration: 380,
         easing: SOFT,
         fill: "both",
       },
     ).finished;
-    await wait(560);
-    await tween(340, (_, t) => set(clapCurve(t)));
-    await wait(680);
+    await wait(380);
+    await tween(275, (_, t) => set(clapCurve(t)));
+    await wait(340);
     const rise = innerHeight / 2 + card.getBoundingClientRect().height;
     pulled?.();
     await card.animate([{ transform: "none" }, { transform: `translateY(${-rise}px) rotate(-2.5deg)` }], {
-      duration: 1050,
+      duration: 440,
       easing: SMOOTH,
       fill: "both",
     }).finished;
@@ -224,7 +225,7 @@ export async function playCut(go: () => unknown, { slate }: { slate?: Slate } = 
     })();
     svg.style.opacity = "0";
     draw();
-    await tween(slate ? 400 : 280, (e) => (svg.style.opacity = String(e)), ease.outCubic);
+    await tween(slate ? 220 : 280, (e) => (svg.style.opacity = String(e)), ease.outCubic);
     const swapped = settle(go());
     if (slate) {
       // The camera comes in as the slate leaves the frame.
