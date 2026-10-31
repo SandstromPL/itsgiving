@@ -43,8 +43,7 @@ export default async function FeaturedPage({ params }: PageProps<"/t/[slug]">) {
   const item = lookup(slug);
   return (
     <>
-      {/* The board arrives through the camera, so its title card has the screen: the header comes in once you scroll. */}
-      <SiteHeader current="examples" reveal="scroll" badges={item && <ModeBadges qloo="live" llm="live" treatment={item.treatment} />} />
+      <SiteHeader current="examples" badges={item && <ModeBadges qloo="live" llm="live" treatment={item.treatment} />} />
       <SmoothScroll />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-8 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
         {item ? (

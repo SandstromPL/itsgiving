@@ -9,6 +9,15 @@
   position: relative;
   height: calc(100svh * 3.7);
 }
+/* The mark the site header waits for (opening.tsx places it): it comes in as this reaches the top of the screen. */
+.intro-at {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
 .intro-stage {
   position: sticky;
   top: 0;

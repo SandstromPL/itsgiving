@@ -26,8 +26,8 @@ function skipToContent(event: MouseEvent<HTMLAnchorElement>) {
   scrollToY(Math.max(0, main.getBoundingClientRect().top + window.scrollY - head));
 }
 
-/** When the header is on screen: always, once the page has scrolled, or once an element's top is above 62% of it. */
-export type Reveal = "always" | "scroll" | { after: string };
+/** When the header is on screen: always, or once the page has scrolled to an element (its top at the screen's top). */
+export type Reveal = "always" | { after: string };
 
 /**
  * The header on every page: the camera tile and the lettermark, the same three links with the current section lit,
@@ -35,9 +35,9 @@ export type Reveal = "always" | "scroll" | { after: string };
  * profile menu (the rooms, and the account when accounts are set up). Pages add only status badges, live or mock.
  * Each page names its section rather than the header reading the URL: with Cache Components a pathname read can
  * suspend on a route's fallback shell, and a featured treatment's page must stay static.
- * It stays at the top. The homepage keeps it away until "Watch it work" (`reveal={{ after }}`) and a board until you
- * scroll (`"scroll"`): those pages start under no header, so there it lies over the page instead of above it. Keyboard
- * focus inside it always shows it. Its height is `--head` on <html>, for what sticks below it. On phones it takes two
+ * It stays at the top. The homepage keeps it away through the title card and brings it in with the headline
+ * (`reveal={{ after }}`, a mark the opening places at that point of its scroll, so a returning visitor, who opens on the
+ * headline, has it at once): there it lies over the page instead of above it. Keyboard focus inside it always shows it. Its height is `--head` on <html>, for what sticks below it. On phones it takes two
  * rows: the marks, the unc switch and the profile menu, then the links.
  */
 export function SiteHeader({
@@ -66,11 +66,10 @@ export function SiteHeader({
     return () => observer.disconnect();
   }, []);
 
-  useScrollFrame((y) => {
-    if (reveal === "always") return;
-    if (reveal === "scroll") return setShown(y > 40);
-    const target = after ? onScreen(after) : null;
-    setShown(target ? target.getBoundingClientRect().top < innerHeight * 0.62 : true);
+  useScrollFrame(() => {
+    if (!after) return;
+    const target = onScreen(after);
+    setShown(target ? target.getBoundingClientRect().top <= 1 : true);
   });
 
   return (

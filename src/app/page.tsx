@@ -10,13 +10,13 @@ import { SiteHeader } from "./studio/site-header";
 /**
  * The pitch, one block to a screen: the title card dollied through to the line, the pitch, the featured treatments on a
  * flatbed, one real run step by step, and the way in. It holds no form and reads nothing per request, so the whole page
- * is built once, featured treatments included. The header waits until "Watch it work".
+ * is built once, featured treatments included. The header comes in with the headline, once the title card is through.
  */
 export default function Home() {
   const { live, frames, run } = showData();
   return (
     <>
-      <SiteHeader home reveal={{ after: "how" }} />
+      <SiteHeader home reveal={{ after: "headline-at" }} />
       <SmoothScroll />
       <main className="flex flex-1 flex-col">
         <Opening />

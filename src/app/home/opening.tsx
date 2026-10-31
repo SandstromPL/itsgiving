@@ -84,6 +84,7 @@ export function Opening() {
   const ui = useRef<HTMLDivElement>(null);
   const skipButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const headerAt = useRef<HTMLSpanElement>(null);
   const s = useRef({
     /** Whether the title card plays: decided once per page, so Back to a page Next kept keeps the layout it left. */
     on: null as boolean | null,
@@ -218,6 +219,11 @@ export function Opening() {
     s.hold = s.reduce || !s.on ? 0 : Math.round(innerHeight * 1.1);
     s.dist = s.on ? Math.round(innerHeight * 1.6) : 0;
     sec.style.height = `${s.H + s.dist + s.hold}px`;
+    // Where the site header comes in (it waits for this mark to reach the top): as the first word racks in; under
+    // reduced motion once the words have faded in, when Skip goes from the corner the header takes. A returning
+    // visitor's headline has it at once.
+    const at = !s.on ? 0 : s.reduce ? s.dist * 0.8 : s.dist + s.hold * WORDS.start;
+    if (headerAt.current) headerAt.current.style.top = `${Math.round(at)}px`;
     s.top = sec.getBoundingClientRect().top + scrollY;
     place(scrollY);
     fit();
@@ -345,6 +351,7 @@ export function Opening() {
 
   return (
     <section ref={section} className="intro" aria-label="itsgiving" data-dark="">
+      <span ref={headerAt} id="headline-at" aria-hidden className="intro-at" />
       <div ref={stage} className="intro-stage">
         <div className="hero">
           <div className="hero-wrap">

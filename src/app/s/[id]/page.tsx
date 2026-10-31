@@ -40,7 +40,7 @@ export default function SavedPage({ params }: PageProps<"/s/[id]">) {
     <Suspense
       fallback={
         <>
-          <SiteHeader reveal="scroll" />
+          <SiteHeader />
           <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-8 px-4 pt-8 pb-16 sm:px-8 sm:pt-10">
             <div
               aria-hidden
@@ -83,11 +83,7 @@ async function Saved({ params }: { params: PageProps<"/s/[id]">["params"] }) {
   const t = item.treatment;
   return (
     <>
-      {/* As on an example's page: the board has the screen, and the header comes in once you scroll. */}
-      <SiteHeader
-        reveal="scroll"
-        badges={<ModeBadges qloo={t.mock.qloo ? "mock" : "live"} llm={t.writtenBy.mock ? "mock" : "live"} treatment={t} />}
-      />
+      <SiteHeader badges={<ModeBadges qloo={t.mock.qloo ? "mock" : "live"} llm={t.writtenBy.mock ? "mock" : "live"} treatment={t} />} />
       <SmoothScroll />
       <main className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col gap-8 px-4 pt-8 pb-16 sm:px-8 sm:pt-10 print:p-0">
         <SavedBoard id={item.id} treatment={t} own={item.ownerId === viewer} shared={item.shared} />
