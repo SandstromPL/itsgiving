@@ -16,9 +16,11 @@ export interface Slate {
 const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
+/** A soft landing, and a smooth start and stop: the slate's arrival and its pull. */
+const SOFT = "cubic-bezier(0.16, 1, 0.3, 1)";
+const SMOOTH = "cubic-bezier(0.65, 0, 0.35, 1)";
 const ease = {
   inQuad: (t: number) => t * t,
-  inCubic: (t: number) => t * t * t,
   outCubic: (t: number) => 1 - (1 - t) ** 3,
   inOutCubic: (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2),
 };
@@ -80,7 +82,11 @@ function ensureLayers() {
   return layers;
 }
 
-/** The slate fills the frame, claps, and is pulled up out of it; `pulled` runs as the pull starts. */
+/**
+ * The slate fills the frame, claps, and is pulled up out of it; `pulled` runs as the pull starts. Its arrival and its
+ * pull are Web Animations of transform and opacity, so the compositor keeps them smooth while the board renders
+ * underneath; only the stick's clap is drawn frame by frame.
+ */
 async function slateScene(take: HTMLDivElement, info: Slate, pulled?: () => void) {
   take.innerHTML = `<div class="slate-card">${slateMarkup(info)}</div>`;
   take.hidden = false;
@@ -88,32 +94,34 @@ async function slateScene(take: HTMLDivElement, info: Slate, pulled?: () => void
   const stick = take.querySelector("[data-stick]")!;
   const set = (k: number) => stick.setAttribute("transform", `rotate(${(STICK_OPEN * k).toFixed(2)} 1.6 7.9)`);
   if (reduced()) {
-    card.style.opacity = "0";
-    await tween(200, (e) => (card.style.opacity = String(e)));
-    await wait(450);
+    await card.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: "ease-out", fill: "both" }).finished;
+    await wait(650);
     set(0);
-    await wait(520);
+    await wait(750);
     pulled?.();
-    await tween(220, (e) => (card.style.opacity = String(1 - e)));
+    await card.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 360, easing: "ease-in", fill: "both" }).finished;
   } else {
-    await tween(
-      380,
-      (e) => {
-        card.style.opacity = String(e);
-        card.style.transform = `translateY(${((1 - e) * 40).toFixed(1)}px) scale(${(0.95 + 0.05 * e).toFixed(4)})`;
+    await card.animate(
+      [
+        { opacity: 0, transform: "translateY(64px) scale(0.94)" },
+        { opacity: 1, transform: "none" },
+      ],
+      {
+        duration: 760,
+        easing: SOFT,
+        fill: "both",
       },
-      ease.outCubic,
-    );
-    await wait(380);
-    await tween(275, (_, t) => set(clapCurve(t)));
-    await wait(340);
+    ).finished;
+    await wait(560);
+    await tween(340, (_, t) => set(clapCurve(t)));
+    await wait(680);
     const rise = innerHeight / 2 + card.getBoundingClientRect().height;
     pulled?.();
-    await tween(
-      440,
-      (e) => (card.style.transform = `translateY(${(-rise * e).toFixed(1)}px) rotate(${(-2.5 * e).toFixed(2)}deg)`),
-      ease.inCubic,
-    );
+    await card.animate([{ transform: "none" }, { transform: `translateY(${-rise}px) rotate(-2.5deg)` }], {
+      duration: 1050,
+      easing: SMOOTH,
+      fill: "both",
+    }).finished;
   }
   take.hidden = true;
   take.innerHTML = "";
@@ -141,10 +149,10 @@ export async function playCut(go: () => unknown, { slate }: { slate?: Slate } = 
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     if (reduced()) {
       svg.innerHTML = `<rect width="${W}" height="${H}" fill="${ink}"/>`;
-      await tween(140, (e) => (svg.style.opacity = String(e)));
+      await tween(220, (e) => (svg.style.opacity = String(e)));
       if (slate) await slateScene(take, slate);
       await settle(go());
-      await tween(220, (e) => (svg.style.opacity = String(1 - e)));
+      await tween(320, (e) => (svg.style.opacity = String(1 - e)));
       return;
     }
     const [bx, by, bw, bh] = CAMERA.box;
@@ -185,14 +193,14 @@ export async function playCut(go: () => unknown, { slate }: { slate?: Slate } = 
     })();
     svg.style.opacity = "0";
     draw();
-    await tween(slate ? 220 : 160, (e) => (svg.style.opacity = String(e)), ease.outCubic);
+    await tween(slate ? 400 : 280, (e) => (svg.style.opacity = String(e)), ease.outCubic);
     const swapped = settle(go());
     if (slate) {
       // The camera comes in as the slate leaves the frame.
       let arriving: Promise<void> | null = null;
       await slateScene(take, slate, () => {
         arriving = tween(
-          460,
+          820,
           (e) => {
             cam.setAttribute("opacity", e.toFixed(3));
             const s = 0.82 + 0.18 * e;
@@ -203,24 +211,24 @@ export async function playCut(go: () => unknown, { slate }: { slate?: Slate } = 
       });
       await arriving;
       cam.removeAttribute("transform");
-      await wait(160);
+      await wait(280);
     }
     await swapped;
     // Roll: up to speed like a motor, and the window opens on the next screen.
-    await tween(320, (e) => ((speed = e), (peek = e)), ease.inQuad);
-    await wait(160);
-    // Park a window at the top, then push through it until it is the screen.
+    await tween(560, (e) => ((speed = e), (peek = e)), ease.inQuad);
+    await wait(220);
+    // Park a window at the top, slowing from the reels' own speed, then push through it until it is the screen.
     const a0 = angle;
     const w = Math.max(60, speed * 0.85 * 360);
     const target = Math.ceil((a0 + w * 0.12) / CAMERA.spacing) * CAMERA.spacing;
     speed = 0;
-    await tween(clamp(((3 * (target - a0)) / w) * 1000, 240, 460), (e) => (angle = a0 + (target - a0) * e), ease.outCubic);
+    await tween(clamp(((3 * (target - a0)) / w) * 1000, 360, 1100), (e) => (angle = a0 + (target - a0) * e), ease.outCubic);
     const p = cameraPortal(angle);
     const px = tx + p.cx * k;
     const py = ty + p.cy * k;
     const far = Math.max(Math.hypot(px, py), Math.hypot(W - px, py), Math.hypot(px, H - py), Math.hypot(W - px, H - py));
     const zMax = (far / (p.r * k)) * 1.05;
-    await tween(600, (e) => (z = Math.exp(Math.log(zMax) * e)), ease.inOutCubic);
+    await tween(1050, (e) => (z = Math.exp(Math.log(zMax) * e)), ease.inOutCubic);
     spinning = false;
   } finally {
     svg.setAttribute("hidden", "");
