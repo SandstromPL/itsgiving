@@ -85,15 +85,33 @@ export function nearMiss(wanted: string, name: string): boolean {
 const WIDER_THAN_A_CITY = new Set(["state", "county", "region", "province", "country"]);
 
 /**
- * A city is never worth a question: take Qloo's first exact match, except that a state or county sharing
- * its name with a city means the city. Live Qloo lists New York State before New York City, and Los Angeles
- * County before the city; Delhi's first match is the state, with no same-name city, so it stays.
+ * How much better known (popularity, 0-1) Qloo's first result must be than the first place with the name as typed for
+ * it to be the place meant. Live "Jaipur" is a suburb of Ranchi (0.50) while the city is Qloo's first result, "Jaipur
+ * Municipal Corporation" (1.0); "Tokyo" is an islet off Dubai (0.22) while the city is "東京都" (1.0). A neighbourhood
+ * typed on purpose is rarely that much less known than whatever comes first.
  */
-function pickLocality(item: z.output<typeof itemSchema>, entities: QlooEntity[]): Resolution {
+const BETTER_KNOWN = 0.3;
+
+/**
+ * A city is never worth a question: take Qloo's first exact match, unless Qloo's own first result is far better known;
+ * then a state or county sharing its name with a city means the city. Live Qloo lists New York State before New York
+ * City, and Los Angeles County before the city; Delhi's first match is the state, with no same-name city, so it stays.
+ */
+export function pickLocality(item: z.output<typeof itemSchema>, entities: QlooEntity[]): Resolution {
   if (entities.length === 0) return { input: item.name, status: "not_found" };
   const wanted = normalizeName(item.name);
   const exact = entities.filter((e) => normalizeName(e.name) === wanted);
-  const first = exact[0] ?? entities[0];
+  const [top] = entities;
+  const lesser = exact[0] && (top.popularity ?? 0) - (exact[0].popularity ?? 0) >= BETTER_KNOWN ? exact[0] : undefined;
+  if (lesser) {
+    return {
+      input: item.name,
+      status: "resolved",
+      match: compactEntity(top, { maxTags: 3 }),
+      note: `Qloo's place named "${item.name}" is a lesser-known one (${lesser.disambiguation ?? lesser.name}), so itsgiving used ${top.name}.`,
+    };
+  }
+  const first = exact[0] ?? top;
   const kind = localityKind(first);
   const city = kind && WIDER_THAN_A_CITY.has(kind) ? exact.find((e) => localityKind(e) === "city") : undefined;
   const match = compactEntity(city ?? first, { maxTags: 3 });

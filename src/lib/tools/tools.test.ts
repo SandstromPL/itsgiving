@@ -6,7 +6,8 @@ import { distanceM, framedGrid, heatGrid, hotAreas, type HeatArea, type HeatGrid
 import { TOOLS, runTool, toolDefinitions } from "./registry";
 import { readAudience, tasteOverlap } from "./taste";
 import { oneBranchEach } from "./treatment";
-import type { CompactEntity, HeatCell } from "../qloo";
+import type { CompactEntity, HeatCell, QlooEntity } from "../qloo";
+import { pickLocality } from "./resolve";
 
 const qloo = createQlooClient({ mode: "mock", baseUrl: "https://mock.qloo.invalid" });
 const ctx = { qloo };
@@ -145,6 +146,49 @@ describe("resolve_entities", () => {
     expect(newYork.note).toContain("is the state");
     expect(mumbai).toMatchObject({ status: "resolved", match: { name: "Mumbai" } });
     expect(mumbai.note).toBeUndefined();
+  });
+
+  // Live Qloo, 2026-10-31: the place named as typed can be a little-known one elsewhere, while the city is Qloo's first result.
+  const place = (name: string, kind: string | undefined, popularity: number, disambiguation: string): QlooEntity => ({
+    name,
+    entity_id: disambiguation,
+    popularity,
+    disambiguation,
+    tags: kind ? [{ id: `urn:tag:genre:locality:${kind}`, name: kind }] : [],
+  });
+  const city = (name: string) => ({ name, type: "locality" as const });
+
+  it("takes Qloo's first result over a far lesser-known place of the same name", () => {
+    const jaipur = pickLocality(city("Jaipur"), [
+      place("Jaipur Municipal Corporation", undefined, 1, "Jaipur Municipal Corporation, Jaipur District, Rajasthan, India"),
+      place("Jaipur District", undefined, 1, "Jaipur District, Rajasthan, India"),
+      place("Jaipur", "suburb", 0.502, "Jaipur, Kanke, Ranchi District, Jharkhand, India"),
+    ]);
+    expect(jaipur).toMatchObject({ status: "resolved", match: { name: "Jaipur Municipal Corporation" } });
+    expect(jaipur.status === "resolved" && jaipur.note).toContain("Ranchi");
+    const tokyo = pickLocality(city("Tokyo"), [
+      place("東京都", "province", 1, "東京都"),
+      place("Tokyo", "islet", 0.216, "Tokyo, Dubai, United Arab Emirates"),
+    ]);
+    expect(tokyo).toMatchObject({ status: "resolved", match: { name: "東京都" } });
+  });
+
+  it("keeps a neighbourhood typed on purpose when it's nearly as well known as the first result", () => {
+    const williamsburg = pickLocality(city("Williamsburg"), [
+      place("Williamsburg", "city", 0.95, "Williamsburg, Virginia, United States of America"),
+      place("Williamsburg", "neighbourhood", 0.9, "Williamsburg, Brooklyn, New York, United States of America"),
+    ]);
+    // Both have the name as typed, so the first of them stays, as before.
+    expect(williamsburg).toMatchObject({
+      status: "resolved",
+      match: { disambiguation: "Williamsburg, Virginia, United States of America" },
+    });
+    const bandra = pickLocality(city("Bandra"), [
+      place("Bandra West", "suburb", 0.97, "Bandra West, H/W Ward, Mumbai, Maharashtra, India"),
+      place("Bandra", "suburb", 0.9, "Bandra, Mumbai, Maharashtra, India"),
+    ]);
+    expect(bandra).toMatchObject({ status: "resolved", match: { name: "Bandra" } });
+    expect(bandra.status === "resolved" && bandra.note).toBeFalsy();
   });
 });
 
