@@ -41,15 +41,15 @@ export function useToast() {
 
 /**
  * A fresh treatment lands with a short toast; the live region already announced it, so this is for the eyes. It's
- * always there, closed until a treatment lands: it rises from the corner a moment after the board (once its letterbox
- * has begun to open), sinks back out keeping its words, and lets taps through to whatever is under it.
+ * always there, closed until a treatment lands: a moment after the board it drops in at the top, under the header, clear
+ * of the board's own buttons (Save, Save as PDF), fades back out keeping its words, and lets taps through.
  */
 export function Toast({ toast }: { toast: ToastNote | null }) {
   return (
     <div
       aria-hidden
       data-open={toast?.open || undefined}
-      className="pointer-events-none fixed right-4 bottom-4 z-40 flex max-w-[min(25rem,calc(100vw-2rem))] translate-y-[calc(100%+1rem)] items-center gap-3.5 rounded-[20px] bg-foreground px-4 py-3.5 text-background opacity-0 shadow-[6px_6px_0_rgb(0_0_0/0.15)] transition-[opacity,translate] duration-200 motion-reduce:translate-y-0 data-open:translate-y-0 data-open:opacity-100 data-open:delay-400 data-open:duration-300 print:hidden"
+      className="pointer-events-none fixed top-[calc(var(--head,0px)+14px)] left-1/2 z-40 flex w-max max-w-[min(25rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-3 items-center gap-3.5 rounded-[20px] bg-foreground px-4 py-3.5 text-background opacity-0 shadow-[0_14px_36px_rgb(0_0_0/0.38)] transition-[opacity,translate] duration-200 motion-reduce:translate-y-0 data-open:translate-y-0 data-open:opacity-100 data-open:delay-400 data-open:duration-300 print:hidden"
     >
       {toast && (
         <>
