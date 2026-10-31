@@ -91,8 +91,9 @@ export function SiteHeader({
         <div className="order-1 lg:mr-2">
           <Wordmark href={home ? undefined : "/"} />
         </div>
-        {/* Before the unc switch; on phones, where the first row is full, at the end of the links, before GitHub. */}
-        <RoomSwitch className={`order-6 ml-auto sm:order-4 ${badges ? "sm:ml-0" : ""}`} />
+        {/* Before the unc switch; on phones, where the first row is full, at the end of the links, before GitHub. With
+            badges it shows the room's dots alone, as on a phone: in Tungsten its name and "Written by" broke the row. */}
+        <RoomSwitch named={!badges} className={`order-6 ml-auto sm:order-4 ${badges ? "sm:ml-0" : ""}`} />
         <div className="order-2 ml-auto sm:order-4 sm:ml-0">
           <UncSwitch />
         </div>

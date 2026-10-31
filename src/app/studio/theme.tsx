@@ -93,11 +93,11 @@ export function RoomPicker({ name }: { name: string }) {
 }
 
 /**
- * The header's room button: the room the page is in, its dots and (from a tablet up) its name, opening the four rooms.
- * Every room's face is in the page and the stylesheet shows the one `data-room` names (set before first paint), so a
- * page never opens on Grade's name in another room while its script loads.
+ * The header's room button: the room the page is in, its dots and (from a tablet up, unless `named` is off) its name,
+ * opening the four rooms. Every room's face is in the page and the stylesheet shows the one `data-room` names (set
+ * before first paint), so a page never opens on Grade's name in another room while its script loads.
  */
-export function RoomSwitch({ className = "" }: { className?: string }) {
+export function RoomSwitch({ className = "", named = true }: { className?: string; named?: boolean }) {
   const id = useId();
   return (
     <>
@@ -105,7 +105,7 @@ export function RoomSwitch({ className = "" }: { className?: string }) {
         type="button"
         popoverTarget={`${id}-rooms`}
         title="Room"
-        className={`press inline-flex size-10 items-center justify-center rounded-full border border-foreground bg-card text-ui font-bold text-foreground hover:bg-field sm:h-12 sm:w-auto sm:px-3.5 ${className}`}
+        className={`press inline-flex size-10 items-center justify-center rounded-full border border-foreground bg-card text-ui font-bold text-foreground hover:bg-field sm:size-12 ${named ? "sm:w-auto sm:px-3.5" : ""} ${className}`}
       >
         <span className="sr-only">Room: </span>
         {ROOMS.map((r) => (
@@ -115,7 +115,7 @@ export function RoomSwitch({ className = "" }: { className?: string }) {
                 <i key={c} className={`size-3.5 rounded-full ring-2 ring-card ${i ? "-ml-1" : ""}`} style={{ background: c }} />
               ))}
             </span>
-            <span className="max-sm:sr-only">{r.name}</span>
+            <span className={named ? "max-sm:sr-only" : "sr-only"}>{r.name}</span>
           </span>
         ))}
       </button>
