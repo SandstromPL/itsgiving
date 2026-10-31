@@ -28,7 +28,7 @@ export const TITLE_FONTS: TitleFont[] = [
     name: "house style",
     plain: "House style",
     evokes: "itsgiving's own",
-    style: { fontFamily: "var(--font-bricolage), system-ui, sans-serif", fontWeight: 800, letterSpacing: "-0.055em", lineHeight: 0.9 },
+    style: { fontFamily: "var(--font-bricolage), system-ui, sans-serif", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 0.9 },
     scale: 1,
   },
   {
